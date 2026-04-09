@@ -11,8 +11,8 @@
 # - Segredos/credenciais NÃO devem existir aqui (somente referências).
 schema:
   name: "objective-manifest"
-  version: "1.0"
-  last_updated: "2026-03-26"
+  version: "1.1"
+  last_updated: "2026-04-09"
   authors:
     - "yvesmarinho"
 
@@ -20,184 +20,251 @@ schema:
 # 1) Identidade do projeto
 # -----------------------------------------------------------------------------
 project:
-  name: "enterprise-chathoot-migration"
-  codename: ""
-  domain: "agnostic"   # ex: software, infra, hardware, eletricidade, data, research
-  summary: "Projeto para migração de dados entre versões diferentes do Chatwoot"
-  problem_statement: "Projeto para migração de dados entre versões diferentes do Chatwoot"
-  success_statement: "CHANGE_ME (como saberemos que deu certo?)"
+  name: "enterprise-chatwoot-migration"
+  codename: "enterprise-chatwoot-migration"
+  domain: "data-migration"
+  summary: "Migração incremental de dados de chatwoot_dev_db (origem) para chatwoot004_dev_db (destino), consolidando chat.vya.digital em synchat.vya.digital com integridade referencial e remapeamento de IDs."
+  problem_statement: "Migrar todos os dados de duas instâncias independentes do Chatwoot (chatwoot_dev_db e chatwoot004_dev_db) para uma única instância destino, resolvendo conflitos de IDs, preservando relações entre entidades e sem expor dados sensíveis em nenhuma etapa."
+  success_statement: "100% dos registros de chatwoot_dev_db migrados para chatwoot004_dev_db; zero violações de FK; todas as conversas associadas a contacts; todas as mensagens associadas a conversas; contagem de registros validada por tabela; log de execução sem exposição de dados sensíveis."
 
 stakeholders:
   owner:
-    team_or_person: "enterprise-chathoot-migration team"
+    team_or_person: "yvesmarinho"
     contact: ""
   users_personas:
-    - name: "PrimaryUser"
-      description: "Quem usa e como usa."
+    - name: "DBA/Desenvolvedor"
+      description: "Executa a ferramenta de migração via script Python direto no terminal. Único usuário e operador."
   reviewers:
-    - "tech_lead"
-    - "security"
-    - "ops"
+    - "yvesmarinho"
   decision_makers:
-    - "enterprise-chathoot-migration owner"
+    - "yvesmarinho"
 
 # -----------------------------------------------------------------------------
 # 2) Escopo e fronteiras (para evitar creep)
 # -----------------------------------------------------------------------------
 scope:
   in_scope:
-    - "enterprise-chathoot-migration owner"
+    - "Migração completa de todos os dados do banco chatwoot_dev_db para chatwoot004_dev_db"
+    - "Remapeamento de IDs da origem para valores posteriores ao maior ID existente no destino"
+    - "Preservação de integridade referencial entre todas as entidades migradas"
+    - "Migração das referências (URLs) de attachments S3 - sem mover arquivos físicos"
+    - "Execução incremental com suporte a re-execução sem duplicação (idempotência)"
+    - "Log de execução mascarando dados sensíveis"
+    - "Relatório de validação final com contagem de registros por tabela"
   out_of_scope:
-    - "enterprise-chathoot-migration owner"
+    - "Modificação de qualquer código da aplicação Chatwoot"
+    - "Movimentação física de arquivos no S3"
+    - "Migração de configurações da aplicação (env vars, settings)"
+    - "Interface web ou API para a ferramenta de migração"
+    - "Alteração do banco chatwoot_dev_db (somente leitura)"
+    - "Migração de ambiente de produção nesta fase (apenas DEV)"
   assumptions:
-    - "enterprise-chathoot-migration owner"
+    - "Os dois bancos são da mesma aplicação Chatwoot com schema_sha1 idêntico (da6b4a366d550dc7794f55f5e1536342ce50845f) — schemas plenamente compatíveis, confirmado por scripts/check_chatwoot_versions.py"
+    - "Os dados das duas instâncias pertencem a empresas/clientes distintos - sem duplicação entre bases"
+    - "No ambiente DEV as URLs de S3 são suficientes; arquivos físicos não são efetivamente utilizados"
+    - "Credenciais de acesso estão disponíveis em .secrets/generate_erd.json"
+    - "Backup de chatwoot004_dev_db foi realizado e está disponível para rollback"
   constraints:
-    # Triângulo de ferro: tempo/custo/escopo/qualidade
     timeline:
       target_date: "unknown"
       hard_deadline: false
     budget:
       max_budget: "unknown"
-      currency: "USD"
-    risk_tolerance: "medium"  # low|medium|high
+      currency: "BRL"
+    risk_tolerance: "low"
     change_policy:
-      mode: "brownfield"      # greenfield|brownfield
+      mode: "brownfield"
       principles:
-        - "minimize_disruption"
-        - "backward_compatible_when_possible"
-      rebuild_allowed: "unknown"  # true|false|unknown
+        - "chatwoot_dev_db é somente leitura - nunca alterado"
+        - "chatwoot004_dev_db modificado apenas via script de migração controlado"
+        - "nenhum código da aplicação Chatwoot pode ser modificado"
+      rebuild_allowed: false
 
 # -----------------------------------------------------------------------------
 # 3) Estado atual (brownfield context) e inventário de base existente
 # -----------------------------------------------------------------------------
 current_state:
-  description: "unknown"
+  description: "Duas instâncias independentes do Chatwoot rodando no mesmo servidor PostgreSQL 16 (wfdb02.vya.digital / 82.197.64.145). chatwoot_dev não tem app web ativa. chatwoot004_dev tem app web ativa em https://vya-chat-dev.vya.digital. As aplicações rodam em containers Docker no servidor wf001.vya.digital. Ambas são réplicas DEV de ambientes de produção."
   existing_assets:
     repos:
-      - url: ""
-        notes: ""
+      - url: "https://github.com/chatwoot/chatwoot"
+        notes: "Repositório oficial do Chatwoot - somente para referência de schema e migrations"
     systems_services:
-      - name: ""
-        owner: ""
-        notes: ""
-    hardware_components:
-      - name: ""
-        model: ""
-        notes: ""
-    facilities_electrical:
-      - name: ""
-        standards: ""
-        notes: ""
+      - name: "chatwoot_dev_db"
+        owner: "yvesmarinho"
+        notes: "Banco ORIGEM. Sem app web ativa. Site chat.vya.digital (será eliminado). Somente leitura neste projeto. Última migration: 20241217041352. Total migrations: 252. Registros: accounts=5, contacts=38868, conversations=41743, messages=310155, inboxes=21, users=112, teams=3, labels=32, attachments=26889."
+      - name: "chatwoot004_dev_db"
+        owner: "yvesmarinho"
+        notes: "Banco DESTINO. App web ativa em https://vya-chat-dev.vya.digital. Site synchat.vya.digital (mantido). Possui backup. Última migration: 20240820191716. Total migrations: 255. Registros: accounts=20, contacts=225536, conversations=153582, messages=1302949, inboxes=151, users=294, teams=22, labels=184, attachments=73435."
+      - name: "PostgreSQL 16"
+        owner: "yvesmarinho"
+        notes: "Servidor VPS wfdb02.vya.digital (82.197.64.145) hospedando ambos os bancos na porta 5432."
+      - name: "Chatwoot Docker containers"
+        owner: "yvesmarinho"
+        notes: "Servidor wf001.vya.digital. Este projeto NAO modifica os containers Chatwoot."
+    hardware_components: []
+    facilities_electrical: []
   known_pain_points:
-    - "unknown"
+    - "Conversas não estão corretamente associadas aos seus contacts em chatwoot_dev_db"
+    - "Mensagens não estão corretamente associadas às conversas em chatwoot_dev_db"
+    - "IDs das duas instâncias entram em conflito - remapeamento obrigatório"
+    - "Duas instâncias independentes precisam ser unificadas sem perda de dados"
   known_constraints:
-    - "unknown"
+    - "Schema SHA1 idêntico entre instâncias (da6b4a366d...) — D1 resolvido em 2026-04-09"
+    - "chatwoot_dev_db tem migration mais recente (20241217) vs chatwoot004_dev_db (20240820) — 3 migrations extras na origem, sem impacto no SHA do schema"
+    - "Ambiente DEV - downtime aceitável durante migração"
+    - "chatwoot_dev_db não deve ser alterado em nenhuma hipótese"
 
 # -----------------------------------------------------------------------------
 # 4) Pré-requisitos e dependências (HARD vs SOFT)
 # -----------------------------------------------------------------------------
 prerequisites:
   hard:
-    - id: "access_or_permissions"
-      description: "Acessos/permissões necessários para começar."
-      status: "unknown" # ready|blocked|unknown
-      evidence: ""      # link/commit/ticket
-    - id: "tools_environment"
-      description: "Ferramentas/ambiente mínimo (SO, compilador, runtime, etc.)."
-      status: "unknown"
-      evidence: ""
+    - id: "db_credentials"
+      description: "Credenciais de acesso a chatwoot_dev_db e chatwoot004_dev_db"
+      status: "ready"
+      evidence: ".secrets/generate_erd.json (não versionado)"
+    - id: "python_312"
+      description: "Python 3.12+ com uv/pyproject.toml configurado no projeto"
+      status: "ready"
+      evidence: "pyproject.toml na raiz"
+    - id: "db_backup"
+      description: "Backup de chatwoot004_dev_db disponível para rollback"
+      status: "ready"
+      evidence: "Confirmado pelo owner"
+    - id: "chatwoot_versions"
+      description: "Versões exatas do Chatwoot (schema_migrations) de cada instância"
+      status: "ready"
+      evidence: "D1 resolvido em 2026-04-09. chatwoot_dev_db: migration=20241217041352, total=252. chatwoot004_dev_db: migration=20240820191716, total=255. schema_sha1 idêntico."
   soft:
-    - id: "nice_to_have_tooling"
-      description: "Ferramentas recomendadas."
-      status: "unknown"
-      evidence: ""
+    - id: "chatwoot_github_reference"
+      description: "Acesso a https://github.com/chatwoot/chatwoot para referência de schema"
+      status: "ready"
+      evidence: "Repositório público"
 
 dependencies:
   internal:
-    - name: "unknown"
-      type: "service|team|repo|hardware|facility|process"
-      criticality: "unknown" # low|medium|high|unknown
-      notes: ""
+    - name: "chatwoot_dev_db"
+      type: "db"
+      criticality: "high"
+      notes: "Banco ORIGEM - somente leitura durante toda a migração"
+    - name: "chatwoot004_dev_db"
+      type: "db"
+      criticality: "high"
+      notes: "Banco DESTINO - recebe os dados migrados"
   external:
-    - name: "unknown"
-      type: "vendor|standard|library|api|regulation"
-      criticality: "unknown"
-      notes: ""
+    - name: "SQLAlchemy"
+      type: "library"
+      criticality: "high"
+      notes: "ORM para acesso PostgreSQL com Fabric Design Pattern"
+    - name: "psycopg2"
+      type: "library"
+      criticality: "high"
+      notes: "Driver PostgreSQL para Python"
+    - name: "Alembic"
+      type: "library"
+      criticality: "medium"
+      notes: "Controle de versão de schema (não usar mecanismo interno do Chatwoot)"
+    - name: "PostgreSQL 16"
+      type: "vendor"
+      criticality: "high"
+      notes: "Servidor VPS wfdb02.vya.digital na porta 5432"
+    - name: "LGPD"
+      type: "regulation"
+      criticality: "medium"
+      notes: "Dados de contatos/clientes brasileiros - aplica-se à proteção durante o processo"
 
 # -----------------------------------------------------------------------------
 # 5) Requisitos funcionais e não-funcionais (agnóstico)
 # -----------------------------------------------------------------------------
 requirements:
   functional:
-    - "unknown"
+    - "Migrar todos os registros de chatwoot_dev_db para chatwoot004_dev_db de forma incremental"
+    - "Remapear IDs da origem: novo_id = id_origem + max(id_destino), preservando todas as FK relacionadas"
+    - "Garantir integridade referencial entre accounts, contacts, conversations, messages, inboxes, teams, labels, attachments"
+    - "Migrar URLs de referência a attachments S3 sem mover arquivos físicos"
+    - "Suportar re-execução sem duplicação (idempotência)"
+    - "Gerar log de execução mascarando dados sensíveis (e-mails, nomes, conteúdo de mensagens, telefones)"
+    - "Gerar relatório de validação final: contagem de registros por tabela (origem vs. delta inserido no destino)"
+    - "Executar via script direto: python src/migrar.py"
   non_functional:
     security:
-      classification: "unknown"     # public|internal|confidential|restricted|unknown
+      classification: "confidential"
       secrets_policy: "no_secrets_in_repo"
-      threat_model_required: true
-      authn_authz: "unknown"        # none|basic|oauth|mtls|physical_access|unknown
-      audit_logging_required: "unknown"
+      threat_model_required: false
+      authn_authz: "db_credentials_in_secrets_folder"
+      audit_logging_required: true
+      notes: "Nenhum dado sensível (e-mails, nomes, números de telefone, conteúdo de mensagens) deve aparecer em stdout, logs de arquivo ou qualquer saída visível em nenhuma etapa."
     reliability:
-      availability_target: "unknown"  # ex: 99.9%
-      rpo: "unknown"
-      rto: "unknown"
-      backup_required: "unknown"
+      availability_target: "not_applicable"
+      rpo: "backup_pre_migration"
+      rto: "restore_backup_chatwoot004_dev_db"
+      backup_required: true
     performance:
-      latency_p95: "unknown"
-      throughput: "unknown"
-      resource_limits: "unknown"
+      latency_p95: "not_critical"
+      throughput: "< 5GB total"
+      resource_limits: "execução local no computador do owner"
     maintainability:
       documentation_required: true
-      test_coverage_target: "unknown"
-      coding_standards: "unknown"
+      test_coverage_target: "unit tests para funções críticas: remapeamento de IDs, FK validation, log masking"
+      coding_standards: "PEP8, ruff (linting), black (formatação), reStructuredText (docstrings)"
     compliance:
       regulations:
-        - "unknown"  # ex: LGPD, SOC2, ISO27001, IEC, ABNT, etc.
+        - "LGPD - dados de contatos/clientes brasileiros"
     usability:
-      accessibility: "unknown"
+      accessibility: "not_applicable"
     portability:
       platforms:
-        - "unknown"  # linux, windows, embedded, mobile, etc.
+        - "linux"
 
 # -----------------------------------------------------------------------------
 # 6) Interface e integrações (agnóstico: API, UI, CLI, hardware IO)
 # -----------------------------------------------------------------------------
 interfaces:
   user_interface:
-    type: "unknown" # none|web|mobile|desktop|hmi|unknown
-    notes: ""
+    type: "none"
+    notes: "Sem interface gráfica. Execução exclusivamente via terminal."
   programmatic_interface:
-    type: "unknown" # none|rest|grpc|mqtt|modbus|canbus|serial|unknown
-    versioning: "unknown"
-    backwards_compatibility_required: "unknown"
+    type: "none"
+    versioning: "not_applicable"
+    backwards_compatibility_required: false
   data_interfaces:
     inputs:
-      - name: "unknown"
-        format: "unknown" # json,yaml,csv,sql,binary,etc.
-        notes: ""
+      - name: "chatwoot_dev_db"
+        format: "postgresql"
+        notes: "Leitura de todas as tabelas. Conexão via SQLAlchemy. Credenciais em .secrets/."
     outputs:
-      - name: "unknown"
-        format: "unknown"
-        notes: ""
+      - name: "chatwoot004_dev_db"
+        format: "postgresql"
+        notes: "Inserção com IDs remapeados. Zero modificações nos dados existentes."
+      - name: "migration_execution_log"
+        format: "text"
+        notes: "Log de execução sem dados sensíveis. Gerado em logs/ ou stdout."
+      - name: "validation_report"
+        format: "text"
+        notes: "Relatório final de contagem de registros por tabela."
   integrations:
-    - name: "unknown"
-      direction: "inbound|outbound|bidirectional|unknown"
-      protocol: "unknown"
-      auth: "unknown"
-      notes: ""
+    - name: "PostgreSQL direto"
+      direction: "bidirectional"
+      protocol: "tcp/postgresql"
+      auth: "credentials_from_secrets_folder"
+      notes: "Execução: python src/migrar.py"
 
 # -----------------------------------------------------------------------------
 # 7) Dados (opcional, agnóstico)
 # -----------------------------------------------------------------------------
 data:
-  model_required: "unknown"
+  model_required: true
   data_sources:
-    - name: "unknown"
-      type: "db|files|api|sensors|manual|unknown"
-      quality_expectations: "unknown"
+    - name: "chatwoot_dev_db"
+      type: "db"
+      quality_expectations: "Inconsistências conhecidas: conversas sem associação a contacts, mensagens sem associação a conversas. A migração migra o estado atual sem corrigir essas inconsistências."
+    - name: "chatwoot004_dev_db"
+      type: "db"
+      quality_expectations: "Dados de clientes/empresas completamente distintos da origem. Sem sobreposição de registros."
   data_retention:
-    retention_period: "unknown"
-    deletion_policy: "unknown"
+    retention_period: "not_applicable"
+    deletion_policy: "chatwoot_dev_db não é alterado nem deletado por este projeto"
 
 # -----------------------------------------------------------------------------
 # 8) Entregáveis (documentos/artefatos) — não é tarefa, é “contrato de saída”
@@ -220,23 +287,26 @@ deliverables:
 # -----------------------------------------------------------------------------
 implementation_rules:
   error_handling_policy:
-    applies: "unknown"  # always|by_module|by_layer|unknown
-    default_behavior: "unknown"
+    applies: "always"
+    default_behavior: "levantar exception, registrar no log sem dados sensíveis, abortar registro atual, continuar incremental"
     notes: >
-      Exemplo: "Em libs internas retornar False; em CLI usar exit codes;
-      em API levantar exceptions e mapear para HTTP codes."
+      Em violações de FK: registrar o ID que falhou (sem conteúdo) e continuar.
+      Relatório de falhas ao final da execução.
+      Nunca imprimir valores de colunas de dados (e-mail, nome, mensagem) em nenhum log.
   parameter_validation:
     required: true
-    strict_typing: "unknown" # true|false|unknown
+    strict_typing: true
   documentation:
     required: true
-    style: "reStructuredText" # pode ser alterado por projeto
-    doctest_required: "unknown"
+    style: "reStructuredText"
+    doctest_required: true
   testing:
     required: true
-    strategy: "unknown" # unit|integration|e2e|hardware_in_loop|unknown
+    strategy: "unit"
   coding_patterns:
-    - "unknown" # ex: factory, repository, observer, strategy, singleton
+    - "factory"
+    - "repository"
+    - "fabric_design_pattern"  # obrigatório em TODO o código, da camada de conexão aos migrators
 
 # -----------------------------------------------------------------------------
 # 10) Gates: perguntas orientadoras (o motor do Spec-Driven Design)
@@ -250,13 +320,19 @@ gates:
       question: "Qual é o resultado mensurável (métricas) que define sucesso?"
       expected_answer_type: "text"
       required: true
-      current_answer: "unknown"
+      current_answer: "100% dos registros de chatwoot_dev_db migrados para chatwoot004_dev_db; zero FK violations; todas as conversas associadas a contacts; todas as mensagens associadas a conversas; contagem de registros validada por tabela; log sem exposição de dados sensíveis."
     - id: "goal_002"
       category: "scope"
       question: "O que explicitamente NÃO será feito (out-of-scope) nesta fase?"
       expected_answer_type: "list"
       required: true
-      current_answer: ["unknown"]
+      current_answer:
+        - "Modificar código da aplicação Chatwoot"
+        - "Mover arquivos físicos no S3"
+        - "Criar interface web ou API para a ferramenta"
+        - "Alterar o banco chatwoot_dev_db (origin is read-only)"
+        - "Migrar configurações da aplicação ou variáveis de ambiente"
+        - "Migrar ambiente de produção nesta fase"
 
     # B) Contexto / brownfield
     - id: "ctx_001"
@@ -264,13 +340,16 @@ gates:
       question: "Quais ativos existentes NÃO podem ser quebrados (compatibilidade / contratos)?"
       expected_answer_type: "list"
       required: true
-      current_answer: ["unknown"]
+      current_answer:
+        - "chatwoot_dev_db - somente leitura, nunca alterado"
+        - "chatwoot004_dev_db - app web ativa não pode ser derrubada durante a migração DEV"
+        - "Nenhum código do Chatwoot pode ser modificado"
     - id: "ctx_002"
       category: "change_policy"
       question: "Rebuild do core é permitido? Se sim, em quais partes e sob quais condições?"
       expected_answer_type: "text"
       required: true
-      current_answer: "unknown"
+      current_answer: "Código novo - não existe código de migração anterior. Fabric Design Pattern obrigatório do início ao fim."
 
     # C) Pré-requisitos e dependências
     - id: "pre_001"
@@ -278,13 +357,13 @@ gates:
       question: "Quais acessos/permissões/recursos são necessários para iniciar (e quem aprova)?"
       expected_answer_type: "text"
       required: true
-      current_answer: "unknown"
+      current_answer: "Credenciais em .secrets/generate_erd.json (owner aprova). Python 3.12. Backup de chatwoot004_dev_db confirmado. D1 resolvido: schema_sha1 idêntico, chatwoot_dev_db migration=20241217041352 (252 total), chatwoot004_dev_db migration=20240820191716 (255 total)."
     - id: "dep_001"
       category: "dependencies"
       question: "Quais dependências internas/externas são críticas e quais são os riscos de atraso?"
       expected_answer_type: "text"
       required: true
-      current_answer: "unknown"
+      current_answer: "SQLAlchemy e psycopg2-binary para PostgreSQL. Acesso de rede ao servidor wfdb02.vya.digital:5432. Risco: gap de schema entre instâncias pode exigir mapeamento manual de colunas adicionais."
 
     # D) Qualidade, segurança, compliance
     - id: "sec_001"
@@ -292,13 +371,13 @@ gates:
       question: "Qual a classificação dos dados e quais requisitos mínimos de segurança (auth, auditoria, criptografia)?"
       expected_answer_type: "text"
       required: true
-      current_answer: "unknown"
+      current_answer: "confidential. Credenciais somente em .secrets/ (não versionado). Nenhum dado sensível (e-mails, nomes, conteúdo de mensagens, telefones) pode aparecer em stdout, logs de arquivo ou qualquer saída visível."
     - id: "nfr_001"
       category: "reliability"
       question: "Qual disponibilidade/continuidade é necessária (SLA/SLO, RPO/RTO)?"
       expected_answer_type: "text"
       required: false
-      current_answer: "unknown"
+      current_answer: "Ambiente DEV. Downtime aceitável. Rollback via restore de backup de chatwoot004_dev_db."
 
     # E) Interfaces (API/UI/Hardware)
     - id: "if_001"
@@ -306,7 +385,7 @@ gates:
       question: "Quais interfaces existem/serão expostas (UI, CLI, API, serial, MQTT etc.) e seus contratos?"
       expected_answer_type: "text"
       required: true
-      current_answer: "unknown"
+      current_answer: "Script Python direto. Sem CLI args obrigatórios na fase inicial. Sem interface web ou API. Execução: python src/migrar.py"
 
     # F) Entregáveis
     - id: "deliv_001"
@@ -314,4 +393,9 @@ gates:
       question: "Quais documentos/artefatos são obrigatórios no final (constitution/spec/plan/runbook)?"
       expected_answer_type: "list"
       required: true
-      current_answer: ["constitution", "specification", "plan", "risk_register", "readme_or_runbook"]
+      current_answer:
+        - "constitution"
+        - "specification"
+        - "plan"
+        - "migration_runbook"
+        - "readme"

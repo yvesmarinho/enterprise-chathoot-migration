@@ -78,9 +78,11 @@ echo "feat(escopo): descrição" > /tmp/commit.txt
 | Tipo | Localização |
 |------|-------------|
 | Docs de sessão | `docs/SESSIONS/YYYY-MM-DD/` |
+| Docs de chat | `docs/SESSIONS/YYYY-MM-DD/CHAT-HH-MM.md/` |
 | Docs técnicos | `docs/` |
 | Python source | `src/` |
 | Scripts | `scripts/` |
+| Temporary files | `.tmp/` |
 
 ❌ **NUNCA** arquivos de sessão/doc na raiz
 
