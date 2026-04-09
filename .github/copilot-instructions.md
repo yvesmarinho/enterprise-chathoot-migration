@@ -124,3 +124,10 @@ Correto: [alternativa válida]
 ```
 
 *Gerado por scaffold.py em 2026-04-09T11:37:54Z — Projeto: enterprise-chathoot-migration*
+
+## Active Technologies
+- Python 3.12+ + SQLAlchemy 2.0.49 (Core + ORM), psycopg2-binary 2.9.11, alembic 1.18.4 (referência), ruff 0.15.10, black 26.3.1, pytest 9.0.3, pytest-cov (001-enterprise-chatwoot-migration)
+- PostgreSQL 16.10 — `wfdb02.vya.digital:5432`, sem SSL (`sslmode=disable`). Dois bancos: `chatwoot_dev_db` (read-only) e `chatwoot004_dev_db` (read-write). (001-enterprise-chatwoot-migration)
+
+## Recent Changes
+- 001-enterprise-chatwoot-migration: Added Python 3.12+ + SQLAlchemy 2.0.49 (Core + ORM), psycopg2-binary 2.9.11, alembic 1.18.4 (referência), ruff 0.15.10, black 26.3.1, pytest 9.0.3, pytest-cov
