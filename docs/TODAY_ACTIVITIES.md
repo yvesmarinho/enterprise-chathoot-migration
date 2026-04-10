@@ -81,3 +81,89 @@
 ---
 
 *Atualizado em 2026-04-09 — Session Manager*
+
+---
+
+# 📅 Atividades — 2026-04-10
+
+**Data**: 2026-04-10
+**Projeto**: `enterprise-chathoot-migration`
+**Branch**: `001-enterprise-chatwoot-migration`
+**Status**: ✅ Sessão encerrada
+
+---
+
+## ⏰ Atividades do Dia
+
+### ✅ Phase 1 — Debate e Decisões de Migração
+
+- Debatidas as regras de migração estratégica (MERGE vs incremental)
+- 9 erros catalogados (E1–E9), 6 decisões registradas (D3-A–F)
+- Criado `docs/debates/D3-DEBATE-REGRAS-MIGRACAO-2026-04-10.md`
+
+---
+
+### ✅ Phase 2 — Tooling de Diagnóstico
+
+- Criado `app/05_diagnostico_completo.py` (14 blocos de análise SOURCE vs DEST)
+- `app/db.py` reescrito para carregar credenciais de `.secrets/generate_erd.json`
+- Baseline capturado: `tmp/diagnostico_20260410_165333.txt` (18KB)
+
+---
+
+### ✅ Phase 3 — Investigações (5 INVs)
+
+| INV | Resultado |
+|-----|-----------|
+| T2-DEEP | VERDE — 2 colunas novas no DEST (defaults seguros) |
+| 5727-INV | 5.727 conversations órfãs (account_id=2,6 deletadas) → descartar |
+| E5-INV | 23.530 `content_attributes` não-NULL → anomalia (0 chaves na amostra) |
+| 1429-INV | 1.429 messages órfãs (account_id=2,6) → descartar |
+| PARTICIPANTS-INV | VERDE — 22.919 registros, 0 FK quebradas |
+
+---
+
+### ✅ Phase 4 — Análise SQL Legados
+
+- Analisados `scriptImportacaoChatToSynchat.sql` e `scriptImportacaoTbChatChatWoot.sql`
+- 6 padrões críticos extraídos: `pubsub_token=NULL`, `display_id` offset, `uuid`, `content_attributes`, `sender_id`, `_migration_src_id`
+
+---
+
+### ✅ Phase 5 — speckit.clarify (5 perguntas)
+
+| Q | Decisão |
+|---|---------|
+| Q1 | Orphans descartar + reportar |
+| Q2 | `content_attributes` preservar + amostrar |
+| Q3 | `source_id` — verificar colisões |
+| Q4 | Attachments — copiar metadados |
+| Q5 | Accounts — merge por `name` |
+
+---
+
+### ✅ Phase 6 — Spec Atualizada
+
+- FR-002, 003, 004, 005, 007, 013 (novo) atualizados
+- SC-001: volumes corrigidos (conversations=36.016, messages=239.439)
+
+---
+
+## 🔖 Commits
+
+| Hash | Descrição | Arquivos |
+|------|-----------|----------|
+| `5dafbdc` | feat(spec+analysis): speckit.clarify Q1-Q5 + SQL insights + diagnostic tooling | ~8 |
+
+---
+
+## ⏭️ Próxima Sessão
+
+- **P0 Imediato**: `speckit.tasks` — geração de tasks de implementação
+- **P0 Investigação**: Anomalia E5-INV — `content_attributes` com 0 chaves na amostra
+- **P0 Pré-implementação**: Verificar colisões `source_id` entre SOURCE e DEST
+- **Início de implementação**: `src/factory/` → `src/utils/` → `src/repository/` → `src/migrators/`
+
+---
+
+*Atualizado em 2026-04-10 — Session Manager*
