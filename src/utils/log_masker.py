@@ -163,13 +163,18 @@ class MaskingHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         """Mask PII in *record* then forward to the inner handler.
 
+        Only the user-supplied message text is masked (via ``record.getMessage()``),
+        not the fully-formatted string, to prevent the inner handler from
+        double-formatting the record.
+
         :param record: The original log record.
         :type record: logging.LogRecord
         """
         try:
-            original = self.format(record)
-            masked = mask_message(original)
-            # Patch the record message so inner handler emits the masked version
+            # Mask only the rendered message (expands %s args), not the full
+            # formatter output.  The inner handler applies its own formatter once.
+            original_msg = record.getMessage()
+            masked = mask_message(original_msg)
             new_record = logging.makeLogRecord(record.__dict__)
             new_record.msg = masked
             new_record.args = None

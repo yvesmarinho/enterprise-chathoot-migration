@@ -149,7 +149,9 @@ class ConnectionFactory:
                 )
             missing = _REQUIRED_INSTANCE_KEYS - set(value.keys())
             if missing:
-                raise ConfigError(f"Instance '{key}' missing required keys: {sorted(missing)}")
+                raise ConfigError(
+                    f"Instance '{key}' missing required keys: {sorted(missing)}"
+                )
         return data
 
     def _build_url(self, instance: dict[str, Any]) -> str:

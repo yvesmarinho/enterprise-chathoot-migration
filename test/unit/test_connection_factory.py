@@ -81,7 +81,9 @@ def test_invalid_json_raises_config_error(tmp_path: Path) -> None:
     "missing_key",
     ["host", "port", "username", "password", "database"],
 )
-def test_missing_required_key_raises_config_error(tmp_path: Path, missing_key: str) -> None:
+def test_missing_required_key_raises_config_error(
+    tmp_path: Path, missing_key: str
+) -> None:
     """ConfigError is raised when any single required instance key is absent."""
     modified = {k: v for k, v in _VALID_CREDS["instance_a"].items() if k != missing_key}
     creds = {"instance_a": modified, "instance_b": _VALID_CREDS["instance_b"]}

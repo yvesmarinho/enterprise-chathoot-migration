@@ -197,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
             logger.info("[DRY-RUN] Would migrate table: %s", table_name)
             continue
 
+        logger.info(">>> Iniciando migração: %s", table_name)
         # AccountsMigrator may raise SystemExit(3) on failure — let it propagate
         result = migrator.migrate()
         results.append(result)

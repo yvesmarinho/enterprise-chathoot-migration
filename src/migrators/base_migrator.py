@@ -147,6 +147,7 @@ class BaseMigrator(ABC):
         ]
 
         total_batches = len(batches)
+        log_interval = max(1, total_batches // 10)
         for batch_num, batch in enumerate(batches, start=1):
             self.logger.debug(
                 "Table %s — batch %d/%d (%d rows)",
@@ -155,6 +156,17 @@ class BaseMigrator(ABC):
                 total_batches,
                 len(batch),
             )
+            if batch_num % log_interval == 0 or batch_num == total_batches:
+                self.logger.info(
+                    "Table %s: %d/%d batches (%.0f%%) — migrated=%d skipped=%d failed=%d",
+                    table_name,
+                    batch_num,
+                    total_batches,
+                    100.0 * batch_num / total_batches,
+                    migrated,
+                    skipped,
+                    len(failed_ids),
+                )
             # Remap and filter
             pending: list[tuple[int, dict]] = []
             for row in batch:
