@@ -10,6 +10,10 @@ prompt:
       - workflow-specify: "objetivo.yaml → speckit.constitution → speckit.clarify → speckit.plan → speckit.checklist → speckit.tasks → speckit.analyze → speckit.implement"
       - out-scope: "Não deve ser alterada nada em nenhum código do Chatwoot, esse projeto é totalmente independente."
       - rules:
+          - Regras para migração:
+              - "Validar se o Cliente está ativo nas duas bases"
+              - "Caso o Cliente estja inativo na base destino, sobrepor todos os dados"
+              - " Caso haja conflitos clientes ativos e demais informações chaves, gerar relatório detalhado para análise posterior"
           - "Todos os arquivos gerados devem ser armazenados nas devidas pastas, na raiz do projeto só os arquivos extremamente necessários"
           - "Códigos gerados devem seguir padrões de qualidade e estilo, com linting e formatação automática"
           - "Fluxo de trabalho deve ser guiado por prompts para GitHub Copilot"

@@ -223,7 +223,9 @@ def main(argv: list[str] | None = None) -> int:
     # (8) Determine exit code
     total_failed = sum(len(r.failed_ids) for r in results)
     if total_failed > 0:
-        logger.warning("Migration completed with %d failed records (exit code 1)", total_failed)
+        logger.warning(
+            "Migration completed with %d failed records (exit code 1)", total_failed
+        )
         return 1
 
     logger.info("=== Migration completed successfully (exit code 0) ===")

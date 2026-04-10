@@ -17,6 +17,28 @@
 - Q: Threshold mínimo de cobertura de testes unitários → A: 90% de cobertura de linhas nos módulos críticos (`pytest --cov --fail-under=90`)
 - Q: Trigger e mecanismo de rollback em caso de falha catastrófica → A: Rollback manual — script registra falha no relatório e instrui o operador a restaurar o backup; sem rollback automático
 
+### Session 2026-04-10
+
+- Q: Política de resolução de conflito quando chave de negócio encontra match entre origem e destino → A: **Merge** — atualizar campos `NULL` no destino com valores da origem; registrar como `dedup-merged` em `migration_state`; mapear `id_origem → id_destino` para FK remapping nas entidades dependentes
+
+- Q: Política para records com account_id inexistente na SOURCE (5.727 conversations + 70.716 messages de account_id=2 e 6 deletadas) → A: **Descartar e reportar** — SOURCE é read-only (nenhuma alteração); registros órfãos são pulados com `status='skipped-orphan-account'` em `migration_state`; FR-007 atualizado para incluir seção de registros descartados no relatório final
+- Q: Tratamento de `messages.content_attributes` (23.530 registros não-nulos na SOURCE) → A: **Preservar + inspecionar** — copiar `content_attributes` exatamente como está; amostrar e documentar as estruturas únicas encontradas na seção "Amostras de content_attributes" do relatório final
+- Q: Política para `contact_inboxes.source_id` (SOURCE já tem valores preenchidos; risco de colisão no DEST) → A: **Preservar com verificação prévia** — antes da migração checar colisões de `source_id` entre SOURCE e DEST; copiar apenas os sem colisão; para colisões, regenerar com `gen_random_uuid()` e registrar IDs no relatório
+- Q: Tratamento de `attachments` com `external_url` ausente (26.888/26.889 na SOURCE sem URL) → A: **Copiar metadados como estão** — migrar todos os registros de `attachments` independentemente de `external_url`; documentar cobertura de URL no relatório; arquivos físicos não são movimentados
+- Q: Política de remapping para accounts com IDs coincidentes entre SOURCE e DEST (id=1 "Vya Digital", id=17 "Unimed Poços PJ") → A: **Merge por nome** — accounts que já existem no DEST por `name` preservam o `id_destino` (sem offset); accounts novos recebem offset; toda a cadeia de FK downstream é remapeada usando o `id_destino` resolvido de cada account
+
+### Insights dos SQL Scripts Legados (2026-04-10)
+
+> Padrões extraídos de `docs/sql_code_old/` — migrações TBChat→Chatwoot pré-existentes.
+> Confirmam e complementam as regras deste projeto.
+
+- **pubsub_token = NULL**: Ambos os scripts SQL legados inserem `contact_inboxes` com `pubsub_token = null` explicitamente. Diagnóstico confirmou 4.360 colisões entre SOURCE e DEST. Regra formalizada em FR-013.
+- **display_id por account**: SQL legado calcula `MAX(display_id)+1` globalmente (sem filtro por account), o que é um bug. Este projeto DEVE calcular por account, pois `display_id` é scoped por `account_id` no Chatwoot. Formalizado em FR-002 (atualizado).
+- **conversations.uuid = PRESERVAR**: SQL legado gerava `gen_random_uuid()` porque a origem era um sistema externo (TBChat, sem UUID). Neste projeto a origem já é Chatwoot — UUIDs são globalmente únicos e devem ser PRESERVADOS para manter rastreabilidade. Formalizado em FR-003 (atualizado).
+- **content_attributes ≠ NULL**: SQL legado inseria `content_attributes = null`. Diagnóstico confirmou 23.530 mensagens na SOURCE com conteúdo não-nulo real. Portanto `content_attributes` DEVE ser copiado tal como está — nunca zerado. Formalizado em FR-003 (atualizado).
+- **sender_type/sender_id**: SQL legado mapeia `type_in_message = 'RECEIVED'` → `sender_type = 'Contact'`, caso contrário `sender_type = 'User'`. Na migração Chatwoot→Chatwoot, esses campos já estão corretamente preenchidos na SOURCE — o único tratamento necessário é o FK remapping de `sender_id` quando `sender_type IN ('Contact', 'User', 'AgentBot')`. Formalizado em FR-003 (atualizado).
+- **custom_attributes com external_id**: SQL legado persiste `external_id` da origem em `custom_attributes` das conversations para idempotência e rastreabilidade. Este projeto usa `migration_state` como mecanismo primário, mas DEVE também escrever `id_origem` em `custom_attributes->>'_migration_src_id'` para consultas ad-hoc sem acesso à `migration_state`.
+
 ---
 
 ## User Scenarios & Testing *(mandatory)*
@@ -113,6 +135,13 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
   destino que cheguem durante a execução não afetam o offset de sessão, mas o estado de migração
   é atualizado para prevenir conflitos na próxima sessão.
 
+- O que acontece com conversations/messages cujo `account_id` não existe na tabela `accounts`
+  da SOURCE (account_id=2 e account_id=6, confirmados no diagnóstico)?
+  → SOURCE é somente-leitura — nenhuma alteração é feita. O sistema pula esses registros,
+  registra como `status='skipped-orphan-account'` em `migration_state` e inclui contagem e IDs
+  na seção "Registros Descartados" do relatório final. Não é criada nenhuma account placeholder
+  no destino para acomodar esses registros.
+
 - O que acontece quando uma conversation de origem não possui `contact_id` válido (dado inconsistente
   conhecido em `chatwoot_dev1_db`)?
   → A inconsistência é registrada no relatório (apenas o ID da conversation) e o registro é pulado;
@@ -140,21 +169,75 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 - **FR-002**: O sistema DEVE calcular, uma única vez por sessão, o offset de ID para cada tabela
   com chave primária (`offset = max(id_destino) + 1`) e aplicá-lo a todos os registros da origem
-  antes da inserção.
+  antes da inserção. Para `conversations.display_id`, o offset DEVE ser calculado **por account_id**
+  (i.e., `MAX(display_id) + 1` filtrado por `account_id`), pois `display_id` é scoped por account
+  no Chatwoot — um cálculo global causaria colisões dentro de cada account.
+  **Exceção para `accounts`**: o offset não é aplicado uniformemente. O sistema resolve o
+  `id_destino` de cada account por merge por `name`:
+  - Account com match por `name` no DEST: usar `id_destino` existente (sem offset).
+    Confirmado: `name='Vya Digital'` → id=1 em ambos; `name='Unimed Poços PJ'` → id=17 em ambos.
+  - Account sem match (novo): atribuir `max(id_destino_accounts) + 1` em sequência.
+    Confirmado novos: id=4 (Sol Copernico), id=18 (Unimed Poços PF), id=25 (Unimed Guaxupé).
+  Toda a cadeia de FK downstream (inboxes, users, contacts, conversations, messages, attachments)
+  é remapeada usando o `id_destino` resolvido de cada account, não o `id_origem`.
 
 - **FR-003**: O sistema DEVE migrar as seguintes entidades na ordem de dependência de FK:
   `accounts` → `inboxes` → `users` → `teams` → `labels` → `contacts` →
   `conversations` → `messages` → `attachments`, com todas as FKs internas remapeadas no
   mesmo lote de inserção. Inserção realizada em batches de **500 registros**, dentro de uma
   transação por batch; falha em um batch registra os IDs afetados e continua com o próximo.
+  Regras adicionais de mapeamento de campos extraídas dos scripts SQL legados:
+  - `conversations.uuid`: PRESERVAR o UUID original da SOURCE (não regenerar). UUIDs Chatwoot
+    são globalmente únicos — preservar mantém rastreabilidade sem risco de colisão.
+  - `messages.content_attributes`: COPIAR tal como está da SOURCE (não forçar NULL).
+    Diagnóstico confirmou 23.530 mensagens com conteúdo real neste campo. Durante a migração,
+    o sistema DEVE coletar uma amostra das estruturas únicas encontradas (chaves de topo,
+    tipos de valores) e incluí-las na seção **"Amostras de content_attributes"** do relatório
+    de validação final (mascarando valores que sejam dados pessoais).
+  - `messages.sender_id`: FK remap obrigatório quando `sender_type IN ('Contact', 'User', 'AgentBot')`.
+    Para `sender_type = 'Contact'`: usar `contact_id` remapeado. Para `sender_type = 'User'`:
+    usar `user_id` remapeado. Para outros tipos (`ApiChannel`, etc.): copiar `sender_id` sem remap.
+  - `contact_inboxes.pubsub_token`: SEMPRE `NULL` na inserção (ver FR-013).
+  - `contact_inboxes.source_id`: verificar colisões com o DEST **antes** da migração
+    (query `SELECT source_id FROM contact_inboxes` em ambos os bancos). Registros sem
+    colisão: copiar `source_id` original. Registros com colisão: regenerar com
+    `gen_random_uuid()` e registrar IDs afetados na seção **"source_id Regenerados"**
+    do relatório de validação.
+  - Adicionar `custom_attributes->>'_migration_src_id'` com o `id` original da SOURCE em cada
+    registro migrado das tabelas `contacts`, `conversations` e `messages`, para rastreabilidade
+    ad-hoc sem acesso à tabela `migration_state`.
 
-- **FR-004**: O sistema DEVE migrar apenas as referências (URLs) de attachments S3; arquivos
-  físicos no S3 NÃO devem ser movimentados.
+- **FR-004**: O sistema DEVE migrar os registros da tabela `attachments` como estão, incluindo
+  o campo `external_url` (mesmo que vazio). Arquivos físicos no S3 NÃO devem ser
+  movimentados. Diagnóstico confirmou que 26.888 de 26.889 attachments não têm `external_url`
+  preenchida — isso é esperado (Chatwoot usa ActiveStorage internamente). O relatório
+  DEVE incluir a cobertura de `external_url` (quantos com/sem URL).
 
-- **FR-005**: O sistema DEVE ser idempotente: re-execução sobre o mesmo destino não deve
-  produzir registros duplicados. A tabela `migration_state` em `chatwoot004_dev1_db` rastreia
-  quais IDs da origem já foram inseridos no destino, com colunas: `tabela`, `id_origem`,
-  `id_destino`, `status`, `migrated_at`. Essa tabela é criada automaticamente na primeira execução.
+- **FR-005**: O sistema DEVE ser idempotente e operar por estratégia de **merge**: antes de inserir
+  qualquer registro, o sistema verifica se ele já existe no destino pela chave de negócio da entidade
+  (ver tabela em Architecture Constraints). Há dois caminhos possíveis:
+  - **Registro sem match** (novo): inserido com ID remapeado (`id_origem + offset`); registrado como
+    `status='ok'` em `migration_state`.
+  - **Registro com match** (deduplicado): campos `NULL` no destino são preenchidos com valores
+    não-nulos da origem (_merge_); o `id_destino` existente é preservado; registrado como
+    `status='dedup-merged'` em `migration_state` com o mapeamento `id_origem → id_destino` para
+    uso no FK remapping das entidades dependentes.
+  **Chaves de negócio por entidade (para dedução e merge-by-name):**
+  | Entidade | Chave de negócio |
+  |---|---|
+  | accounts | `name` |
+  | users | `email` |
+  | inboxes | `name` + `account_id` |
+  | teams | `name` + `account_id` |
+  | labels | `title` + `account_id` |
+  | contacts | `phone_number` (preferêncial) ou `email` |
+  | conversations | `uuid` |
+  | messages | `source_id` (quando não-nulo) |
+  | contact_inboxes | `contact_id` + `inbox_id` |
+  A tabela `migration_state` em `chatwoot004_dev1_db` rastreia todos os registros processados com
+  colunas: `tabela`, `id_origem`, `id_destino`, `status` (VARCHAR: `ok` | `dedup-merged` | `failed`),
+  `migrated_at`. Índice único em `(tabela, id_origem)` garante que re-execuções não reprocessem
+  registros já tratados. Essa tabela é criada automaticamente na primeira execução.
 
 - **FR-006**: Toda saída do sistema DEVE ter mascaramento automático de dados sensíveis:
   e-mails, nomes, números de telefone, conteúdo de mensagens, tokens e quaisquer valores de
@@ -164,7 +247,16 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 - **FR-007**: O sistema DEVE gerar um relatório de validação final contendo, por tabela:
   total de registros na origem, total migrado na execução atual, total acumulado no destino e
-  lista de IDs com falha (sem conteúdo dos registros).
+  lista de IDs com falha (sem conteúdo dos registros). O relatório DEVE incluir também:
+  - Seção **"Registros Descartados"**: contagem e IDs por motivo de descarte
+    (`skipped-orphan-account`, etc.). SOURCE não é modificada em nenhuma hipótese.
+  - Seção **"Amostras de content_attributes"**: após migração das messages, listar as chaves
+    de topo únicas encontradas e seus tipos; valores que sejam dados pessoais devem ser
+    mascarados. Esta seção serve como auditoria de integridade do campo.
+  - Seção **"source_id Regenerados"**: listar IDs de `contact_inboxes` cujo `source_id`
+    colidiu com o DEST e foi regenerado com `gen_random_uuid()`.
+  - Seção **"Cobertura de external_url em attachments"**: total com URL preenchida vs total
+    sem URL, confirmando que o campo foi copiado fielmente da SOURCE.
 
 - **FR-008**: Violações de FK durante a migração DEVEM ser registradas por ID (sem conteúdo),
   incluídas no relatório final e não devem abortar a execução completa das demais entidades.
@@ -184,6 +276,13 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 - **FR-012**: Testes unitários DEVEM cobrir no mínimo: `id_remapper`, `log_masker`,
   `fk_validator`, `connection_factory` e cada `Migrator` individualmente, com cobertura
   mínima de **90% de linhas** nesses módulos (`pytest --cov --fail-under=90`).
+
+- **FR-013**: Durante a inserção de registros em `contact_inboxes`, o campo `pubsub_token`
+  DEVE ser definido como `NULL` (nunca copiar o valor da SOURCE). Diagnóstico confirmou
+  4.360 colisões de `pubsub_token` entre SOURCE e DEST — copiar causaria violação de
+  constraint UNIQUE. O Chatwoot regenera o token automaticamente quando necessário.
+  Scripts SQL legados (`docs/sql_code_old/`) confirmam este padrão com `pubsub_token = null`
+  explícito em todos os INSERTs.
 
 ---
 
@@ -232,9 +331,11 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% dos registros de `chatwoot_dev1_db` (accounts=5, contacts=38.868,
-  conversations=41.743, messages=310.155, inboxes=21, users=112, teams=3, labels=32,
-  attachments=26.889) inseridos em `chatwoot004_dev1_db` ao final da execução.
+- **SC-001**: 100% dos registros de `chatwoot_dev1_db` com `account_id` válido inseridos em
+  `chatwoot004_dev1_db` ao final da execução. Registros com `account_id` inexistente na tabela
+  `accounts` da SOURCE (account_id=2: 5.727 conversations + 70.716 messages; account_id=6 incluso)
+  são descartados e documentados no relatório — não constituem falha de migração.
+  Volumes esperados após exclusão de órfãos: conversations=36.016, messages=239.439.
 
 - **SC-002**: Zero violações de FK verificadas por consulta direta ao banco destino após a
   migração completa (todo `contact_id` em conversations e todo `conversation_id` em messages

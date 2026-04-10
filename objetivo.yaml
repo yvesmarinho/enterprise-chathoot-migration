@@ -23,8 +23,8 @@ project:
   name: "enterprise-chatwoot-migration"
   codename: "enterprise-chatwoot-migration"
   domain: "data-migration"
-  summary: "Migração incremental de dados de chatwoot_dev1_db (origem) para chatwoot004_dev1_db (destino), consolidando chat.vya.digital em synchat.vya.digital com integridade referencial e remapeamento de IDs."
-  problem_statement: "Migrar todos os dados de duas instâncias independentes do Chatwoot (chatwoot_dev1_db e chatwoot004_dev1_db) para uma única instância destino, resolvendo conflitos de IDs, preservando relações entre entidades e sem expor dados sensíveis em nenhuma etapa."
+  summary: "Migração por merge de dados de chatwoot_dev1_db (origem) para chatwoot004_dev1_db (destino), consolidando chat.vya.digital em synchat.vya.digital com deduplicação por chave de negócio, integridade referencial e remapeamento de IDs para registros novos."
+  problem_statement: "Migrar todos os dados de duas instâncias independentes do Chatwoot (chatwoot_dev1_db e chatwoot004_dev1_db) para uma única instância destino, resolvendo sobreposição de registros por deduplicação, conflitos de IDs por remapeamento (para registros novos), preservando relações entre entidades e sem expor dados sensíveis em nenhuma etapa."
   success_statement: "100% dos registros de chatwoot_dev1_db migrados para chatwoot004_dev1_db; zero violações de FK; todas as conversas associadas a contacts; todas as mensagens associadas a conversas; contagem de registros validada por tabela; log de execução sem exposição de dados sensíveis."
 
 stakeholders:
@@ -60,7 +60,7 @@ scope:
     - "Migração de ambiente de produção nesta fase (apenas DEV)"
   assumptions:
     - "Os dois bancos são da mesma aplicação Chatwoot com schema_sha1 idêntico (da6b4a366d550dc7794f55f5e1536342ce50845f) — schemas plenamente compatíveis, confirmado por scripts/check_chatwoot_versions.py"
-    - "Os dados das duas instâncias pertencem a empresas/clientes distintos - sem duplicação entre bases"
+    - "Os dados das duas instâncias pertencem a empresas/clientes que podem se sobrepor — já há registros correspondentes identificados em ambos os bancos; a estratégia de migração adota merge em vez de inserção incremental pura"
     - "No ambiente DEV as URLs de S3 são suficientes; arquivos físicos não são efetivamente utilizados"
     - "Credenciais de acesso estão disponíveis em .secrets/generate_erd.json"
     - "Backup de chatwoot004_dev1_db foi realizado e está disponível para rollback"
@@ -114,6 +114,13 @@ current_state:
     - "chatwoot_dev1_db tem migration mais recente (20241217) vs chatwoot004_dev1_db (20240820) — 3 migrations extras na origem, sem impacto no SHA do schema"
     - "Ambiente DEV - downtime aceitável durante migração"
     - "chatwoot_dev1_db não deve ser alterado em nenhuma hipótese"
+    # Restrições de campos identificadas nos scripts SQL de migração anteriores (docs/sql_code_old/)
+    - "contact_inboxes.pubsub_token DEVE ser NULL na inserção — UUID único globalmente; bancos fork possuem os mesmos tokens, INSERT com valor original causaria violação de UNIQUE constraint"
+    - "contact_inboxes.source_id DEVE ser regenerado via gen_random_uuid() — não copiar da origem"
+    - "conversations.uuid DEVE ser regenerado via gen_random_uuid() — não copiar da origem (campo UNIQUE)"
+    - "messages.content_attributes DEVE ser NULL na inserção — campo é do tipo json (não jsonb); se inserido com valor, Rails/ActiveRecord retorna String em vez de Hash quebrando push_event_data com 'no implicit conversion of Hash into String'"
+    - "conversations.display_id DEVE ser resequenciado: MAX(display_id)+1 por sessão no destino — não copiar da origem (colide com display_ids já existentes no destino)"
+    - "users.uid / users.email é a chave de resolução de usuários entre instâncias — não criar novos users, apenas mapear por email"
 
 # -----------------------------------------------------------------------------
 # 4) Pré-requisitos e dependências (HARD vs SOFT)
@@ -179,7 +186,7 @@ dependencies:
 # -----------------------------------------------------------------------------
 requirements:
   functional:
-    - "Migrar todos os registros de chatwoot_dev1_db para chatwoot004_dev1_db de forma incremental"
+    - "Migrar todos os registros de chatwoot_dev1_db para chatwoot004_dev1_db por estratégia de merge: (1) identificar registros já presentes no destino pela chave de negócio por entidade, (2) aplicar política de resolução de conflito (skip / merge / origem-vence) por entidade, (3) inserir registros realmente novos com IDs remapeados"
     - "Remapear IDs da origem: novo_id = id_origem + max(id_destino), preservando todas as FK relacionadas"
     - "Garantir integridade referencial entre accounts, contacts, conversations, messages, inboxes, teams, labels, attachments"
     - "Migrar URLs de referência a attachments S3 sem mover arquivos físicos"
@@ -261,10 +268,76 @@ data:
       quality_expectations: "Inconsistências conhecidas: conversas sem associação a contacts, mensagens sem associação a conversas. A migração migra o estado atual sem corrigir essas inconsistências."
     - name: "chatwoot004_dev1_db"
       type: "db"
-      quality_expectations: "Dados de clientes/empresas completamente distintos da origem. Sem sobreposição de registros."
+        quality_expectations: "Dados de clientes/empresas com possibilidade de sobreposição com a origem. Registros correspondentes identificados — a migração DEVE resolver a sobreposição por deduplicação com chave de negócio antes de inserir."
   data_retention:
     retention_period: "not_applicable"
     deletion_policy: "chatwoot_dev1_db não é alterado nem deletado por este projeto"
+
+  # Chaves de negócio por entidade para deduplicação (Estágio 1 do merge — ver constitution D3)
+  # Fonte: análise de docs/sql_code_old/ + app/01_migrar_account.py
+  # Prioridade: primeiro match vence (ordem decrescente de confiabilidade)
+  business_keys:
+    accounts:
+      keys: ["name"]
+      notes: "Accounts são resolvidas por nome. Se já existe no destino, reutilizar o id_destino."
+    inboxes:
+      keys: ["name + account_id"]
+      notes: "Inboxes resolvidas por nome dentro da account. Se já existe, reutilizar."
+    users:
+      keys: ["email (campo uid)", "email"]
+      notes: "Users NÃO são criados — somente mapeados por email entre instâncias. Campo uid = email."
+    teams:
+      keys: ["name + account_id"]
+      notes: "Teams resolvidas por nome dentro da account."
+    labels:
+      keys: ["title + account_id"]
+      notes: "Labels resolvidas por title dentro da account."
+    contacts:
+      keys:
+        - "custom_attributes->>'src_id' (rastreio de migração anterior, prioridade máxima)"
+        - "identifier + account_id"
+        - "phone_number + account_id"
+        - "email + account_id"
+        - "name + account_id (fallback — menor confiabilidade)"
+      notes: "Dedup em cascata. Qualquer match encerra a busca. Fonte: app/01_migrar_account.py e scriptImportacaoChatToSynchat.sql."
+    conversations:
+      keys: ["custom_attributes->>'src_id'"]
+      notes: "Conversations não têm chave natural no Chatwoot. Rastreio exclusivo via src_id gravado na migração. Sem src_id = candidato a inserção nova."
+    messages:
+      keys: ["additional_attributes->>'src_id'"]
+      notes: "Messages não têm chave natural. Rastreio via additional_attributes (não custom_attributes) — convenção do Chatwoot para mensagens."
+    attachments:
+      keys: ["message_id + external_url"]
+      notes: "Orphan check por FK suficiente. Sem chave de negócio própria além do vínculo com a message."
+    contact_inboxes:
+      keys: ["contact_id + inbox_id"]
+      notes: "Gerado durante migração. Não copiar pubsub_token nem source_id da origem — regen obrigatório."
+
+  # Coluna de rastreio de origem — convenção a adotar em TODOS os registros inseridos
+  tracking_column_convention:
+    contacts: "custom_attributes->>'src_id' = id da origem (INT como texto)"
+    conversations: "custom_attributes->>'src_id' = id da origem"
+    messages: "additional_attributes->>'src_id' = id da origem"
+    inboxes: "custom_attributes->>'src_id' = id da origem (se suportado pelo schema)"
+    notes: "Padrão estabelecido em app/01_migrar_account.py. Os scripts legados (docs/sql_code_old/) usavam external_id — migrar para src_id."
+
+  # Campos com tratamento especial obrigatório na inserção
+  special_field_rules:
+    - field: "contact_inboxes.pubsub_token"
+      rule: "SEMPRE NULL"
+      reason: "UUID único globalmente; fork compartilha tokens com origem → violação de UNIQUE constraint"
+    - field: "contact_inboxes.source_id"
+      rule: "SEMPRE gen_random_uuid()"
+      reason: "Não copiar da origem — risco de colisão"
+    - field: "conversations.uuid"
+      rule: "SEMPRE gen_random_uuid()"
+      reason: "Campo UNIQUE global; copiar da origem causa conflito"
+    - field: "messages.content_attributes"
+      rule: "SEMPRE NULL"
+      reason: "Tipo json (não jsonb); Rails retorna String em vez de Hash quebrando push_event_data"
+    - field: "conversations.display_id"
+      rule: "MAX(display_id)+1 calculado por sessão no destino"
+      reason: "display_id é sequencial por account; copiar da origem colide com ids existentes no destino"
 
 # -----------------------------------------------------------------------------
 # 8) Entregáveis (documentos/artefatos) — não é tarefa, é “contrato de saída”

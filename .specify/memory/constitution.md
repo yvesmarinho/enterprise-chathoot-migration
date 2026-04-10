@@ -1,17 +1,26 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (unset) → 1.0.0
-Added sections: Core Principles (5), Architecture & Technology Stack, Development Workflow, Governance
-Modified principles: N/A — first full population from template
+Version change: 1.0.0 → 2.0.0 (MAJOR — mudança de estratégia incremental → merge)
+Version change: 2.0.0 → 2.0.1 (PATCH — clarificações técnicas: tabela de chaves de negócio, regras de campos especiais e convenção src_id derivadas de docs/sql_code_old/)
+Added sections: N/A
+Modified principles:
+  ✅ Princípio II — adicionada cláusula de deduplicação por chave de negócio antes de remapear IDs
+  ✅ Princípio II — tabela de chaves de negócio por entidade (10 entidades)
+  ✅ Princípio II — tabela de regras de campos especiais (5 campos obrigatórios)
+  ✅ Princípio II — convenção canônica de rastreio src_id
+  ✅ Princípio IV — renomeado para "Idempotência & Execução por Merge"; regras reescritas
+Modified sections:
+  ✅ Fluxo de Desenvolvimento — passos 1/2 atualizados para mencionar merge
+  ✅ Pendências — D3 adicionado
 Templates updated:
-  ✅ .specify/memory/constitution.md — this file
-  ⚠ .specify/templates/plan-template.md — "Constitution Check" section references generic gates; update after speckit.plan
-  ⚠ .specify/templates/spec-template.md — no constitution-specific constraints to update yet
-  ⚠ .specify/templates/tasks-template.md — no constitution-specific task types to add yet
+  ⚠ .specify/templates/plan-template.md — atualizar após debate de estratégia de merge por entidade
+  ⚠ .specify/templates/spec-template.md — atualizar user stories para refletir merge
+  ⚠ .specify/templates/tasks-template.md — novos tipos de tarefa para resolução de conflito
 Deferred TODOs:
   - D1: RESOLVIDO em 2026-04-09 — schema_sha1 idêntico (da6b4a366d...). chatwoot_dev1_db: migration=20241217041352, total=252. chatwoot004_dev1_db: migration=20240820191716, total=255.
   - D2: Destino final de chatwoot_dev1_db pós-migração — decisão do owner (yvesmarinho)
+  - D3: ABERTO em 2026-04-10 — existem registros sobrepostos entre as duas instâncias. A estratégia de migração passa de incremental para merge. Debate necessário para definir: (a) chave de negócio de deduplicação por entidade, (b) política de resolução de conflito (origem vence / destino vence / fusão de campos), (c) tratamento de IDs órfãos após deduplicação.
 -->
 
 # Enterprise Chatwoot Migration Constitution
@@ -34,21 +43,64 @@ Regras obrigatórias:
 - Dependências entre migrators DEVEM ser declaradas explicitamente (grafo de ordem de execução)
 - Módulos internos DEVEM ser importáveis e testáveis sem execução do script principal
 
-### II. Integridade dos Dados & Remapeamento de IDs (NON-NEGOTIABLE)
+### II. Integridade dos Dados, Deduplicação e Remapeamento de IDs (NON-NEGOTIABLE)
 
 Toda operação de migração DEVE preservar a integridade referencial entre todas as entidades.
-IDs da origem (chatwoot_dev1_db) DEVEM ser remapeados para valores posteriores ao maior ID
-existente no destino (chatwoot004_dev1_db) no momento da execução.
+Antes de remapear e inserir qualquer registro, o sistema DEVE verificar se aquele registro já
+existe no destino por meio de uma **chave de negócio por entidade** (não apenas por ID primário).
 
-Fórmula obrigatória: `novo_id = id_origem + offset`, onde `offset = max(id_destino)` (i.e., `SELECT MAX(id)`) calculado uma única vez por sessão para cada tabela com chave primária própria. Se a tabela destino estiver vazia, `offset = 0` e os IDs da origem são preservados (comportamento seguro — nenhuma colisão possível com tabela vazia).
+**Estágio 1 — Deduplicação por chave de negócio (novo)**:
+Cada entidade possui uma chave de negócio canônica que determina se um registro da origem
+já existe no destino. Registros com match na chave de negócio DEVEM ser tratados pela política
+de resolução de conflito definida para a entidade (skip / merge de campos / origem vence).
+Registros sem match passam para o Estágio 2 como candidatos a inserção.
+
+**Estágio 2 — Remapeamento de IDs (candidatos à inserção apenas)**:
+IDs da origem (chatwoot_dev1_db) SAÓ remapeados para valores posteriores ao maior ID existente
+no destino (chatwoot004_dev1_db) apenas para registros que NÃO encontraram match no Estágio 1.
+
+Fórmula obrigatória para inserções novas: `novo_id = id_origem + offset`, onde
+`offset = max(id_destino)` calculado uma única vez por sessão. Se a tabela destino estiver
+vazia, `offset = 0`.
 
 Regras obrigatórias:
-- O offset DEVE ser calculado uma única vez no início da sessão de migração e mantido constante
-- TODA FK referenciando a ID remapeada DEVE ser atualizada no mesmo lote (batch)
+- A chave de negócio por entidade DEVE ser definida antes da implementação (debate D3)
+- O offset DEVE ser calculado uma única vez no início da sessão e mantido constante
+- TODA FK referenciando uma ID remapeada DEVE ser atualizada no mesmo lote (batch)
 - A ordem de inserção DEVE respeitar o grafo de dependências de FK
   (ex: `accounts` → `inboxes` → `contacts` → `conversations` → `messages`)
 - Violações de FK durante a migração DEVEM ser registradas por ID (sem conteúdo) e incluídas
   no relatório final, sem abortar a execução completa
+
+**Tabela de chaves de negócio por entidade** (fonte: `docs/sql_code_old/` + `app/01_migrar_account.py`):
+
+| Entidade | Chave de negócio (prioridade decrescente) | Política de conflito |
+|---|---|---|
+| `accounts` | `name` | reutilizar id destino |
+| `inboxes` | `name + account_id` | reutilizar id destino |
+| `users` | `email` (`uid`) | mapear — NÃO criar |
+| `teams` | `name + account_id` | reutilizar id destino |
+| `labels` | `title + account_id` | reutilizar id destino |
+| `contacts` | `src_id` → `identifier+account` → `phone+account` → `email+account` → `name+account` | skip / merge (D3) |
+| `conversations` | `custom_attributes->>'src_id'` | skip / merge (D3) |
+| `messages` | `additional_attributes->>'src_id'` | skip (D3) |
+| `attachments` | `message_id + external_url` | orphan check por FK |
+| `contact_inboxes` | `contact_id + inbox_id` | regenerar campos únicos |
+
+**Regras de campos especiais — OBRIGATÓRIAS em toda inserção** (fonte: `docs/sql_code_old/`):
+
+| Campo | Regra | Motivo |
+|---|---|---|
+| `contact_inboxes.pubsub_token` | SEMPRE `NULL` | UUID único global; fork compartilha tokens com origem → UNIQUE violation |
+| `contact_inboxes.source_id` | SEMPRE `gen_random_uuid()` | Não copiar da origem — risco de colisão |
+| `conversations.uuid` | SEMPRE `gen_random_uuid()` | Campo UNIQUE global; copiar da origem causa conflito |
+| `messages.content_attributes` | SEMPRE `NULL` | Tipo `json` (não `jsonb`); Rails retorna String em vez de Hash quebrando `push_event_data` |
+| `conversations.display_id` | `MAX(display_id)+1` calculado no destino | Sequencial por account; copiar da origem colide com ids existentes |
+
+**Coluna de rastreio de origem** (convenção canônica do projeto):
+- `contacts`, `conversations`, `inboxes`: `custom_attributes->>'src_id'` = id de origem (como texto)
+- `messages`: `additional_attributes->>'src_id'` = id de origem (convenção Chatwoot para mensagens)
+- Nota: scripts legados em `docs/sql_code_old/` usam `external_id` — padrão deste projeto é `src_id`
 
 ### III. Segurança e Privacidade por Padrão (NÃO-NEGOCIÁVEL)
 
@@ -67,21 +119,28 @@ Regras obrigatórias:
   proveniente de tabelas de dados (contacts, messages, conversations, users)
 - Classificação dos dados: `confidential` — LGPD se aplica ao processo de migração
 
-### IV. Idempotência & Execução Incremental
+### IV. Idempotência & Execução por Merge
 
 O sistema de migração DEVE ser seguro para re-execução: múltiplas execuções do script
-sobre o mesmo banco destino NÃO DEVEM produzir registros duplicados.
+sobre o mesmo banco destino NÃO DEVEM produzir registros duplicados nem sobrescrever
+registros com dados idênticos sem necessidade.
 
-Rationale: Migrações falham parcialmente. A capacidade de re-executar sem efeitos colaterais
-elimina a necessidade de rollback manual e torna o processo auditável.
+Rationale: As duas instâncias possuem registros sobrepostos (mesmas entidades em ambos os
+bancos). A estratégia incremental pura (offset de IDs) não é suficiente — é necessário
+identificar e resolver sobreposições antes de inserir. A re-execução segura elimina a
+necessidade de rollback manual e torna o processo auditável.
 
 Regras obrigatórias:
-- O sistema DEVE manter um registro de estado de migração (tabela de controle ou arquivo)
-  indicando quais registros da origem já foram inseridos no destino
-- Antes de inserir qualquer registro, o sistema DEVE verificar se ele já foi migrado
-- Re-execução DEVE processar apenas registros ainda não migrados (incremental)
-- O relatório de validação final DEVE exibir: total da origem, total migrado nesta execução,
-  total acumulado no destino, registro de falhas por tabela
+- O sistema DEVE identificar registros já presentes no destino pela chave de negócio
+  (não pelo ID primário) antes de qualquer inserção
+- Registros com match na chave de negócio DEVEM ser tratados pela política de resolução
+  de conflito da entidade: skip (sem alteração), merge (fusão de campos) ou update
+  (origem vence). A política DEVE ser definida por entidade antes da implementação (D3)
+- Registros sem match DEVEM ser inseridos como novos com ID remapeado (Princípio II)
+- O sistema DEVE manter tabela de controle de migração registrando o resultado de cada
+  registro: novo-inserido / dedup-skip / dedup-merged / falha
+- O relatório de validação final DEVE exibir por tabela: total na origem, novos inseridos,
+  deduplicados (skip), deduplicados (merged), falhas, total acumulado no destino
 
 ### V. Qualidade por Contrato
 
@@ -152,7 +211,9 @@ test/
 
 1. **Pré-implementação**: D1 RESOLVIDO (2026-04-09) — schema_sha1 idêntico confirmado.
    chatwoot_dev1_db: migration=20241217041352 (252 total) | chatwoot004_dev1_db: migration=20240820191716 (255 total).
-   Schemas plenamente compatíveis. Prosseguir diretamente para `speckit.clarify`.
+   Schemas plenamente compatíveis.
+   D3 ABERTO (2026-04-10) — existem registros sobrepostos. Estratégia alterada para merge.
+   Debate necessário antes de spec/plan revisados. Ver `docs/debates/` para registro.
 2. **Ordem do speckit chain**: `speckit.constitution` → `speckit.clarify` →
    `speckit.plan` → `speckit.checklist` → `speckit.tasks` → `speckit.analyze` →
    `speckit.implement`
@@ -169,6 +230,7 @@ test/
 |----|--------|-------------|
 | D1 | ✅ RESOLVIDO — schema_sha1 idêntico (da6b4a366d...). Contagens: origem 38.868 contacts/41.743 convs/310.155 msgs. Destino 225.536 contacts/153.582 convs/1.302.949 msgs. | Copilot |
 | D2 | Definir destino final de chatwoot_dev1_db após migração | yvesmarinho |
+| D3 | 🔴 ABERTO — Existem registros sobrepostos entre as instâncias. Definir: (a) chave de negócio por entidade, (b) política de resolução de conflito por entidade, (c) coluna de rastreio de origem (ex: `custom_attributes->>src_id`). Debate obrigatório antes de spec/plan revisados. | yvesmarinho + Copilot |
 
 ## Governance
 
@@ -194,5 +256,5 @@ antes de `speckit.implement`.
 - Script de verificação de versão: `scripts/check_chatwoot_versions.py`
 - Relatório de análise pré-spec: `docs/SESSIONS/2026-04-09/PRE_SPEC_ANALYSIS_REPORT.md`
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-09 | **Last Amended**: 2026-04-09
+**Version**: 2.0.1 | **Ratified**: 2026-04-09 | **Last Amended**: 2026-04-10
 <!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->

@@ -143,7 +143,8 @@ class BaseMigrator(ABC):
 
         # Split into batches
         batches = [
-            source_rows[i : i + _BATCH_SIZE] for i in range(0, len(source_rows), _BATCH_SIZE)
+            source_rows[i : i + _BATCH_SIZE]
+            for i in range(0, len(source_rows), _BATCH_SIZE)
         ]
 
         total_batches = len(batches)

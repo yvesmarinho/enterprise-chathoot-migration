@@ -1,0 +1,380 @@
+
+============================================================================
+  DIAGNÓSTICO COMPLETO — SOURCE vs DEST
+  2026-04-10 16:53:33
+  SOMENTE LEITURA — nenhum dado sensível impresso
+============================================================================
+
+============================================================================
+  BLOCO 1 — INVENTÁRIO GLOBAL DE TABELAS
+============================================================================
+
+  TABELA                              SOURCE        DEST        DIFF
+  ------------------------------  ----------  ----------  ----------
+  accounts                                 5          18         +13
+  users                                  112         294        +182
+  teams                                    3          22         +19
+  labels                                  32         184        +152
+  inboxes                                 21         146        +125
+  contacts                            38,868     221,792    +182,924
+  conversations                       41,743     127,826     +86,083
+  messages                           310,155   1,132,685    +822,530
+  attachments                         26,889      73,435     +46,546
+  contact_inboxes                      8,523     154,789    +146,266
+  ------------------------------  ----------  ----------  ----------
+  TOTAL PRINCIPAL                    426,351   1,711,191  +1,284,840
+
+----------------------------------------------------------------------------
+  Tabelas Ancilares / Pivot
+----------------------------------------------------------------------------
+
+  TABELA                                   SOURCE        DEST
+  -----------------------------------  ----------  ----------
+  conversation_participants                22,919      69,877
+  team_memberships                          N/EX.       N/EX.
+  account_users                                50         306
+  notifications                             1,651         513
+  mentions                                     12           0
+  conversations_labels                      N/EX.       N/EX.
+  assignments                               N/EX.       N/EX.
+  channel_email_mailboxes                   N/EX.       N/EX.
+
+============================================================================
+  BLOCO 2 — SCHEMA MIGRATIONS DIFF (T2)
+============================================================================
+
+  SOURCE total migrations:    252
+  DEST   total migrations:    255
+  Em comum:                   250
+  Apenas na SOURCE:             2
+  Apenas na DEST:               5
+
+  Migrations SOMENTE na SOURCE (origem tem schema mais recente):
+    + 20240923215335
+    + 20241217041352
+
+  Migrations SOMENTE na DEST (possível schema divergente — ATENÇÃO):
+    + 20230726203159
+    + 20240118132749
+    + 20240129143157
+    + 20240131075225
+    + 20240820191716
+
+============================================================================
+  BLOCO 3 — TIPOS DE CAMPOS ESPECIAIS (T1)
+============================================================================
+
+  TABELA.COLUNA                                   TIPO SOURCE     TIPO DEST  STATUS
+  ---------------------------------------------  ------------  ------------  --------------------
+  messages.content_attributes                            json          json  ✓ iguais
+  messages.additional_attributes                        jsonb         jsonb  ✓ iguais
+  conversations.uuid                                     uuid          uuid  ✓ iguais
+  conversations.display_id                               int4          int4  ✓ iguais
+  conversations.custom_attributes                       jsonb         jsonb  ✓ iguais
+  contact_inboxes.pubsub_token                        varchar       varchar  ✓ iguais
+  contact_inboxes.source_id                           varchar       varchar  ✓ iguais
+  contacts.custom_attributes                            jsonb         jsonb  ✓ iguais
+
+  Legenda de tipos PostgreSQL:
+    json     = tipo texto sem indexação — Rails pode retornar String (bug Rails push_event_data)
+    jsonb    = binário indexável — Rails retorna Hash corretamente
+    uuid     = UUID nativo
+    text     = texto livre
+    int4/int8 = inteiro
+
+
+============================================================================
+  BLOCO 4 — ACCOUNTS — COLISÃO DE NOMES (T3)
+============================================================================
+
+  SOURCE: 5 accounts  |  DEST: 18 accounts
+
+----------------------------------------------------------------------------
+  Accounts da SOURCE — mapeamento no DEST
+----------------------------------------------------------------------------
+
+    SRC_ID   DEST_ID    STATUS  RESULTADO                  NOME
+  --------  --------  --------  -------------------------  ------------------------------
+         1         1         0  MATCH → dest_id=1          Vya Digital
+         4         —         0  SEM MATCH — será inserida  Sol Copernico
+        17        17         0  MATCH → dest_id=17         Unimed Poços PJ
+        18         —         0  SEM MATCH — será inserida  Unimed Poços PF
+        25         —         0  SEM MATCH — será inserida  Unimed Guaxupé
+
+----------------------------------------------------------------------------
+  Accounts EXCLUSIVAS do DEST (não existem na SOURCE)
+----------------------------------------------------------------------------
+
+  Total: 16
+    dest_id=   20  status=1  nome=Unimed PC - Relacionamento PF
+    dest_id=   28  status=1  nome=Unimed São Sebastião do Paraíso
+    dest_id=   30  status=0  nome=Viana Peixoto
+    dest_id=   31  status=0  nome=Hcosta
+    dest_id=   32  status=1  nome=Global B2C
+    dest_id=   33  status=1  nome=Global B2B
+    dest_id=   34  status=0  nome=Alpes Mídia
+    dest_id=   35  status=0  nome=New Informática
+    dest_id=   36  status=0  nome=Instituto Femme
+    dest_id=   37  status=0  nome=Unimed Poços - Viver Bem
+    dest_id=   38  status=0  nome=LocalCred - Safra Consignado
+    dest_id=   39  status=0  nome=Licitacao
+    dest_id=   40  status=0  nome=LocalCred - Safra Leves
+    dest_id=   41  status=0  nome=PRECATORIOS VYA
+    dest_id=   42  status=0  nome=Planejados SDR AI
+    dest_id=   43  status=0  nome=Localcred - Banco Volks
+
+============================================================================
+  BLOCO 5 — USERS — MAPEAMENTO POR EMAIL (sem imprimir emails)
+============================================================================
+
+  SOURCE total users:                   112
+  DEST   total users:                   294
+  Com match por UID/email:              104  ← esses serão mapeados
+  SOURCE sem match (sem conta DEST):      8  ← assignee_id ficará NULL em conversas
+  DEST   exclusivos:                    190
+
+  ⚠  Conversas da SOURCE com assignee_id de usuarios sem match no DEST:
+  Conversations com assignee sem match:    434
+
+  Usuários por tipo (coluna 'type'):
+    User                  SOURCE=  103
+    SuperAdmin            SOURCE=    9
+
+============================================================================
+  BLOCO 6 — INBOXES / TEAMS / LABELS — SOBREPOSIÇÃO POR NOME
+============================================================================
+
+----------------------------------------------------------------------------
+  INBOXES
+----------------------------------------------------------------------------
+
+  SOURCE total:     21
+  DEST   total:    146
+  Match (account_id + name):       2  ← reutilizar id destino
+  Sem match (novos no DEST):           19  ← inserir novo
+
+----------------------------------------------------------------------------
+  TEAMS
+----------------------------------------------------------------------------
+
+  SOURCE total:      3
+  DEST   total:     22
+  Match (account_id + name):       2  ← reutilizar id destino
+  Sem match (novos no DEST):            1  ← inserir novo
+
+----------------------------------------------------------------------------
+  LABELS
+----------------------------------------------------------------------------
+
+  SOURCE total:     32
+  DEST   total:    184
+  Match (account_id + title):      16  ← reutilizar id destino
+  Sem match (novos no DEST):           16  ← inserir novo
+
+============================================================================
+  BLOCO 7 — CONTACTS — ANÁLISE PROFUNDA
+============================================================================
+
+  SOURCE total contacts:                  38,868
+  DEST   total contacts:                 221,792
+
+  DEST com src_id (já migrados):               0  (  0.0%)
+  DEST sem src_id (nativos/chatwoot):    221,792  (100.0%)
+
+  SOURCE — preenchimento de campos de chave de negócio:
+    com email:             330  (  0.8%)
+    com phone:          30,062  ( 77.3%)
+    com identifier:      1,668  (  4.3%)
+    sem nenhum:          8,727  ( 22.5%)  ← fallback: name+account
+
+----------------------------------------------------------------------------
+  Sobreposição SOURCE × DEST por chave de negócio
+----------------------------------------------------------------------------
+
+  ⚠  Comparação cross-DB exata de emails/phones requer dblink ou CSV temporário.
+     As contagens abaixo são internamente no SOURCE (verifica se o SOURCE tem duplicatas próprias).
+
+  Emails duplicados internamente — SOURCE:      3  |  DEST:      4
+  Phones duplicados internamente — SOURCE:    284  |  DEST:  8,205
+
+============================================================================
+  BLOCO 8 — CONVERSATIONS — ANÁLISE E QUALIDADE
+============================================================================
+
+  SOURCE total conversations:                  41,743
+  DEST   total conversations:                 127,826
+
+  SOURCE com src_id nos custom_attributes:          0
+  DEST   com src_id (já migrados):                  0
+  DEST   sem src_id (nativas/chatwoot):       127,826
+
+  UUIDs duplicados — SOURCE:      0  |  DEST:      0
+     ↳ todos UUID DEVEM ser regenerados na migração (campo UNIQUE global)
+
+  Qualidade SOURCE:
+    sem contact_id (NULL):                  0  (  0.0%)
+    contact_id FK quebrada:                10  (  0.0%)
+    inbox_id FK quebrada:               5,727  ( 13.7%)
+
+----------------------------------------------------------------------------
+  display_id máximo por account_id no DEST (E4 — sequencial por account)
+----------------------------------------------------------------------------
+
+       DEST ACCOUNT_ID    MAX DISPLAY_ID   TOTAL CONVS
+  --------------------  ----------------  ------------
+                     1             1,542           378
+                     4             1,457         1,438
+                     6             8,161         5,717
+                    13             1,460         1,198
+                    17             9,702         9,551
+                    18             8,046         7,992
+                    20               748           746
+                    25               176           137
+                    28                13             6
+                    30            89,303        88,633
+                    31             2,315         2,238
+                    32             4,520         4,396
+                    33               814           503
+                    34                25            23
+                    35             1,442         1,401
+                    36               267           266
+                    37               121           118
+                    38             4,675         2,232
+                    39                11            11
+                    40               586           448
+                    41               347           347
+                    42               233            47
+
+============================================================================
+  BLOCO 9 — MESSAGES — ANÁLISE E QUALIDADE
+============================================================================
+
+  SOURCE total messages:                      310,155
+  DEST   total messages:                    1,132,685
+
+  SOURCE com src_id (rastreio):                     0
+  DEST   com src_id (já migrados):                  0
+
+  Qualidade SOURCE:
+    conversation_id FK quebrada:        1,429  (  0.5%)
+
+  content_attributes NÃO NULL (serão forçados para NULL na migração — E5):
+    SOURCE:     23,530  (  7.6%)
+    DEST:       79,152  (  7.0%)
+
+  Distribuição temporal SOURCE:
+    mais antigo:   2024-01-19
+    mais recente:  2026-02-10
+    últimos 7d:             0
+    últimos 30d:            0
+    último ano:       101,971
+
+  Tipos de mensagem (SOURCE):
+    outgoing         124,062  ( 40.0%)
+    incoming         116,301  ( 37.5%)
+    activity          67,044  ( 21.6%)
+    template           2,748  (  0.9%)
+
+============================================================================
+  BLOCO 10 — ATTACHMENTS
+============================================================================
+
+  SOURCE total attachments:      26,889
+  DEST   total attachments:      73,435
+
+  SOURCE message_id FK quebrada:           0  (  0.0%)
+  SOURCE sem external_url (S3):       26,888    (100.0%)
+
+  Tipos de arquivo (SOURCE):
+    file            13,113
+    image            7,458
+    video            3,936
+    audio            2,279
+    8                  101
+    location             2
+
+============================================================================
+  BLOCO 11 — CONTACT_INBOXES — CAMPOS ESPECIAIS
+============================================================================
+
+  SOURCE total contact_inboxes:      8,523
+  DEST   total contact_inboxes:    154,789
+
+  pubsub_token NULL  — SOURCE:        0  |  DEST:        0
+  source_id NULL     — SOURCE:        0
+
+  Colisão de pubsub_token entre SOURCE e DEST:  4,360
+  ⚠  CRÍTICO: 4360 tokens idênticos nos dois bancos!
+     Confirma obrigatoriedade da regra: pubsub_token = NULL na inserção.
+
+============================================================================
+  BLOCO 12 — IDs MÁXIMOS E OFFSETS DE MIGRAÇÃO
+============================================================================
+
+  TABELA                      MAX ID SOURCE   MAX ID DEST   OFFSET (max_dest)   NOVO ID MIN
+  -------------------------  --------------  ------------  ------------------  ------------
+  accounts                               25            43                  43            44
+  contacts                           39,307       226,274             226,274       226,275
+  conversations                      66,460       156,684             156,684       156,755
+  messages                          527,934     1,372,095           1,372,095     1,372,560
+  attachments                        63,607       112,963             112,963       113,849
+  inboxes                               125           396                 396           399
+  users                                 141           357                 357           358
+  teams                                  34            51                  51            64
+  labels                                 80           252                 252           254
+  contact_inboxes                    33,999       167,871             167,871       167,909
+
+  Fórmula: novo_id = id_origem + offset  (onde offset = MAX(id_destino))
+  Isso garante que o menor novo_id = min_id_origem + max_id_destino
+  — nunca colide com IDs existentes no destino.
+
+  ⚠  E1 do Debate D3: spec.md FR-002 define offset = max+1 (INCORRETO).
+     A fórmula correta é offset = max (sem +1) conforme constitution.md.
+
+
+============================================================================
+  BLOCO 13 — RESUMO DE QUALIDADE GERAL — PONTOS DE RISCO
+============================================================================
+
+  NÍVEL             N  DESCRIÇÃO
+  --------  ---------  -------------------------------------------------------
+  ⚠ ALTO            0  ✓ Conversations SOURCE sem contact_id
+  ⚠ ALTO           10  ◉ Conversations SOURCE com contact_id FK quebrada
+  ⚠ ALTO        1,429  ◉ Messages SOURCE com conversation_id FK quebrada
+  ⚠ MED             0  ✓ Attachments SOURCE com message_id FK quebrada
+  ⚠ MED         8,727  ◉ Contacts SOURCE sem nenhuma chave de negócio
+  ⚠ ALTO       23,530  ◉ Messages SOURCE com content_attributes (perda de dados)
+  ℹ INFO            0  ✓ Conversations SOURCE com uuid NULL
+
+============================================================================
+  BLOCO 14 — ESTIMATIVA DE MIGRAÇÃO (T4)
+============================================================================
+
+  Premissas: batch_size=500  latência_simples=5ms/batch  latência_dedup=50ms/batch
+
+  TABELA                  TOTAL SOURCE   BATCHES    S/ DEDUP    C/ DEDUP
+  --------------------  --------------  --------  ----------  ----------
+  contacts                      38,868        78        0.4s        3.9s
+  conversations                 41,743        84        0.4s        4.2s
+  messages                     310,155       621        3.1s       31.1s
+  attachments                   26,889        54        0.3s        2.7s
+  inboxes                           21         1        0.0s        0.1s
+  users                            112         1        0.0s        0.1s
+  teams                              3         1        0.0s        0.1s
+  labels                            32         1        0.0s        0.1s
+  contact_inboxes                8,523        18        0.1s        0.9s
+  --------------------  --------------  --------  ----------  ----------
+  TOTAL                                                 4.3s       42.9s
+
+  Estimativa SEM dedup lookup:  4s (0.1 min)
+  Estimativa COM dedup lookup:  43s (0.7 min)
+
+  Nota: latências baseadas em network ~10ms. Com lookup por business key
+  (query extra por batch), o tempo real pode ser 2-10× maior em volumes
+  de contacts/conversations com dedup por JSON path (custom_attributes).
+  Execute --dry-run para medir tempo real antes da migração.
+
+
+============================================================================
+  FIM DO DIAGNÓSTICO
+============================================================================

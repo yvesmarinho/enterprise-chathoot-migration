@@ -1,6 +1,6 @@
 # Enterprise Chathoot Migration
 
-> Projeto para migração de dados entre versões diferentes do Chatwoot
+> Migração por merge de dados entre instâncias do Chatwoot com deduplicação por chave de negócio
 
 **Domínio**: programming | **Linguagem**: python
 **Criado em**: 2026-04-09T11:37:54Z
@@ -211,3 +211,24 @@ Formato de cada linha:
 ```json
 {"phase": "conversations", "id": "38733", "reason": "server closed the connection..."}
 ```
+
+---
+
+## ⚠️ Mudança de Estratégia — 2026-04-10
+
+**Descoberta**: existem registros sobrepostos entre `chatwoot_dev1_db` e `chatwoot004_dev1_db`.
+
+A estratégia de migração do projeto enterprise (`src/`) passa de **incremental pura** (offset de IDs)
+para **merge** (deduplicação por chave de negócio + remapeamento apenas para registros realmente novos).
+
+| Abordagem anterior | Nova abordagem |
+|--------------------|----------------|
+| Assume dados completamente distintos entre bancos | Assume possível sobreposição |
+| Insere todos os registros com `id = id_origem + offset` | Verifica chave de negócio antes de inserir |
+| Sem resolução de conflito | Política de conflito por entidade (skip / merge / origem-vence) |
+
+**Impacto**: spec.md, plan.md e tasks.md do feature `001-enterprise-chatwoot-migration`
+precisam ser revisados após debate D3 (ver `.specify/memory/constitution.md`).
+
+Os scripts `app/` (caminho `01_migrar_account.py`) já implementam merge por `src_id` e
+servem como referência de lógica de deduplicação por entidade.

@@ -128,6 +128,8 @@ Correto: [alternativa válida]
 ## Active Technologies
 - Python 3.12+ + SQLAlchemy 2.0.49 (Core + ORM), psycopg2-binary 2.9.11, alembic 1.18.4 (referência), ruff 0.15.10, black 26.3.1, pytest 9.0.3, pytest-cov (001-enterprise-chatwoot-migration)
 - PostgreSQL 16.10 — `wfdb02.vya.digital:5432`, sem SSL (`sslmode=disable`). Dois bancos: `chatwoot_dev1_db` (read-only) e `chatwoot004_dev1_db` (read-write). (001-enterprise-chatwoot-migration)
+- **Estratégia de migração**: MERGE (não incremental). Existem registros sobrepostos entre os dois bancos. Deduplicação por chave de negócio obrigatória antes de remapear IDs. Ver D3 na constitution. (2026-04-10)
 
 ## Recent Changes
 - 001-enterprise-chatwoot-migration: Added Python 3.12+ + SQLAlchemy 2.0.49 (Core + ORM), psycopg2-binary 2.9.11, alembic 1.18.4 (referência), ruff 0.15.10, black 26.3.1, pytest 9.0.3, pytest-cov
+- 001-enterprise-chatwoot-migration (2026-04-10): Estratégia alterada de incremental para merge. Registros sobrepostos identificados. Constitution v2.0.0 publicada. Debate D3 necessário antes de spec/plan/tasks revisados.
