@@ -1,13 +1,19 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-09T09:00:00Z (Session 2026-04-09)
+**Last Updated**: 2026-04-10T08:57:00Z (Session 2026-04-10)
 **Status**: 🟢 Em andamento
 
 ---
 
 ## 🟠 Em Progresso
 
-*(nenhum)*
+### P0 — Implementação (Sessão 2026-04-10)
+- [ ] Gerar `speckit.tasks` — último passo pré-implementação
+- [ ] Implementar `src/factory/connection_factory.py`
+- [ ] Implementar `src/utils/id_remapper.py` + `log_masker.py` + `fk_validator.py`
+- [ ] Implementar `src/repository/base_repository.py` + `migration_state_repository.py`
+- [ ] Implementar `src/migrators/base_migrator.py` + migrators por entidade (ordem FK)
+- [ ] Implementar `src/migrar.py` (entrypoint)
 
 ## 🔵 Pendente
 
@@ -33,3 +39,9 @@
 
 - [x] Scaffold inicial gerado (2026-04-09T11:37:54Z)
 - [x] Primeira sessão inicializada e documentada (2026-04-09)
+- [x] Pre-spec analysis concluído — D1 resolvida (schema_sha1 idêntico) (2026-04-09)
+- [x] `speckit.constitution` gerado (2026-04-09)
+- [x] `speckit.specify` (spec.md) gerado — 3 US, 12 FR, 8 SC (2026-04-09)
+- [x] `speckit.clarify` — 5/5 questões respondidas (2026-04-09)
+- [x] `speckit.plan` — artefatos de design: plan, research, data-model, cli-contract, quickstart (2026-04-09)
+- [x] Branch `001-enterprise-chatwoot-migration` criada e pushed (2026-04-09)

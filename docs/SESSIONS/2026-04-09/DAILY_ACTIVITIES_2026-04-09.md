@@ -31,7 +31,7 @@
 
 <!-- Add new activities below this line with separator --- -->
 
-<!-- 
+<!--
 ===========================================================================
 TEMPLATE DE BLOCO ESTRUTURADO
 ===========================================================================
@@ -74,7 +74,7 @@ Copie o template abaixo e preencha os campos:
 ---
 -->
 
-<!-- 
+<!--
 ===========================================================================
 EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 ===========================================================================
@@ -129,7 +129,7 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 
 **Resultado**: Aprovação unânime da Alternativa 1 (hybrid approach) com cronograma de 3 sessões. ROI calculado: 3.5x return (280h saved/year vs 80h maintenance).
 
-**Decisões técnicas**: 
+**Decisões técnicas**:
 - Implementação em 4 IMPs sequenciais (48-51)
 - IMP-51 (Busca MCP) priorizado por atender objetivo B do usuário
 - Controles de segurança (gitleaks) obrigatórios antes de persistir docs

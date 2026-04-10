@@ -1,6 +1,6 @@
 {
   "integration": "copilot",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "scripts": {
     "update-context": ".specify/integrations/copilot/scripts/update-context.sh"
   }
