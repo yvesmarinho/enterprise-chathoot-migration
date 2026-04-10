@@ -168,6 +168,9 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 - **FR-008**: Violações de FK durante a migração DEVEM ser registradas por ID (sem conteúdo),
   incluídas no relatório final e não devem abortar a execução completa das demais entidades.
+  **Exceção**: Falha irrecuperável em `accounts` (entidade raiz de todas as FKs) DEVE abortar
+  a execução com exit code 3, pois nenhuma outra entidade pode ser inserida sem um `account_id`
+  válido no destino. O operador deve restaurar o backup antes de re-executar.
 
 - **FR-009**: O sistema DEVE ser executável via `python src/migrar.py`, sem argumentos
   obrigatórios na fase inicial, em ambiente Linux com Python 3.12+.

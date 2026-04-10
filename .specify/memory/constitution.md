@@ -40,8 +40,7 @@ Toda operação de migração DEVE preservar a integridade referencial entre tod
 IDs da origem (chatwoot_dev_db) DEVEM ser remapeados para valores posteriores ao maior ID
 existente no destino (chatwoot004_dev_db) no momento da execução.
 
-Fórmula obrigatória: `novo_id = id_origem + offset`, onde `offset = max(id_destino) + 1`
-para cada tabela com chave primária própria.
+Fórmula obrigatória: `novo_id = id_origem + offset`, onde `offset = max(id_destino)` (i.e., `SELECT MAX(id)`) calculado uma única vez por sessão para cada tabela com chave primária própria. Se a tabela destino estiver vazia, `offset = 0` e os IDs da origem são preservados (comportamento seguro — nenhuma colisão possível com tabela vazia).
 
 Regras obrigatórias:
 - O offset DEVE ser calculado uma única vez no início da sessão de migração e mantido constante

@@ -7,7 +7,7 @@
 
 Migração incremental e idempotente de todos os dados de `chatwoot_dev_db` (origem, somente
 leitura) para `chatwoot004_dev_db` (destino, leitura/escrita), utilizando o Fabric Design
-Pattern com Factory + Repository. IDs remapeados via offset (`novo_id = id_origem + max_destino + 1`),
+Pattern com Factory + Repository. IDs remapeados via offset (`novo_id = id_origem + max(id_destino)`, onde `offset = MAX(id)` calculado uma única vez por sessão — se tabela vazia no destino, offset=0 e IDs da origem são preservados),
 inserção em batches de 500 registros por transação, estado rastreado em tabela `migration_state`
 no destino. Interface: `python src/migrar.py`. ~418k registros de origem.
 

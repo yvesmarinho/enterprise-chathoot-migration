@@ -1,3 +1,6 @@
+# Logs de execução da migração (não versionar)
+.tmp/
+
 # Segredos e credenciais
 .secrets/
 *.key
