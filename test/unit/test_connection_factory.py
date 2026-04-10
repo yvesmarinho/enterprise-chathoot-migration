@@ -21,8 +21,8 @@ _VALID_CREDS = {
     "port": 5432,
     "user": "migrate_user",
     "password": "s3cr3t",
-    "source_db": "chatwoot_dev_db",
-    "dest_db": "chatwoot004_dev_db",
+    "source_db": "chatwoot_dev1_db",
+    "dest_db": "chatwoot004_dev1_db",
 }
 
 
@@ -87,7 +87,7 @@ def test_source_engine_url_contains_source_db_and_ssl_disable(
     factory = ConnectionFactory(secrets_path=p)
     engine = factory.create_source_engine()
     url_str = str(engine.url)
-    assert "chatwoot_dev_db" in url_str
+    assert "chatwoot_dev1_db" in url_str
     assert "sslmode=disable" in url_str
 
 
@@ -102,7 +102,7 @@ def test_dest_engine_url_contains_dest_db_and_ssl_disable(tmp_path: Path) -> Non
     factory = ConnectionFactory(secrets_path=p)
     engine = factory.create_dest_engine()
     url_str = str(engine.url)
-    assert "chatwoot004_dev_db" in url_str
+    assert "chatwoot004_dev1_db" in url_str
     assert "sslmode=disable" in url_str
 
 

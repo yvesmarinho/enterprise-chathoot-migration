@@ -100,18 +100,18 @@ Schema esperado pelo script (nunca impresso ou logado):
 
 ```json
 {
-  "chatwoot_dev_db": {
+  "chatwoot_dev1_db": {
     "host": "wfdb02.vya.digital",
     "port": 5432,
-    "database": "chatwoot_dev_db",
+    "database": "chatwoot_dev1_db",
     "user": "...",
     "password": "...",
     "SSL": false
   },
-  "chatwoot004_dev_db": {
+  "chatwoot004_dev1_db": {
     "host": "wfdb02.vya.digital",
     "port": 5432,
-    "database": "chatwoot004_dev_db",
+    "database": "chatwoot004_dev1_db",
     "user": "...",
     "password": "...",
     "SSL": false
@@ -123,7 +123,7 @@ Schema esperado pelo script (nunca impresso ou logado):
 
 ## Invariantes do Contrato
 
-1. O script NUNCA modifica `chatwoot_dev_db`
+1. O script NUNCA modifica `chatwoot_dev1_db`
 2. O script NUNCA imprime credenciais, senhas ou tokens
 3. O script NUNCA imprime conteúdo de mensagens, nomes ou emails de usuários/contatos
 4. Re-execução sem novos dados origina exit code `0` com "0 novos registros"

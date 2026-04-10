@@ -184,8 +184,8 @@ com emails do destino. Estratégia: sufixo `_migrated` ou prefixo de domínio. V
 |-------|------|-------------|-----------|
 | id | BIGSERIAL | PK | Auto-increment interno |
 | tabela | VARCHAR(100) | NOT NULL | Nome da tabela chatwoot migrada |
-| id_origem | BIGINT | NOT NULL | ID original em chatwoot_dev_db |
-| id_destino | BIGINT | — | ID remapeado em chatwoot004_dev_db |
+| id_origem | BIGINT | NOT NULL | ID original em chatwoot_dev1_db |
+| id_destino | BIGINT | — | ID remapeado em chatwoot004_dev1_db |
 | status | VARCHAR(20) | NOT NULL DEFAULT 'ok' | 'ok' \| 'failed' |
 | migrated_at | TIMESTAMP | NOT NULL DEFAULT NOW() | Timestamp da migração |
 | UNIQUE | — | (tabela, id_origem) | Garante idempotência |

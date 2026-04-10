@@ -20,7 +20,7 @@ Após consolidação de todas as respostas, os dois arquivos de especificação 
 | # | Tema | Resolução |
 |---|---|---|
 | **D1** | Versão do Chatwoot | ✅ RESOLVIDA (2026-04-09) — `scripts/check_chatwoot_versions.py` executado com sucesso. schema_sha1 idêntico em ambas as instâncias. Ver tabela completa abaixo. |
-| **D2** | Destino de `chatwoot_dev_db` pós-migração | Atribuído ao owner (yvesmarinho) para decidir após conclusão |
+| **D2** | Destino de `chatwoot_dev1_db` pós-migração | Atribuído ao owner (yvesmarinho) para decidir após conclusão |
 | **D3** | Attachments S3 | Migrar apenas URLs de referência — sem mover arquivos físicos |
 | **D4** | ETL ou cópia direta | Mesma aplicação — cópia com remapeamento de IDs (offset). Sem transformação de dados. |
 | **D5** | Dados sensíveis | Nenhum dado sensível em stdout, logs ou qualquer saída visível em nenhum momento |
@@ -34,7 +34,7 @@ Após consolidação de todas as respostas, os dois arquivos de especificação 
 |---|---|
 | `domain` | `data-migration` |
 | `codename` | `enterprise-chatwoot-migration` |
-| `problem_statement` | Migrar `chatwoot_dev_db` → `chatwoot004_dev_db`, consolidando `chat.vya.digital` em `synchat.vya.digital` |
+| `problem_statement` | Migrar `chatwoot_dev1_db` → `chatwoot004_dev1_db`, consolidando `chat.vya.digital` em `synchat.vya.digital` |
 | `success_statement` | 100% dos registros migrados, zero FK violations, conversas e mensagens com associações corretas, contagem validada |
 | PostgreSQL | Versão 16, mesmo servidor VPS (wfdb02.vya.digital / 82.197.64.145) |
 | Volume | < 5 GB |
@@ -46,7 +46,7 @@ Após consolidação de todas as respostas, os dois arquivos de especificação 
 | S3 | Migrar apenas URLs de referência — sem mover arquivos físicos |
 | Dados sensíveis em log | Proibido em qualquer output (stdout, arquivo, terminal) |
 | Estratégia | Incremental + idempotente |
-| Rollback | Backup de `chatwoot004_dev_db` disponível. `chatwoot_dev_db` não sofre alteração. |
+| Rollback | Backup de `chatwoot004_dev1_db` disponível. `chatwoot_dev1_db` não sofre alteração. |
 | Fabric Design Pattern | Todo o código — da camada de conexão aos migrators |
 | Interface | Script direto: `python src/migrar.py` |
 | Python mínimo | 3.12 |
@@ -57,7 +57,7 @@ Após consolidação de todas as respostas, os dois arquivos de especificação 
 
 ## 📊 Dados Coletados por D1 (2026-04-09)
 
-| Campo | chatwoot_dev_db (ORIGEM) | chatwoot004_dev_db (DESTINO) |
+| Campo | chatwoot_dev1_db (ORIGEM) | chatwoot004_dev1_db (DESTINO) |
 |---|---|---|
 | Última migration | `20241217041352` | `20240820191716` |
 | Total migrations | 252 | 255 |
@@ -81,7 +81,7 @@ do schema. Migração pode prosseguir com cpia direta + remapeamento de IDs.
 | ID | Tarefa | Responsável | Ação |
 |---|---|---|---|
 | ~~**D1**~~ | ~~Verificar versão exata do Chatwoot em cada instância~~ | Copilot | ✅ RESOLVIDA — ver tabela acima |
-| **D2** | Definir destino de `chatwoot_dev_db` após migração bem-sucedida | yvesmarinho | Manter histórico? Congelar? Desativar? |
+| **D2** | Definir destino de `chatwoot_dev1_db` após migração bem-sucedida | yvesmarinho | Manter histórico? Congelar? Desativar? |
 
 ---
 

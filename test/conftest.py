@@ -35,8 +35,8 @@ def tmp_secrets(tmp_path: Path) -> Path:
                 "port": 5432,
                 "user": "test_user",
                 "password": "test_pass",
-                "source_db": "chatwoot_dev_db",
-                "dest_db": "chatwoot004_dev_db",
+                "source_db": "chatwoot_dev1_db",
+                "dest_db": "chatwoot004_dev1_db",
             }
         )
     )
@@ -52,12 +52,12 @@ def tmp_secrets(tmp_path: Path) -> Path:
 def mock_source_engine() -> MagicMock:
     """Return a MagicMock representing a read-only SQLAlchemy source engine.
 
-    :returns: Mock engine for chatwoot_dev_db.
+    :returns: Mock engine for chatwoot_dev1_db.
     :rtype: MagicMock
     """
     engine = MagicMock(spec=Engine)
     engine.url = MagicMock()
-    engine.url.database = "chatwoot_dev_db"
+    engine.url.database = "chatwoot_dev1_db"
     return engine
 
 
@@ -65,12 +65,12 @@ def mock_source_engine() -> MagicMock:
 def mock_dest_engine() -> MagicMock:
     """Return a MagicMock representing a read-write SQLAlchemy dest engine.
 
-    :returns: Mock engine for chatwoot004_dev_db.
+    :returns: Mock engine for chatwoot004_dev1_db.
     :rtype: MagicMock
     """
     engine = MagicMock(spec=Engine)
     engine.url = MagicMock()
-    engine.url.database = "chatwoot004_dev_db"
+    engine.url.database = "chatwoot004_dev1_db"
     return engine
 
 

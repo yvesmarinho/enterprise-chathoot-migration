@@ -46,7 +46,7 @@
 | 2 | Batch size = 500 registros/transação | Performance vs. risco OOM |
 | 3 | `novo_id = id_origem + max(id_destino) + 1` | Remapeamento de IDs sem colisão |
 | 4 | Log em `.tmp/migration_YYYYMMDD_HHMMSS.log` | Não versionado |
-| 5 | `migration_state` em `chatwoot004_dev_db` | Rastreamento de idempotência no destino |
+| 5 | `migration_state` em `chatwoot004_dev1_db` | Rastreamento de idempotência no destino |
 | 6 | Schemas idênticos (sha1=`da6b4a366d...`) | Cópia direta, sem transformação estrutural |
 | 7 | Interface: `python src/migrar.py` | CLI script simples |
 | 8 | Credenciais: `.secrets/generate_erd.json` | Exclusivamente via arquivo secreto local |
@@ -68,7 +68,7 @@
 - [ ] Adicionar testes unitários em `test/unit/`
 
 ### P2
-- [ ] D2: Definir destino final de `chatwoot_dev_db` pós-migração (aguarda decisão do owner)
+- [ ] D2: Definir destino final de `chatwoot_dev1_db` pós-migração (aguarda decisão do owner)
 
 ---
 
@@ -76,13 +76,13 @@
 
 | Banco | Host | Porta | SSL | Modo |
 |-------|------|-------|-----|------|
-| `chatwoot_dev_db` (ORIGEM) | `wfdb02.vya.digital` | 5432 | disable | read-only |
-| `chatwoot004_dev_db` (DESTINO) | `wfdb02.vya.digital` | 5432 | disable | read-write |
+| `chatwoot_dev1_db` (ORIGEM) | `wfdb02.vya.digital` | 5432 | disable | read-only |
+| `chatwoot004_dev1_db` (DESTINO) | `wfdb02.vya.digital` | 5432 | disable | read-write |
 
 | Banco | Contacts | Conversations | Messages | Accounts |
 |-------|----------|---------------|----------|----------|
-| chatwoot_dev_db | 38.868 | 41.743 | 310.155 | 5 |
-| chatwoot004_dev_db | 225.536 | 153.582 | 1.302.949 | 20 |
+| chatwoot_dev1_db | 38.868 | 41.743 | 310.155 | 5 |
+| chatwoot004_dev1_db | 225.536 | 153.582 | 1.302.949 | 20 |
 
 ---
 

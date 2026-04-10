@@ -10,8 +10,8 @@ Templates updated:
   ⚠ .specify/templates/spec-template.md — no constitution-specific constraints to update yet
   ⚠ .specify/templates/tasks-template.md — no constitution-specific task types to add yet
 Deferred TODOs:
-  - D1: RESOLVIDO em 2026-04-09 — schema_sha1 idêntico (da6b4a366d...). chatwoot_dev_db: migration=20241217041352, total=252. chatwoot004_dev_db: migration=20240820191716, total=255.
-  - D2: Destino final de chatwoot_dev_db pós-migração — decisão do owner (yvesmarinho)
+  - D1: RESOLVIDO em 2026-04-09 — schema_sha1 idêntico (da6b4a366d...). chatwoot_dev1_db: migration=20241217041352, total=252. chatwoot004_dev1_db: migration=20240820191716, total=255.
+  - D2: Destino final de chatwoot_dev1_db pós-migração — decisão do owner (yvesmarinho)
 -->
 
 # Enterprise Chatwoot Migration Constitution
@@ -37,8 +37,8 @@ Regras obrigatórias:
 ### II. Integridade dos Dados & Remapeamento de IDs (NON-NEGOTIABLE)
 
 Toda operação de migração DEVE preservar a integridade referencial entre todas as entidades.
-IDs da origem (chatwoot_dev_db) DEVEM ser remapeados para valores posteriores ao maior ID
-existente no destino (chatwoot004_dev_db) no momento da execução.
+IDs da origem (chatwoot_dev1_db) DEVEM ser remapeados para valores posteriores ao maior ID
+existente no destino (chatwoot004_dev1_db) no momento da execução.
 
 Fórmula obrigatória: `novo_id = id_origem + offset`, onde `offset = max(id_destino)` (i.e., `SELECT MAX(id)`) calculado uma única vez por sessão para cada tabela com chave primária própria. Se a tabela destino estiver vazia, `offset = 0` e os IDs da origem são preservados (comportamento seguro — nenhuma colisão possível com tabela vazia).
 
@@ -61,7 +61,7 @@ Regras obrigatórias:
 - Credenciais DEVEM ser carregadas exclusivamente de `.secrets/generate_erd.json`
 - Credenciais NUNCA DEVEM ser impressas, logadas, serializadas em arquivos ou
   incluídas em mensagens de erro
-- O banco `chatwoot_dev_db` é SOMENTE LEITURA — nenhuma transação de escrita
+- O banco `chatwoot_dev1_db` é SOMENTE LEITURA — nenhuma transação de escrita
   ou DDL é permitida contra ele em nenhum módulo
 - Logs de execução DEVEM usar mascaramento automático para qualquer valor de coluna
   proveniente de tabelas de dados (contacts, messages, conversations, users)
@@ -109,8 +109,8 @@ Regras obrigatórias:
 **Formatação**: black
 **Testes**: pytest com doctest integrado
 **Bancos**: PostgreSQL 16 — servidor único `wfdb02.vya.digital` porta 5432
-**Origem**: `chatwoot_dev_db` — somente leitura
-**Destino**: `chatwoot004_dev_db` — leitura e escrita controlada
+**Origem**: `chatwoot_dev1_db` — somente leitura
+**Destino**: `chatwoot004_dev1_db` — leitura e escrita controlada
 **Entrypoint**: `python src/migrar.py`
 **Credenciais**: `.secrets/generate_erd.json` — jamais versionado
 
@@ -151,7 +151,7 @@ test/
 ## Fluxo de Desenvolvimento
 
 1. **Pré-implementação**: D1 RESOLVIDO (2026-04-09) — schema_sha1 idêntico confirmado.
-   chatwoot_dev_db: migration=20241217041352 (252 total) | chatwoot004_dev_db: migration=20240820191716 (255 total).
+   chatwoot_dev1_db: migration=20241217041352 (252 total) | chatwoot004_dev1_db: migration=20240820191716 (255 total).
    Schemas plenamente compatíveis. Prosseguir diretamente para `speckit.clarify`.
 2. **Ordem do speckit chain**: `speckit.constitution` → `speckit.clarify` →
    `speckit.plan` → `speckit.checklist` → `speckit.tasks` → `speckit.analyze` →
@@ -168,7 +168,7 @@ test/
 | ID | Tarefa | Responsável |
 |----|--------|-------------|
 | D1 | ✅ RESOLVIDO — schema_sha1 idêntico (da6b4a366d...). Contagens: origem 38.868 contacts/41.743 convs/310.155 msgs. Destino 225.536 contacts/153.582 convs/1.302.949 msgs. | Copilot |
-| D2 | Definir destino final de chatwoot_dev_db após migração | yvesmarinho |
+| D2 | Definir destino final de chatwoot_dev1_db após migração | yvesmarinho |
 
 ## Governance
 

@@ -10,7 +10,7 @@
 
 ## Requirement Completeness
 
-- [ ] CHK001 — Are connection mode requirements (`read-only` vs `read-write`) specified for both databases, including what happens if `chatwoot_dev_db` is accidentally opened in write mode? [Completeness, Spec §FR-001]
+- [ ] CHK001 — Are connection mode requirements (`read-only` vs `read-write`) specified for both databases, including what happens if `chatwoot_dev1_db` is accidentally opened in write mode? [Completeness, Spec §FR-001]
 - [ ] CHK002 — Are credential loading requirements complete: is the exact path and format of `.secrets/generate_erd.json` documented, including required fields and schema? [Completeness, Spec §FR-001]
 - [ ] CHK003 — Are offset calculation requirements specified for every one of the 9 entities individually, or only generically? Does the spec cover entities without a `max(id)` in the destination (zero records)? [Completeness, Spec §FR-002]
 - [ ] CHK004 — Is the FK migration order for `users` fully specified? The data model shows `users.account_id` is managed via an `account_users` join table — are requirements for this join table's migration documented? [Completeness, Spec §FR-003, Data Model §3]
@@ -60,10 +60,10 @@
 
 - [ ] CHK029 — Are requirements defined for the concurrent execution scenario: what happens if two instances of `python src/migrar.py` are run simultaneously against the same destination? [Coverage, Gap]
 - [ ] CHK030 — Are requirements defined for the partial-table scenario: `--only-table contacts` when `accounts` was never migrated? Is the expected behavior (abort, warn, proceed) specified? [Coverage, CLI Contract]
-- [ ] CHK031 — Are requirements for the "source grows during migration" scenario defined? If `chatwoot_dev_db` receives new records while migration is running, are those records in scope for the current session? [Coverage, Gap]
+- [ ] CHK031 — Are requirements for the "source grows during migration" scenario defined? If `chatwoot_dev1_db` receives new records while migration is running, are those records in scope for the current session? [Coverage, Gap]
 - [ ] CHK032 — Are recovery requirements defined after exit code 3 (catastrophic failure)? Is the exact sequence of manual steps (restore backup → re-run) formally documented as part of the operational requirements, not just as a comment in edge cases? [Coverage, Exception Flow, Spec §Edge Cases]
 - [ ] CHK033 — Are requirements specified for what happens when `migration_state` table exists but has corrupted or inconsistent data (e.g., `id_origem` exists but `id_destino` is NULL)? [Coverage, Edge Case, Gap]
-- [ ] CHK034 — Are requirements defined for the zero-records scenario: what does the script output and what is the exit code when `chatwoot_dev_db` has 0 records in a given table? [Coverage, Edge Case]
+- [ ] CHK034 — Are requirements defined for the zero-records scenario: what does the script output and what is the exit code when `chatwoot_dev1_db` has 0 records in a given table? [Coverage, Edge Case]
 - [ ] CHK035 — Are requirements specified for FK violations that span entity boundaries (e.g., `messages.sender_id` referencing a `user` that failed migration)? Is cascading-failure behavior defined? [Coverage, Exception Flow, Gap]
 
 ---
@@ -98,8 +98,8 @@
 
 ## Dependencies & Open Items
 
-- [ ] CHK049 — Is open item D2 ("destino final de `chatwoot_dev_db` pós-migração") formally tracked with an owner, due date, and impact on current requirements? If unresolved at release, is there a documented risk acceptance? [Dependency, Ambiguity, Checklist §requirements.md]
-- [ ] CHK050 — Are all external dependencies (`chatwoot_dev_db` schema, PostgreSQL 16.10, `.secrets/generate_erd.json` format) formally documented as assumptions with a schema version pin? Is Schema SHA1 `da6b4a36...` the release baseline? [Dependency, Data Model]
+- [ ] CHK049 — Is open item D2 ("destino final de `chatwoot_dev1_db` pós-migração") formally tracked with an owner, due date, and impact on current requirements? If unresolved at release, is there a documented risk acceptance? [Dependency, Ambiguity, Checklist §requirements.md]
+- [ ] CHK050 — Are all external dependencies (`chatwoot_dev1_db` schema, PostgreSQL 16.10, `.secrets/generate_erd.json` format) formally documented as assumptions with a schema version pin? Is Schema SHA1 `da6b4a36...` the release baseline? [Dependency, Data Model]
 - [ ] CHK051 — Is the `account_users` join table dependency formally documented in FR-003 or data-model.md? Its existence is implied in Data Model §3 but not listed in the 9 migrated entities. [Dependency, Gap, Data Model §3]
 
 ---

@@ -46,7 +46,7 @@
 
 ## Phase 3: User Story 1 — Executar Migração Completa de Dados (P1)
 
-**Story goal**: `python src/migrar.py` migrates all 418.828 records from `chatwoot_dev_db` to `chatwoot004_dev_db` with ID remapping, FK integrity, masking, and a final validation report.
+**Story goal**: `python src/migrar.py` migrates all 418.828 records from `chatwoot_dev1_db` to `chatwoot004_dev1_db` with ID remapping, FK integrity, masking, and a final validation report.
 
 **Independent test criteria**: Run `python src/migrar.py --dry-run` against copies of both DBs; verify counts match origin totals and zero FK violations in destination. Unit tests use mocked DB sessions — no live DB required.
 

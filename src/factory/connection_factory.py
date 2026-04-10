@@ -120,7 +120,7 @@ class ConnectionFactory:
     # ------------------------------------------------------------------
 
     def create_source_engine(self) -> Engine:
-        """Create a read-only engine for ``chatwoot_dev_db``.
+        """Create a read-only engine for ``chatwoot_dev1_db``.
 
         The engine is configured with ``sslmode=disable`` and
         ``execution_options(no_autocommit=True)`` to prevent accidental writes.
@@ -137,7 +137,7 @@ class ConnectionFactory:
         )
 
     def create_dest_engine(self) -> Engine:
-        """Create a read-write engine for ``chatwoot004_dev_db``.
+        """Create a read-write engine for ``chatwoot004_dev1_db``.
 
         :returns: SQLAlchemy engine connected to the destination database.
         :rtype: Engine

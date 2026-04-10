@@ -11,7 +11,7 @@
 - `uv` instalado (`uv --version`)
 - Acesso de rede a `wfdb02.vya.digital:5432`
 - Arquivo `.secrets/generate_erd.json` preenchido com credenciais válidas
-- Backup de `chatwoot004_dev_db` confirmado pelo owner
+- Backup de `chatwoot004_dev1_db` confirmado pelo owner
 
 ---
 
@@ -78,7 +78,7 @@ Cobertura mínima: **90%** nos módulos críticos. `make test` falha se abaixo d
 cat .tmp/migration_YYYYMMDD_HHMMSS_report.txt
 
 # Consulta rápida ao migration_state (via psql)
-psql -h wfdb02.vya.digital -U <user> -d chatwoot004_dev_db \
+psql -h wfdb02.vya.digital -U <user> -d chatwoot004_dev1_db \
   -c "SELECT tabela, COUNT(*) as total, SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as falhas FROM migration_state GROUP BY tabela ORDER BY MIN(migrated_at);"
 ```
 
@@ -94,7 +94,7 @@ python src/migrar.py
 ```
 
 Em caso de falha catastrófica (exit code 3), restaurar o backup antes de re-executar:
-1. Restaurar `chatwoot004_dev_db` a partir do backup
+1. Restaurar `chatwoot004_dev1_db` a partir do backup
 2. Re-executar `python src/migrar.py`
 
 ---

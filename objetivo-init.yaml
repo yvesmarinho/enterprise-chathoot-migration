@@ -1,7 +1,7 @@
 prompt:
   role: user
   content:
-    description: "Migração incremental de dados entre duas instâncias do Chatwoot (chatwoot_dev_db → origem / chatwoot004_dev_db → destino) para consolidar chat.vya.digital (eliminada) em synchat.vya.digital (mantida), garantindo integridade referencial, remapeamento de IDs e zero exposição de dados sensíveis."
+    description: "Migração incremental de dados entre duas instâncias do Chatwoot (chatwoot_dev1_db → origem / chatwoot004_dev1_db → destino) para consolidar chat.vya.digital (eliminada) em synchat.vya.digital (mantida), garantindo integridade referencial, remapeamento de IDs e zero exposição de dados sensíveis."
     specification:
       - project_name: "enterprise-chatwoot-migration"
       - response: "código python, com conexão em PostgreSQL, utilizando SQLAlchemy e Alembic para migração de banco de dados."
@@ -33,8 +33,8 @@ prompt:
       - ".vscode - Configurações VS Code e MCP (geradas automaticamente)"
       - "app - Código-fonte principal do projeto (estrutura específica por tipo)"
       - "docs - Documentação (gerada automaticamente)"
-      - "docs/db_erd/chatwoot_dev_db - Diagrama ERD do banco de dados do chatwoot_dev"
-      - "docs/db_erd/chatwoot004_dev_db - Diagrama ERD do banco de dados do chatwoot004_dev_db"
+      - "docs/db_erd/chatwoot_dev1_db - Diagrama ERD do banco de dados do chatwoot_dev"
+      - "docs/db_erd/chatwoot004_dev1_db - Diagrama ERD do banco de dados do chatwoot004_dev1_db"
       - "scripts - Scripts de automação inteligente"
       - "src - Código-fonte do projeto (estrutura específica por tipo)"
       - "test - Testes automatizados (framework baseado na linguagem)"
@@ -43,13 +43,13 @@ prompt:
       - "objetivo-template.yaml - Especificação detalhada do projeto"
       - "mcp-questions.yaml - Configuração gerada pelo Copilot"
     expected_outcome:
-      - migration_result: "100% dos dados de chatwoot_dev_db migrados para chatwoot004_dev_db com zero erros de FK, todas as conversas associadas a contacts e todas as mensagens associadas a conversas"
+      - migration_result: "100% dos dados de chatwoot_dev1_db migrados para chatwoot004_dev1_db com zero erros de FK, todas as conversas associadas a contacts e todas as mensagens associadas a conversas"
       - id_remapping: "Todos os IDs da origem remapeados para valores posteriores ao maior ID do destino, com relações internas preservadas"
       - validation: "Relatório de contagem de registros origem vs destino gerado ao final, confirmando integridade da migração"
       - security: "Nenhum dado sensível exposto em logs ou stdout em nenhuma etapa"
       - code_quality: "Código Python com Fabric Design Pattern, linting (ruff), formatação (black), documentação reStructuredText e testes unitários"
       - s3_handling: "Referências (URLs) de attachments migradas; arquivos físicos no S3 não movimentados"
-      - rollback: "Backup de chatwoot004_dev_db disponível; chatwoot_dev_db não sofre alterações (somente leitura)"
+      - rollback: "Backup de chatwoot004_dev1_db disponível; chatwoot_dev1_db não sofre alterações (somente leitura)"
     infrastructure:
       - "Servidor wfdb02.vya.digitasl hospeda as duas bases de dados PostgreSQL"
       - "A execução do código será feito a partir deste computador"
@@ -82,13 +82,13 @@ prompt:
       - "Execução via script direto: python src/migrar.py"
     pending_tasks:
       - id: "D1"
-        description: "Verificar versão exata do Chatwoot (schema_migrations) em chatwoot_dev_db e chatwoot004_dev_db"
+        description: "Verificar versão exata do Chatwoot (schema_migrations) em chatwoot_dev1_db e chatwoot004_dev1_db"
         assignee: "Copilot"
         script: "scripts/check_chatwoot_versions.py"
         status: "resolvido"
         resolved_at: "2026-04-09"
-        evidence: "schema_sha1 idêntico (da6b4a366d...). chatwoot_dev_db: migration=20241217041352, total=252. chatwoot004_dev_db: migration=20240820191716, total=255."
+        evidence: "schema_sha1 idêntico (da6b4a366d...). chatwoot_dev1_db: migration=20241217041352, total=252. chatwoot004_dev1_db: migration=20240820191716, total=255."
       - id: "D2"
-        description: "Definir destino final de chatwoot_dev_db após migração bem-sucedida (manter histórico, desativar ou congelar)"
+        description: "Definir destino final de chatwoot_dev1_db após migração bem-sucedida (manter histórico, desativar ou congelar)"
         assignee: "yvesmarinho"
         status: "pendente"

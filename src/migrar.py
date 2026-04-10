@@ -1,7 +1,7 @@
 """CLI entrypoint for the enterprise Chatwoot migration.
 
-:description: Orchestrates the full migration pipeline from ``chatwoot_dev_db``
-    (source) to ``chatwoot004_dev_db`` (destination) respecting the FK dependency
+:description: Orchestrates the full migration pipeline from ``chatwoot_dev1_db``
+    (source) to ``chatwoot004_dev1_db`` (destination) respecting the FK dependency
     order:
 
     ``accounts → inboxes → users → teams → labels → contacts →

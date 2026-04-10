@@ -131,7 +131,7 @@ Sessão altamente produtiva com foco em análise prévia à especificação form
 | **Commit HEAD** | `6a7d8c8` — feat(plan): speckit.plan concluido |
 | **Branch** | `001-enterprise-chatwoot-migration` |
 | **speckit** | constitution ✅ \| specify ✅ \| clarify ✅ \| plan ✅ \| tasks ⏳ |
-| **Versões DB coletadas** | chatwoot_dev_db: migration=`20241217041352` \| chatwoot004_dev_db: migration=`20240820191716` |
+| **Versões DB coletadas** | chatwoot_dev1_db: migration=`20241217041352` \| chatwoot004_dev1_db: migration=`20240820191716` |
 | **Schema idêntico** | sha1=`da6b4a366d...` (ambos) |
 | **Tests** | Nenhum ainda (aguarda speckit.tasks) |
 
@@ -141,10 +141,10 @@ Sessão altamente produtiva com foco em análise prévia à especificação form
 
 | Banco | Última migration | Total migrations | Schema SHA1 |
 |-------|-----------------|------------------|-------------|
-| `chatwoot_dev_db` | `20241217041352` | 252 | `da6b4a366d...` |
-| `chatwoot004_dev_db` | `20240820191716` | 255 | `da6b4a366d...` |
+| `chatwoot_dev1_db` | `20241217041352` | 252 | `da6b4a366d...` |
+| `chatwoot004_dev1_db` | `20240820191716` | 255 | `da6b4a366d...` |
 
-| Entidade | chatwoot_dev_db | chatwoot004_dev_db |
+| Entidade | chatwoot_dev1_db | chatwoot004_dev1_db |
 |----------|----------------|--------------------|
 | contacts | 38.868 | 225.536 |
 | conversations | 41.743 | 153.582 |
@@ -175,7 +175,7 @@ Sessão altamente produtiva com foco em análise prévia à especificação form
 | 3 | Log em `.tmp/migration_YYYYMMDD_HHMMSS.log` | Separado de `logs/` para não versionar |
 | 4 | Cobertura `fail_under=90` | Padrão rigoroso adequado ao risco da migração |
 | 5 | Rollback manual com instrução ao operador | Complexidade de rollback automático não justificada |
-| 6 | `migration_state` em `chatwoot004_dev_db` | Destino é read-write, tracking no banco de destino |
+| 6 | `migration_state` em `chatwoot004_dev1_db` | Destino é read-write, tracking no banco de destino |
 | 7 | Schemas idênticos confirmados | Migração é de dados apenas, sem transformação estrutural |
 
 ---
@@ -184,7 +184,7 @@ Sessão altamente produtiva com foco em análise prévia à especificação form
 
 | ID | Tarefa | Prioridade | Status |
 |----|--------|------------|--------|
-| D2 | Destino final de `chatwoot_dev_db` pós-migração | P1 | ⏳ Aguarda decisão de owner |
+| D2 | Destino final de `chatwoot_dev1_db` pós-migração | P1 | ⏳ Aguarda decisão de owner |
 | NEXT | `speckit.tasks` — geração de tasks de implementação | P0 | ⏳ Próximo passo imediato |
 
 ---

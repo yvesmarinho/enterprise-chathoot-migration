@@ -2,7 +2,7 @@
 Script para verificar versões do Chatwoot em ambas as instâncias.
 
 :description: Consulta as tabelas ``schema_migrations`` e ``ar_internal_metadata``
-    de chatwoot_dev_db e chatwoot004_dev_db para identificar a versão de schema
+    de chatwoot_dev1_db e chatwoot004_dev1_db para identificar a versão de schema
     (migration version) de cada instância. Não altera nenhum dado.
 
 :usage:

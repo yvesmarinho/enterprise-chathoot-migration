@@ -29,7 +29,7 @@ batches anteriores (idempotência + relatório de falhas por ID).
 
 ## R-002: Padrão de Offset Constante por Sessão
 
-**Decision**: `offset_table[tabela] = SELECT MAX(id) FROM chatwoot004_dev_db.tabela` executado
+**Decision**: `offset_table[tabela] = SELECT MAX(id) FROM chatwoot004_dev1_db.tabela` executado
 uma única vez no início da sessão, antes do primeiro insert. O offset é mantido em dict em memória
 durante toda a execução.
 

@@ -1,7 +1,7 @@
 [project]
 name = "enterprise-chathoot-migration"
 version = "0.1.0"
-description = "Incremental idempotent migration from chatwoot_dev_db to chatwoot004_dev_db"
+description = "Incremental idempotent migration from chatwoot_dev1_db to chatwoot004_dev1_db"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

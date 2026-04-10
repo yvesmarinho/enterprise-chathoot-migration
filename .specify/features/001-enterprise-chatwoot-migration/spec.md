@@ -11,7 +11,7 @@
 
 ### Session 2026-04-09
 
-- Q: Mecanismo de rastreamento de IDs já migrados (Migration State Record) → A: Tabela `migration_state` no banco destino (`chatwoot004_dev_db`)
+- Q: Mecanismo de rastreamento de IDs já migrados (Migration State Record) → A: Tabela `migration_state` no banco destino (`chatwoot004_dev1_db`)
 - Q: Tamanho de lote (batch size) para inserção de registros → A: Lotes de 500 registros por batch
 - Q: Destino do log de execução → A: Arquivo `.tmp/migration_YYYYMMDD_HHMMSS.log` + stdout simultâneo, ambos com mascaramento de dados sensíveis
 - Q: Threshold mínimo de cobertura de testes unitários → A: 90% de cobertura de linhas nos módulos críticos (`pytest --cov --fail-under=90`)
@@ -24,7 +24,7 @@
 ### User Story 1 — Executar Migração Completa de Dados (Priority: P1)
 
 O DBA/Desenvolvedor executa `python src/migrar.py` e todos os registros de
-`chatwoot_dev_db` são inseridos em `chatwoot004_dev_db` com IDs remapeados,
+`chatwoot_dev1_db` são inseridos em `chatwoot004_dev1_db` com IDs remapeados,
 integridade referencial preservada e sem exposição de dados sensíveis em nenhum output.
 
 **Why this priority**: É o entregável central do projeto. Sem isso, todo o demais não tem valor.
@@ -34,8 +34,8 @@ verificar contagem pós-migração por tabela e ausência de FK violations.
 
 **Acceptance Scenarios**:
 
-1. **Given** chatwoot_dev_db tem 38.868 contacts, **When** `python src/migrar.py` é executado,
-   **Then** esses 38.868 contacts são inseridos em chatwoot004_dev_db com `id >= max_id_destino + 1`,
+1. **Given** chatwoot_dev1_db tem 38.868 contacts, **When** `python src/migrar.py` é executado,
+   **Then** esses 38.868 contacts são inseridos em chatwoot004_dev1_db com `id >= max_id_destino + 1`,
    sem alteração nos 225.536 contacts pré-existentes.
 
 2. **Given** contacts migrados existem no destino, **When** conversations são migradas,
@@ -103,28 +103,28 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 ### Edge Cases
 
-- O que acontece quando `chatwoot_dev_db` está inacessível no momento da execução?
+- O que acontece quando `chatwoot_dev1_db` está inacessível no momento da execução?
   → O script aborta com mensagem de erro indicando falha de conexão (sem imprimir credenciais)
   e registra o evento no log.
 
-- O que acontece se `chatwoot004_dev_db` tiver crescido entre duas execuções (novos registros
+- O que acontece se `chatwoot004_dev1_db` tiver crescido entre duas execuções (novos registros
   chegaram após o cálculo do offset inicial)?
   → O offset é calculado uma única vez no início da sessão e mantido constante; registros novos no
   destino que cheguem durante a execução não afetam o offset de sessão, mas o estado de migração
   é atualizado para prevenir conflitos na próxima sessão.
 
 - O que acontece quando uma conversation de origem não possui `contact_id` válido (dado inconsistente
-  conhecido em `chatwoot_dev_db`)?
+  conhecido em `chatwoot_dev1_db`)?
   → A inconsistência é registrada no relatório (apenas o ID da conversation) e o registro é pulado;
   a execução continua com os registros seguintes.
 
-- O que acontece se o backup de `chatwoot004_dev_db` não existir?
+- O que acontece se o backup de `chatwoot004_dev1_db` não existir?
   → O script verifica a existência de um checkpoint de backup antes da primeira escrita e emite
   aviso ao operador; a execução pode prosseguir somente mediante confirmação explícita do operador.
 
 - O que acontece em caso de falha catastrófica (ex: FK violation generalizada em `accounts`)?
   → O script **não executa rollback automático**. Registra a falha no relatório com IDs afetados,
-  exibe mensagem clara instruindo o operador a restaurar o backup de `chatwoot004_dev_db` antes
+  exibe mensagem clara instruindo o operador a restaurar o backup de `chatwoot004_dev1_db` antes
   de re-executar. A tabela `migration_state` preserva o estado para diagnóstico. Após restauração,
   re-execução é segura (idempotência garante isso).
 
@@ -134,8 +134,8 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 ### Functional Requirements
 
-- **FR-001**: O sistema DEVE conectar-se a `chatwoot_dev_db` em modo somente leitura e a
-  `chatwoot004_dev_db` em modo leitura/escrita, carregando credenciais exclusivamente de
+- **FR-001**: O sistema DEVE conectar-se a `chatwoot_dev1_db` em modo somente leitura e a
+  `chatwoot004_dev1_db` em modo leitura/escrita, carregando credenciais exclusivamente de
   `.secrets/generate_erd.json`.
 
 - **FR-002**: O sistema DEVE calcular, uma única vez por sessão, o offset de ID para cada tabela
@@ -152,7 +152,7 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
   físicos no S3 NÃO devem ser movimentados.
 
 - **FR-005**: O sistema DEVE ser idempotente: re-execução sobre o mesmo destino não deve
-  produzir registros duplicados. A tabela `migration_state` em `chatwoot004_dev_db` rastreia
+  produzir registros duplicados. A tabela `migration_state` em `chatwoot004_dev1_db` rastreia
   quais IDs da origem já foram inseridos no destino, com colunas: `tabela`, `id_origem`,
   `id_destino`, `status`, `migrated_at`. Essa tabela é criada automaticamente na primeira execução.
 
@@ -221,7 +221,7 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
   Apenas URLs S3 são migradas; arquivos físicos não são movimentados. FK → Message.
   _Volumes_: origem = 26.889 / destino = 73.435.
 
-- **Migration State Record**: Tabela `migration_state` criada em `chatwoot004_dev_db` na
+- **Migration State Record**: Tabela `migration_state` criada em `chatwoot004_dev1_db` na
   primeira execução do script. Colunas: `tabela` (VARCHAR), `id_origem` (BIGINT), `id_destino`
   (BIGINT), `status` (VARCHAR: 'ok'|'failed'), `migrated_at` (TIMESTAMP). Índice único em
   `(tabela, id_origem)` garante idempotência. Consultável via SQL para diagnóstico.
@@ -232,15 +232,15 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% dos registros de `chatwoot_dev_db` (accounts=5, contacts=38.868,
+- **SC-001**: 100% dos registros de `chatwoot_dev1_db` (accounts=5, contacts=38.868,
   conversations=41.743, messages=310.155, inboxes=21, users=112, teams=3, labels=32,
-  attachments=26.889) inseridos em `chatwoot004_dev_db` ao final da execução.
+  attachments=26.889) inseridos em `chatwoot004_dev1_db` ao final da execução.
 
 - **SC-002**: Zero violações de FK verificadas por consulta direta ao banco destino após a
   migração completa (todo `contact_id` em conversations e todo `conversation_id` em messages
   existem no destino).
 
-- **SC-003**: Contagem de registros pré-existentes em `chatwoot004_dev_db` permanece inalterada
+- **SC-003**: Contagem de registros pré-existentes em `chatwoot004_dev1_db` permanece inalterada
   após a migração (nem um registro existente foi modificado ou removido).
 
 - **SC-004**: O script completa a migração dos ~690.000 registros totais em menos de 2 horas
@@ -273,7 +273,7 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 - **Migrator isolados**: Cada entidade tem seu próprio `Migrator` testável de forma independente.
 
-- **Somente leitura**: `chatwoot_dev_db` — nenhuma escrita ou DDL é permitida.
+- **Somente leitura**: `chatwoot_dev1_db` — nenhuma escrita ou DDL é permitida.
 
 - **Credenciais**: Carregadas de `.secrets/generate_erd.json` — nunca impressas, logadas
   ou versionadas.
@@ -288,15 +288,15 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 ## Assumptions
 
-- Os schemas de `chatwoot_dev_db` e `chatwoot004_dev_db` são estruturalmente idênticos
+- Os schemas de `chatwoot_dev1_db` e `chatwoot004_dev1_db` são estruturalmente idênticos
   (schema_sha1 = `da6b4a366d550dc7794f55f5e1536342ce50845f`, confirmado em 2026-04-09).
-  As 3 migrations extras em `chatwoot004_dev_db` (total 255 vs 252) não introduzem colunas
-  ou tabelas incompatíveis com `chatwoot_dev_db`.
+  As 3 migrations extras em `chatwoot004_dev1_db` (total 255 vs 252) não introduzem colunas
+  ou tabelas incompatíveis com `chatwoot_dev1_db`.
 
 - Os dados das duas instâncias pertencem a empresas/clientes completamente distintos — não há
   sobreposição de registros entre as bases que exija deduplicação lógica.
 
-- O backup de `chatwoot004_dev_db` está disponível e válido para rollback, conforme confirmado
+- O backup de `chatwoot004_dev1_db` está disponível e válido para rollback, conforme confirmado
   pelo owner antes do início da migração.
 
 - No ambiente DEV, as URLs de S3 presentes nas referências de attachments são suficientes para
@@ -305,7 +305,7 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 - O operador executa o script a partir de uma máquina com Python 3.12+, acesso de rede à porta
   5432 de `wfdb02.vya.digital` e o arquivo `.secrets/generate_erd.json` presente localmente.
 
-- As inconsistências conhecidas em `chatwoot_dev_db` (conversations sem `contact_id`, messages
+- As inconsistências conhecidas em `chatwoot_dev1_db` (conversations sem `contact_id`, messages
   sem `conversation_id`) são migradas no estado atual, sem correção, registradas no relatório.
 
 - Downtime parcial do ambiente DEV é aceitável durante a execução da migração.
@@ -318,10 +318,10 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 |---|---|---|
 | Credenciais `.secrets/generate_erd.json` | ✅ Pronto | Confirmado pelo owner |
 | Python 3.12 + `pyproject.toml` / `uv` | ✅ Pronto | `pyproject.toml` na raiz |
-| Backup de `chatwoot004_dev_db` | ✅ Pronto | Confirmado pelo owner |
+| Backup de `chatwoot004_dev1_db` | ✅ Pronto | Confirmado pelo owner |
 | Schema SHA1 idêntico (D1) | ✅ Resolvido | `scripts/check_chatwoot_versions.py` — 2026-04-09 |
 | Acesso de rede a `wfdb02.vya.digital:5432` | ✅ Pronto | Testado via scripts ERD |
-| Decisão sobre destino final de `chatwoot_dev_db` (D2) | ⏳ Pendente | Aguardando owner |
+| Decisão sobre destino final de `chatwoot_dev1_db` (D2) | ⏳ Pendente | Aguardando owner |
 
 ---
 
@@ -330,16 +330,16 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 - Modificação de qualquer código da aplicação Chatwoot
 - Movimentação física de arquivos no S3
 - Criação de interface web ou API para a ferramenta de migração
-- Alteração do banco `chatwoot_dev_db` (somente leitura em toda esta fase)
+- Alteração do banco `chatwoot_dev1_db` (somente leitura em toda esta fase)
 - Migração de configurações da aplicação (env vars, settings, secrets do Chatwoot)
 - Migração de ambiente de produção nesta fase (somente DEV)
-- Correção de inconsistências de dados em `chatwoot_dev_db` (migrar no estado atual)
+- Correção de inconsistências de dados em `chatwoot_dev1_db` (migrar no estado atual)
 
 ---
 
 ## Data Volumes Summary
 
-| Entidade | Origem (`chatwoot_dev_db`) | Destino (`chatwoot004_dev_db`) |
+| Entidade | Origem (`chatwoot_dev1_db`) | Destino (`chatwoot004_dev1_db`) |
 |---|---|---|
 | accounts | 5 | 20 |
 | inboxes | 21 | 151 |

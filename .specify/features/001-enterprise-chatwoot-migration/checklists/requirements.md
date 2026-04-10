@@ -32,7 +32,7 @@
 ## Notes
 
 - Validation iteration 1: All items pass. Spec is ready for `/speckit.plan`.
-- Known open item (D2): Destino final de `chatwoot_dev_db` pós-migração — não bloqueia spec,
+- Known open item (D2): Destino final de `chatwoot_dev1_db` pós-migração — não bloqueia spec,
   aguarda decisão do owner (yvesmarinho).
 - Architecture Constraints section added (non-standard) to capture Constitution non-negotiables
   inline in spec for planner reference.

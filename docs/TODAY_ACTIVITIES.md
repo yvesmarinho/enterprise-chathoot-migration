@@ -22,8 +22,8 @@
 - Criado `scripts/check_chatwoot_versions.py`
 - `uv sync` — 19 pacotes instalados
 - Dados reais coletados:
-  - `chatwoot_dev_db`: migration=`20241217041352`, 252 total, schema_sha1=`da6b4a366d...`
-  - `chatwoot004_dev_db`: migration=`20240820191716`, 255 total, schema_sha1=`da6b4a366d...` (**IDÊNTICO**)
+  - `chatwoot_dev1_db`: migration=`20241217041352`, 252 total, schema_sha1=`da6b4a366d...`
+  - `chatwoot004_dev1_db`: migration=`20240820191716`, 255 total, schema_sha1=`da6b4a366d...` (**IDÊNTICO**)
   - contacts=38.868/225.536 | conversations=41.743/153.582 | messages=310.155/1.302.949
 - `objetivo.yaml`, `objetivo-init.yaml` e `PRE_SPEC_ANALYSIS_REPORT.md` atualizados
 
@@ -46,7 +46,7 @@
 
 ### ✅ Phase 5 — speckit.clarify (5/5 respondidas)
 
-- Q1: `migration_state` → tabela em `chatwoot004_dev_db`
+- Q1: `migration_state` → tabela em `chatwoot004_dev1_db`
 - Q2: batch size → 500 registros/transação
 - Q3: log → `.tmp/migration_YYYYMMDD_HHMMSS.log` + stdout
 - Q4: cobertura → 90% `fail_under`
@@ -76,7 +76,7 @@
 ## ⏭️ Próxima Sessão
 
 - **Imediato**: `speckit.tasks` — geração de tasks de implementação
-- **Pendente**: D2 — destino final de `chatwoot_dev_db` pós-migração (decisão de owner)
+- **Pendente**: D2 — destino final de `chatwoot_dev1_db` pós-migração (decisão de owner)
 
 ---
 

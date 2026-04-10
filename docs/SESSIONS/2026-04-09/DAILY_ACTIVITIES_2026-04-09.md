@@ -175,7 +175,7 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 
 **11:00 — ✅ Completo**
 
-**Objetivo**: Resolver dúvida D1 — verificar versões reais dos bancos `chatwoot_dev_db` e `chatwoot004_dev_db`
+**Objetivo**: Resolver dúvida D1 — verificar versões reais dos bancos `chatwoot_dev1_db` e `chatwoot004_dev1_db`
 
 **Contexto**: Sem dados reais de versão e schema, impossível garantir compatibilidade na migração. D1 era bloqueante para especificação.
 
@@ -187,8 +187,8 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 5. Atualizar `objetivo.yaml`, `objetivo-init.yaml`, `constitution.md` e `PRE_SPEC_ANALYSIS_REPORT.md` com dados coletados
 
 **Resultado**: Dados reais coletados:
-- `chatwoot_dev_db`: migration=`20241217041352`, total=252 migrações, schema_sha1=`da6b4a366d...`
-- `chatwoot004_dev_db`: migration=`20240820191716`, total=255 migrações, schema_sha1=`da6b4a366d...` (**IDÊNTICO**)
+- `chatwoot_dev1_db`: migration=`20241217041352`, total=252 migrações, schema_sha1=`da6b4a366d...`
+- `chatwoot004_dev1_db`: migration=`20240820191716`, total=255 migrações, schema_sha1=`da6b4a366d...` (**IDÊNTICO**)
 - Contagens: contacts=38868/225536, conversations=41743/153582, messages=310155/1302949
 
 **Decisões técnicas**: schemas idênticos confirmam que migração é de dados apenas, sem transformação estrutural.
@@ -255,7 +255,7 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 **Contexto**: speckit.clarify bloqueia speckit.plan enquanto houver questões abertas.
 
 **Passos executados**:
-1. Q1: `migration_state` → tabela no banco `chatwoot004_dev_db`
+1. Q1: `migration_state` → tabela no banco `chatwoot004_dev1_db`
 2. Q2: batch size → 500 registros por transação
 3. Q3: log → `.tmp/migration_YYYYMMDD_HHMMSS.log` + stdout
 4. Q4: cobertura de testes → 90% (`fail_under`)
@@ -311,7 +311,7 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 - `6a7d8c8` — feat(plan): 6 arquivos — plan, research, data-model, cli-contract, quickstart
 
 **Pendências para próxima sessão**:
-- D2: destino final de `chatwoot_dev_db` pós-migração (decisão do owner — não bloqueante)
+- D2: destino final de `chatwoot_dev1_db` pós-migração (decisão do owner — não bloqueante)
 - `speckit.tasks`: geração de tasks de implementação (próximo passo imediato)
 
 **Status**: ✅ Sessão encerrada
