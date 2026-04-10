@@ -65,9 +65,7 @@ def test_run_batches_skips_already_migrated():
     dest_table = MagicMock()
 
     with patch.object(migrator._repo, "bulk_insert") as mock_insert:
-        result = migrator._run_batches(
-            rows, "test_table", dest_table, remap_fn=lambda r: r
-        )
+        result = migrator._run_batches(rows, "test_table", dest_table, remap_fn=lambda r: r)
 
     # Only id=1 should be inserted
     assert result.migrated == 1
@@ -100,9 +98,7 @@ def test_run_batches_partial_failure_continues():
             raise RuntimeError("DB error on first batch")
 
     with patch.object(migrator._repo, "bulk_insert", side_effect=fail_first_batch):
-        result = migrator._run_batches(
-            rows, "test_table", dest_table, remap_fn=lambda r: r
-        )
+        result = migrator._run_batches(rows, "test_table", dest_table, remap_fn=lambda r: r)
 
     assert len(result.failed_ids) == 500
     assert result.migrated == 501  # batches 2 (500) + 3 (1)
@@ -123,9 +119,7 @@ def test_run_batches_rerun_zero_new_records():
     dest_table = MagicMock()
 
     with patch.object(migrator._repo, "bulk_insert") as mock_insert:
-        result = migrator._run_batches(
-            rows, "test_table", dest_table, remap_fn=lambda r: r
-        )
+        result = migrator._run_batches(rows, "test_table", dest_table, remap_fn=lambda r: r)
 
     assert result.migrated == 0
     assert result.skipped == 100

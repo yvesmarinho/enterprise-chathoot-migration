@@ -17,12 +17,24 @@ from src.factory.connection_factory import ConfigError, ConnectionFactory
 # ---------------------------------------------------------------------------
 
 _VALID_CREDS = {
-    "host": "db.example.com",
-    "port": 5432,
-    "user": "migrate_user",
-    "password": "s3cr3t",
-    "source_db": "chatwoot_dev1_db",
-    "dest_db": "chatwoot004_dev1_db",
+    "instance_a": {
+        "engine": "postgresql",
+        "host": "db.example.com",
+        "port": 5432,
+        "SSL": False,
+        "database": "chatwoot_dev1_db",
+        "username": "migrate_user",
+        "password": "s3cr3t",
+    },
+    "instance_b": {
+        "engine": "postgresql",
+        "host": "db.example.com",
+        "port": 5432,
+        "SSL": False,
+        "database": "chatwoot004_dev1_db",
+        "username": "migrate_user",
+        "password": "s3cr3t",
+    },
 }
 
 
@@ -65,12 +77,24 @@ def test_invalid_json_raises_config_error(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("missing_key", list(_VALID_CREDS.keys()))
+@pytest.mark.parametrize(
+    "missing_key",
+    ["host", "port", "username", "password", "database"],
+)
 def test_missing_required_key_raises_config_error(tmp_path: Path, missing_key: str) -> None:
-    """ConfigError is raised when any single required key is absent."""
-    creds = {k: v for k, v in _VALID_CREDS.items() if k != missing_key}
+    """ConfigError is raised when any single required instance key is absent."""
+    modified = {k: v for k, v in _VALID_CREDS["instance_a"].items() if k != missing_key}
+    creds = {"instance_a": modified, "instance_b": _VALID_CREDS["instance_b"]}
     p = _write_secrets(tmp_path, creds)
     with pytest.raises(ConfigError, match="missing required keys"):
+        ConnectionFactory(secrets_path=p)
+
+
+def test_single_instance_raises_config_error(tmp_path: Path) -> None:
+    """ConfigError is raised when the file has fewer than 2 instances."""
+    creds = {"instance_a": _VALID_CREDS["instance_a"]}
+    p = _write_secrets(tmp_path, creds)
+    with pytest.raises(ConfigError, match="at least 2 database instances"):
         ConnectionFactory(secrets_path=p)
 
 

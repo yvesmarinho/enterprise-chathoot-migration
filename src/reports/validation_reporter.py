@@ -131,9 +131,7 @@ class ValidationReporter:
         # Totals row
         total_source = sum(r.total_source for r in results)
         total_migrated = sum(r.migrated for r in results)
-        total_dest = sum(
-            v for v in dest_counts.values() if isinstance(v, int) and v >= 0
-        )
+        total_dest = sum(v for v in dest_counts.values() if isinstance(v, int) and v >= 0)
         total_failed = sum(len(r.failed_ids) for r in results)
         lines.append("-" * (sum(_COL_WIDTHS) + 3 * (len(_COL_WIDTHS) - 1) + 2))
         lines.append(
@@ -158,11 +156,7 @@ class ValidationReporter:
             if r and r.failed_ids:
                 any_failed = True
                 ids_str = ", ".join(str(i) for i in r.failed_ids[:200])
-                suffix = (
-                    f"  (+ {len(r.failed_ids) - 200} more)"
-                    if len(r.failed_ids) > 200
-                    else ""
-                )
+                suffix = f"  (+ {len(r.failed_ids) - 200} more)" if len(r.failed_ids) > 200 else ""
                 lines.append(f"{table_name}: {ids_str}{suffix}")
         if not any_failed:
             lines.append("(none)")

@@ -51,9 +51,7 @@ class MessagesMigrator(BaseMigrator):
 
         with self.dest_engine.connect() as conn:
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
-            migrated_conversations = self.state_repo.get_migrated_ids(
-                conn, "conversations"
-            )
+            migrated_conversations = self.state_repo.get_migrated_ids(conn, "conversations")
             migrated_users = self.state_repo.get_migrated_ids(conn, "users")
 
         with self.source_engine.connect() as conn:
@@ -83,9 +81,7 @@ class MessagesMigrator(BaseMigrator):
 
             new_row = dict(row)
             new_row["id"] = self.id_remapper.remap(id_origin, "messages")
-            new_row["account_id"] = self.id_remapper.remap(
-                account_id_origin, "accounts"
-            )
+            new_row["account_id"] = self.id_remapper.remap(account_id_origin, "accounts")
 
             # Nullable FK: conversation_id — skip record on orphan
             conv_id = row.get("conversation_id")
@@ -98,18 +94,14 @@ class MessagesMigrator(BaseMigrator):
                         conv_id_origin,
                     )
                     return None
-                new_row["conversation_id"] = self.id_remapper.remap(
-                    conv_id_origin, "conversations"
-                )
+                new_row["conversation_id"] = self.id_remapper.remap(conv_id_origin, "conversations")
 
             # Nullable FK: sender_id — NULL-out if unmigrated
             sender_id = row.get("sender_id")
             if sender_id is not None:
                 sender_id_origin = int(sender_id)
                 if sender_id_origin in migrated_users:
-                    new_row["sender_id"] = self.id_remapper.remap(
-                        sender_id_origin, "users"
-                    )
+                    new_row["sender_id"] = self.id_remapper.remap(sender_id_origin, "users")
                 else:
                     new_row["sender_id"] = None
 

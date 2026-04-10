@@ -150,9 +150,7 @@ def test_accounts_no_exit_on_success():
     with patch.object(
         migrator,
         "_run_batches",
-        return_value=MigrationResult(
-            table="accounts", total_source=1, migrated=1, skipped=0
-        ),
+        return_value=MigrationResult(table="accounts", total_source=1, migrated=1, skipped=0),
     ):
         with patch("src.migrators.accounts_migrator.Table") as mock_table:
             mock_table.return_value = MagicMock()

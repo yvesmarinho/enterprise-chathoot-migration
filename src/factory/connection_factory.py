@@ -4,18 +4,25 @@
     from ``.secrets/generate_erd.json`` and creates engines for the source
     (read-only) and destination (read-write) PostgreSQL databases.
 
-    >>> from pathlib import Path
-    >>> import json, tempfile
-    >>> d = tempfile.mkdtemp()
-    >>> p = Path(d) / ".secrets" / "generate_erd.json"
-    >>> p.parent.mkdir()
-    >>> _ = p.write_text(json.dumps(
-    ...     {"host":"h","port":5432,"user":"u","password":"p",
-    ...      "source_db":"src","dest_db":"dst"}
-    ... ))
-    >>> cf = ConnectionFactory(secrets_path=p)
-    >>> cf._creds["host"]
-    'h'
+    The secrets file uses a named-instance schema (version 2.0)::
+
+        {
+            "_schema_version": "2.0",
+            "instance_a": {
+                "host": "...", "port": 5432,
+                "username": "...", "password": "...",
+                "database": "db_origem"
+            },
+            "instance_b": {
+                "host": "...", "port": 5432,
+                "username": "...", "password": "...",
+                "database": "db_destino"
+            }
+        }
+
+    By default the **first** non-metadata instance (keys not starting with
+    ``_``) is treated as the source and the **second** as the destination.
+    This can be overridden via the constructor parameters.
 """
 
 from __future__ import annotations
@@ -36,8 +43,8 @@ class ConfigError(Exception):
     """
 
 
-_REQUIRED_KEYS: frozenset[str] = frozenset(
-    {"host", "port", "user", "password", "source_db", "dest_db"}
+_REQUIRED_INSTANCE_KEYS: frozenset[str] = frozenset(
+    {"host", "port", "username", "password", "database"}
 )
 
 _DEFAULT_SECRETS_PATH = Path(".secrets") / "generate_erd.json"
@@ -49,12 +56,22 @@ class ConnectionFactory:
     Credentials are loaded exclusively from a JSON secrets file.
     No credential value is ever logged or printed.
 
+    The secrets file must contain at least two named instances (keys that do
+    not start with ``_``).  By default, the first instance is used as the
+    **source** (read-only) and the second as the **destination** (read-write).
+
     :param secrets_path: Path to the JSON secrets file.
         Defaults to ``.secrets/generate_erd.json`` relative to CWD.
     :type secrets_path: Path | None
+    :param source_instance: Key name of the source instance inside the secrets
+        file.  If omitted, the first non-metadata key is used.
+    :type source_instance: str | None
+    :param dest_instance: Key name of the destination instance inside the
+        secrets file.  If omitted, the second non-metadata key is used.
+    :type dest_instance: str | None
 
-    :raises ConfigError: If the secrets file is missing, unreadable,
-        or does not contain all required keys.
+    :raises ConfigError: If the secrets file is missing, unreadable, or does
+        not contain the required instance keys.
 
     Example::
 
@@ -63,15 +80,43 @@ class ConnectionFactory:
         dst = factory.create_dest_engine()
     """
 
-    def __init__(self, secrets_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        secrets_path: Path | None = None,
+        source_instance: str | None = None,
+        dest_instance: str | None = None,
+    ) -> None:
         """Initialise and load credentials from the secrets file.
 
         :param secrets_path: Override path to the secrets file.
         :type secrets_path: Path | None
-        :raises ConfigError: If the file is missing or malformed.
+        :param source_instance: Key of the source instance in the file.
+        :type source_instance: str | None
+        :param dest_instance: Key of the destination instance in the file.
+        :type dest_instance: str | None
+        :raises ConfigError: If the file is missing, malformed, or the
+            requested instance keys are absent.
         """
         path = secrets_path or _DEFAULT_SECRETS_PATH
-        self._creds: dict[str, Any] = self._load(path)
+        all_instances = self._load(path)
+
+        non_meta = [k for k in all_instances if not k.startswith("_")]
+        if len(non_meta) < 2:
+            raise ConfigError(
+                "Secrets file must contain at least 2 database instances "
+                f"(found {len(non_meta)})"
+            )
+
+        src_key = source_instance or non_meta[0]
+        dst_key = dest_instance or non_meta[1]
+
+        if src_key not in all_instances:
+            raise ConfigError(f"Source instance '{src_key}' not found in secrets file")
+        if dst_key not in all_instances:
+            raise ConfigError(f"Dest instance '{dst_key}' not found in secrets file")
+
+        self._source: dict[str, Any] = all_instances[src_key]
+        self._dest: dict[str, Any] = all_instances[dst_key]
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -79,14 +124,14 @@ class ConnectionFactory:
 
     @staticmethod
     def _load(path: Path) -> dict[str, Any]:
-        """Load and validate credentials from *path*.
+        """Load and validate the secrets file at *path*.
 
         :param path: Path to the JSON secrets file.
         :type path: Path
-        :returns: Validated credentials dictionary.
+        :returns: Full parsed JSON as a dict (metadata keys included).
         :rtype: dict[str, Any]
-        :raises ConfigError: If file is missing, not valid JSON, or
-            missing required keys.
+        :raises ConfigError: If the file is missing, not valid JSON, or any
+            non-metadata instance is missing required keys.
         """
         if not path.exists():
             raise ConfigError(f"Secrets file not found: {path}")
@@ -95,23 +140,29 @@ class ConnectionFactory:
         except (json.JSONDecodeError, OSError) as exc:
             raise ConfigError(f"Failed to read secrets file: {exc}") from exc
 
-        missing = _REQUIRED_KEYS - set(data.keys())
-        if missing:
-            raise ConfigError(f"Secrets file missing required keys: {sorted(missing)}")
+        for key, value in data.items():
+            if key.startswith("_"):
+                continue
+            if not isinstance(value, dict):
+                raise ConfigError(
+                    f"Instance '{key}' must be a JSON object, got {type(value).__name__}"
+                )
+            missing = _REQUIRED_INSTANCE_KEYS - set(value.keys())
+            if missing:
+                raise ConfigError(f"Instance '{key}' missing required keys: {sorted(missing)}")
         return data
 
-    def _build_url(self, db_name: str) -> str:
-        """Build a PostgreSQL connection URL (no SSL).
+    def _build_url(self, instance: dict[str, Any]) -> str:
+        """Build a PostgreSQL connection URL (no SSL) for *instance*.
 
-        :param db_name: Target database name.
-        :type db_name: str
+        :param instance: Instance credentials dict from the secrets file.
+        :type instance: dict[str, Any]
         :returns: SQLAlchemy connection URL string.
         :rtype: str
         """
-        c = self._creds
         return (
-            f"postgresql+psycopg2://{c['user']}:{c['password']}"
-            f"@{c['host']}:{c['port']}/{db_name}"
+            f"postgresql+psycopg2://{instance['username']}:{instance['password']}"
+            f"@{instance['host']}:{instance['port']}/{instance['database']}"
             "?sslmode=disable"
         )
 
@@ -120,16 +171,16 @@ class ConnectionFactory:
     # ------------------------------------------------------------------
 
     def create_source_engine(self) -> Engine:
-        """Create a read-only engine for ``chatwoot_dev1_db``.
+        """Create a read-only engine for the source database.
 
-        The engine is configured with ``sslmode=disable`` and
-        ``execution_options(no_autocommit=True)`` to prevent accidental writes.
+        The database name is read exclusively from the secrets file.
+        The engine is configured with ``execution_options(no_autocommit=True)``
+        to prevent accidental writes.
 
         :returns: SQLAlchemy engine connected to the source database.
         :rtype: Engine
-        :raises ConfigError: If credentials are not loaded.
         """
-        url = self._build_url(self._creds["source_db"])
+        url = self._build_url(self._source)
         return create_engine(
             url,
             execution_options={"no_autocommit": True},
@@ -137,13 +188,14 @@ class ConnectionFactory:
         )
 
     def create_dest_engine(self) -> Engine:
-        """Create a read-write engine for ``chatwoot004_dev1_db``.
+        """Create a read-write engine for the destination database.
+
+        The database name is read exclusively from the secrets file.
 
         :returns: SQLAlchemy engine connected to the destination database.
         :rtype: Engine
-        :raises ConfigError: If credentials are not loaded.
         """
-        url = self._build_url(self._creds["dest_db"])
+        url = self._build_url(self._dest)
         return create_engine(
             url,
             pool_pre_ping=True,

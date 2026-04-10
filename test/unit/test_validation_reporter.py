@@ -161,8 +161,7 @@ def test_report_file_path_format():
         reporter.generate(results, engine, duration_seconds=2.0)
 
     assert any(
-        re.match(r"migration_\d{8}_\d{6}_report\.txt", name)
-        for name in filenames_written
+        re.match(r"migration_\d{8}_\d{6}_report\.txt", name) for name in filenames_written
     ), f"No matching filename found in: {filenames_written}"
 
 

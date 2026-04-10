@@ -174,11 +174,7 @@ def test_conversations_assignee_id_nulled_when_unmigrated():
 
 def test_conversations_all_fk_columns_remapped():
     """All 5 FK columns are remapped when all FKs are valid."""
-    rows = [
-        _base_row(
-            id=5, account_id=1, inbox_id=1, contact_id=1, assignee_id=1, team_id=1
-        )
-    ]
+    rows = [_base_row(id=5, account_id=1, inbox_id=1, contact_id=1, assignee_id=1, team_id=1)]
     remapped = []
 
     def capture(source_rows, table_name, dest_table, remap_fn):

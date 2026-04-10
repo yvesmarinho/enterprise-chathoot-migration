@@ -168,9 +168,7 @@ def test_attachments_fk_remapping():
                 remapped.append(r)
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
-    migrator = _make_migrator(
-        source_rows=rows, migrated={"messages": {3}, "accounts": {1}}
-    )
+    migrator = _make_migrator(source_rows=rows, migrated={"messages": {3}, "accounts": {1}})
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.attachments_migrator.Table") as mock_table:
             mock_table.return_value = MagicMock()

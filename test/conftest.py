@@ -31,12 +31,24 @@ def tmp_secrets(tmp_path: Path) -> Path:
     secrets_file.write_text(
         json.dumps(
             {
-                "host": "localhost",
-                "port": 5432,
-                "user": "test_user",
-                "password": "test_pass",
-                "source_db": "chatwoot_dev1_db",
-                "dest_db": "chatwoot004_dev1_db",
+                "instance_a": {
+                    "engine": "postgresql",
+                    "host": "localhost",
+                    "port": 5432,
+                    "SSL": False,
+                    "database": "chatwoot_dev1_db",
+                    "username": "test_user",
+                    "password": "test_pass",
+                },
+                "instance_b": {
+                    "engine": "postgresql",
+                    "host": "localhost",
+                    "port": 5432,
+                    "SSL": False,
+                    "database": "chatwoot004_dev1_db",
+                    "username": "test_user",
+                    "password": "test_pass",
+                },
             }
         )
     )
