@@ -9,18 +9,20 @@
 
 Usage::
 
-    python src/migrar.py [--dry-run] [--only-table <name>] [--verbose]
+    python src/migrar.py [--dry-run] [--poc] [--only-table <name>] [--verbose]
 
 Exit codes:
 
-    * ``0`` — all tables migrated successfully (0 failed IDs)
+    * ``0`` — all tables migrated (or classified) successfully
     * ``1`` — partial failure (some IDs failed, non-catastrophic)
     * ``3`` — catastrophic failure in ``accounts`` (root entity) — aborted
 
 Options:
-    ``--dry-run``      Skip all writes; log what *would* be done.
-    ``--only-table``   Migrate a single table (FK order check still applies).
-    ``--verbose``      Set log level to DEBUG.
+    ``--dry-run``  Skip all writes; log what *would* be done.
+    ``--poc``      Classify all source rows (requires ``--dry-run``);
+                  generates ``.tmp/poc_YYYYMMDD_HHMMSS_report.txt``.
+    ``--only-table``  Migrate/classify a single table.
+    ``--verbose``  Set log level to DEBUG.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ from src.migrators.labels_migrator import LabelsMigrator
 from src.migrators.messages_migrator import MessagesMigrator
 from src.migrators.teams_migrator import TeamsMigrator
 from src.migrators.users_migrator import UsersMigrator
+from src.reports.poc_reporter import POCReporter
 from src.reports.validation_reporter import ValidationReporter
 from src.repository.migration_state_repository import MigrationStateRepository
 from src.utils.fk_validator import FKValidator
@@ -135,6 +138,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"Migrate only this table. Choices: {', '.join(_MIGRATION_ORDER)}",
     )
     parser.add_argument(
+        "--poc",
+        action="store_true",
+        help=(
+            "Classify all source rows without writing to destination. "
+            "Must be combined with --dry-run. "
+            "Generates .tmp/poc_YYYYMMDD_HHMMSS_report.txt."
+        ),
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Set log level to DEBUG.",
@@ -154,8 +166,13 @@ def main(argv: list[str] | None = None) -> int:
     logger, log_file = _setup_logging(args.verbose)
 
     logger.info("=== Enterprise Chatwoot Migration starting ===")
+    if args.poc and not args.dry_run:
+        logger.error("--poc requires --dry-run. Aborting.")
+        return 2
     if args.dry_run:
         logger.warning("DRY-RUN mode — no writes will be performed")
+    if args.poc:
+        logger.warning("POC mode — classifying source rows, no writes")
 
     # (1) Record start time
     start_time = time.time()
@@ -177,10 +194,28 @@ def main(argv: list[str] | None = None) -> int:
     offsets = remapper.compute_offsets(dest_engine, _MIGRATION_ORDER)
     logger.info("Offsets computed: %s", offsets)
 
+    # (3b) Pre-seed remapper aliases from migration_state so that id_remapper.remap()
+    # returns the correct dest_id even after restarts where the computed offset may
+    # differ from the offset used in a previous run.
+    if not args.dry_run:
+        total_aliases = 0
+        with dest_engine.connect() as conn:
+            for table in _MIGRATION_ORDER:
+                pairs = state_repo.get_migrated_id_pairs(conn, table)
+                for src_id, dest_id in pairs:
+                    remapper.register_alias(table, src_id, dest_id)
+                total_aliases += len(pairs)
+        logger.info("Pre-loaded %d ID mappings from migration_state into remapper", total_aliases)
+
     # (4) Determine which tables to migrate
     tables_to_migrate = [args.only_table] if args.only_table else list(_MIGRATION_ORDER)
 
-    results = []
+    results: list = []
+    poc_results: list = []
+    # Simulated destination ID sets used by classify_row_poc for FK checks.
+    # After classifying each table we populate it with the source IDs that
+    # WOULD be migrated so downstream migrators get a realistic FK set.
+    _poc_migrated_sets: dict[str, set[int]] = {}
 
     # (5) Run migrators in FK order
     for table_name in tables_to_migrate:
@@ -192,6 +227,33 @@ def main(argv: list[str] | None = None) -> int:
             state_repo=state_repo,
             logger=logging.getLogger(f"migrar.{table_name}"),
         )
+
+        if args.poc:
+            # POC mode: classify without writing
+            logger.info("[POC] Classifying table: %s", table_name)
+            already_migrated: set[int] = set()
+            try:
+                with dest_engine.connect() as conn:
+                    already_migrated = state_repo.get_migrated_ids(conn, table_name)
+            except Exception:  # noqa: BLE001
+                pass  # state table may not exist; treat as empty
+            poc_result = migrator.poc_classify(
+                already_migrated=already_migrated,
+                migrated_sets=_poc_migrated_sets,
+            )
+            poc_results.append(poc_result)
+            # Populate _poc_migrated_sets with the FULL set of IDs that
+            # would survive (WOULD_MIGRATE + WOULD_MIGRATE_MODIFIED).
+            # POCResult.surviving_ids is populated by add_record() for every
+            # classified record — not limited to the sample cap — so FK chain
+            # validation in downstream tables is accurate.
+            _poc_migrated_sets[table_name] = poc_result.surviving_ids
+            logger.debug(
+                "[POC] %s surviving=%d (full set)",
+                table_name,
+                len(poc_result.surviving_ids),
+            )
+            continue
 
         if args.dry_run:
             logger.info("[DRY-RUN] Would migrate table: %s", table_name)
@@ -205,6 +267,14 @@ def main(argv: list[str] | None = None) -> int:
     # (6) Compute elapsed and generate report
     elapsed = time.time() - start_time
     logger.info("Migration pipeline elapsed: %.2fs", elapsed)
+
+    if poc_results:
+        poc_reporter = POCReporter()
+        poc_path = poc_reporter.generate(poc_results, elapsed)
+        logger.info("POC report saved: %s", poc_path)
+        logger.info("=== POC dry-run completed (exit code 0) ===")
+        logger.info("Log file: %s", log_file)
+        return 0
 
     if results:
         reporter = ValidationReporter()
@@ -223,9 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     # (8) Determine exit code
     total_failed = sum(len(r.failed_ids) for r in results)
     if total_failed > 0:
-        logger.warning(
-            "Migration completed with %d failed records (exit code 1)", total_failed
-        )
+        logger.warning("Migration completed with %d failed records (exit code 1)", total_failed)
         return 1
 
     logger.info("=== Migration completed successfully (exit code 0) ===")

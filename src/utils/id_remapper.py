@@ -48,6 +48,9 @@ class IDRemapper:
         :type offsets: dict[str, int] | None
         """
         self._offsets: dict[str, int] = offsets or {}
+        # Explicit src→dest mappings that override the offset for specific IDs.
+        # Used for merge-rule accounts (same id+name) and deduped contacts.
+        self._aliases: dict[str, dict[int, int]] = {}
 
     @property
     def offsets(self) -> dict[str, int]:
@@ -83,18 +86,52 @@ class IDRemapper:
     def remap(self, id_origem: int, table: str) -> int:
         """Apply the session offset to a single source record ID.
 
+        Aliases (registered via :meth:`register_alias`) take precedence over
+        the offset — this allows merge-rule accounts and deduplicated contacts
+        to map to existing destination IDs rather than offset-shifted ones.
+
         :param id_origem: Original ID from the source database.
         :type id_origem: int
         :param table: Table name used to look up the offset.
         :type table: str
         :returns: Remapped ID for insertion into the destination database.
         :rtype: int
-        :raises KeyError: If *table* is not in the computed offsets.
+        :raises KeyError: If *table* is not in the computed offsets and has no alias.
 
         >>> r = IDRemapper({"contacts": 500})
         >>> r.remap(1, "contacts")
         501
+        >>> r.register_alias("contacts", 99, 42)
+        >>> r.remap(99, "contacts")
+        42
         """
+        tbl_aliases = self._aliases.get(table)
+        if tbl_aliases is not None and id_origem in tbl_aliases:
+            return tbl_aliases[id_origem]
         if table not in self._offsets:
             raise KeyError(f"Table '{table}' not found in offsets. Call compute_offsets first.")
         return id_origem + self._offsets[table]
+
+    def register_alias(self, table: str, src_id: int, dest_id: int) -> None:
+        """Register an explicit src→dest mapping that overrides the offset.
+
+        Used for the accounts merge rule (same id+name → reuse dest_id) and
+        for contact deduplication (same account_id+phone/email → reuse dest_id).
+        Must be called before any downstream :meth:`remap` call that references
+        the same table and source ID.
+
+        :param table: Table name (e.g. ``"accounts"``, ``"contacts"``).
+        :type table: str
+        :param src_id: Source record ID.
+        :type src_id: int
+        :param dest_id: Existing destination record ID to map to.
+        :type dest_id: int
+
+        >>> r = IDRemapper({"accounts": 43})
+        >>> r.register_alias("accounts", 1, 1)
+        >>> r.remap(1, "accounts")
+        1
+        >>> r.remap(4, "accounts")
+        47
+        """
+        self._aliases.setdefault(table, {})[src_id] = dest_id

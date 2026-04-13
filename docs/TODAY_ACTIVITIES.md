@@ -1,6 +1,6 @@
 # 📅 Atividades — Enterprise Chathoot Migration
 
-**Data**: 2026-04-09
+**Data**: 2026-04-09 → 2026-04-13
 **Projeto**: `enterprise-chathoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Status**: ✅ Sessão encerrada
@@ -167,3 +167,60 @@
 ---
 
 *Atualizado em 2026-04-10 — Session Manager*
+
+---
+
+# 📅 Atividades — 2026-04-13
+
+**Data**: 2026-04-13
+**Projeto**: `enterprise-chathoot-migration`
+**Branch**: `001-enterprise-chatwoot-migration`
+**Status**: ✅ Sessão encerrada
+
+---
+
+## ⏰ Atividades do Dia
+
+### ✅ 10 Bug Fixes (FIX-01 a FIX-10)
+
+| Fix | Arquivo | Problema → Solução |
+|-----|---------|-------------------|
+| FIX-01 | `src/repository/base_repository.py` | bulk_insert nested begin() → removido |
+| FIX-02 | `src/migrators/users_migrator.py` | pubsub_token UniqueViolation → secrets.token_hex(32) |
+| FIX-03 | `src/migrators/users_migrator.py` | reset_password_token/confirmation_token → NULL |
+| FIX-04 | teams/labels migrators | dedup pre-step para contas merged |
+| FIX-05 | `src/migrators/accounts_migrator.py` | account_users per-row + ON CONFLICT DO NOTHING |
+| FIX-06 | `src/migrators/users_migrator.py` | migrated_user_ids pré-carregados de migration_state |
+| FIX-07 | `src/repository/migration_state_repository.py` | record_success_bulk() — 1 INSERT/batch |
+| FIX-08 | `src/migrators/contacts_migrator.py` | contacts dedup usa record_success_bulk |
+| FIX-09 **(CRÍTICO)** | `src/utils/id_remapper.py` | get_migrated_id_pairs() + pre-load IDRemapper startup |
+| FIX-10 | `src/migrators/conversations_migrator.py` | UUID regenerado — evita UniqueViolation no DEST |
+
+### ✅ RUN-8 — Migração de Produção (PID 123297, 838.6s)
+
+- **conversations: 33.255 migrados, 0 failed** ✅
+- **messages: 221.933 migrados, 0 failed** ✅
+- **attachments: 21.581 migrados, 0 failed** ✅
+- contacts: 639 failed (orphan account_ids — aceito)
+- Log: `.tmp/migration_real_20260413_162621.log`
+
+---
+
+## 🔖 Commits
+
+| Hash | Descrição |
+|------|-----------|
+| (encerramento) | docs(session-end): encerramento 2026-04-13 — RUN-8 completo |
+
+---
+
+## ⏭️ Próxima Sessão
+
+- Investigar 639 contacts orphans (account_ids 2,3,5,6,10)
+- Validar integridade referencial pós-migração
+- Adicionar testes para os 10 bug fixes
+- Preparar PR para merge
+
+---
+
+*Atualizado em 2026-04-13 — Session Manager*

@@ -123,3 +123,77 @@ def test_offsets_property_returns_copy() -> None:
     snapshot = remapper.offsets
     snapshot["users"] = 999
     assert remapper.offsets["users"] == 294
+
+
+# ---------------------------------------------------------------------------
+# T013-8 — register_alias overrides offset for specific IDs
+# ---------------------------------------------------------------------------
+
+
+def test_register_alias_overrides_offset() -> None:
+    """register_alias causes remap to return dest_id instead of id+offset."""
+    remapper = IDRemapper({"accounts": 43})
+    remapper.register_alias("accounts", 1, 1)
+    remapper.register_alias("accounts", 17, 17)
+
+    # Aliased IDs return dest_id exactly
+    assert remapper.remap(1, "accounts") == 1
+    assert remapper.remap(17, "accounts") == 17
+
+
+# ---------------------------------------------------------------------------
+# T013-9 — non-aliased IDs still use offset even when aliases exist
+# ---------------------------------------------------------------------------
+
+
+def test_non_aliased_ids_still_use_offset() -> None:
+    """IDs without an alias still apply the offset normally."""
+    remapper = IDRemapper({"accounts": 43})
+    remapper.register_alias("accounts", 1, 1)
+
+    # id=4 has no alias → 4 + 43 = 47
+    assert remapper.remap(4, "accounts") == 47
+    # id=18 has no alias → 18 + 43 = 61
+    assert remapper.remap(18, "accounts") == 61
+
+
+# ---------------------------------------------------------------------------
+# T013-10 — alias on one table does not affect another table's remap
+# ---------------------------------------------------------------------------
+
+
+def test_alias_scoped_to_table() -> None:
+    """An alias registered for one table does not affect a different table."""
+    remapper = IDRemapper({"accounts": 43, "contacts": 226274})
+    remapper.register_alias("accounts", 1, 1)
+
+    # contacts id=1 has no alias → 1 + 226274 = 226275
+    assert remapper.remap(1, "contacts") == 226275
+
+
+# ---------------------------------------------------------------------------
+# T013-11 — alias can map to a dest_id different from src_id (contact dedup)
+# ---------------------------------------------------------------------------
+
+
+def test_alias_maps_to_different_dest_id() -> None:
+    """register_alias correctly returns an arbitrary dest_id (contact dedup use-case)."""
+    remapper = IDRemapper({"contacts": 226274})
+    remapper.register_alias("contacts", 500, 1234)
+
+    assert remapper.remap(500, "contacts") == 1234
+    # Other IDs still use offset
+    assert remapper.remap(100, "contacts") == 226374
+
+
+# ---------------------------------------------------------------------------
+# T013-12 — register_alias on unknown table works (no offset required)
+# ---------------------------------------------------------------------------
+
+
+def test_alias_works_without_offset_entry() -> None:
+    """register_alias + remap works even if table has no entry in offsets
+    (alias lookup resolves before the KeyError check)."""
+    remapper = IDRemapper({})
+    remapper.register_alias("contacts", 7, 99)
+    assert remapper.remap(7, "contacts") == 99

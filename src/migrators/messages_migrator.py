@@ -116,3 +116,71 @@ class MessagesMigrator(BaseMigrator):
             len(result.failed_ids),
         )
         return result
+
+    # ------------------------------------------------------------------
+    # POC dry-run hooks
+    # ------------------------------------------------------------------
+
+    def _table_name(self) -> str:
+        """Return canonical table name.
+
+        :returns: ``"messages"``
+        :rtype: str
+        """
+        return "messages"
+
+    def _fetch_all_source_rows(self) -> list[dict]:
+        """Fetch all rows from source ``messages``.
+
+        :returns: All source rows as plain dicts.
+        :rtype: list[dict]
+        """
+        src_meta = MetaData()
+        src_table = Table("messages", src_meta, autoload_with=self.source_engine)
+        with self.source_engine.connect() as conn:
+            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+
+    def _classify_row_poc(  # type: ignore[override]
+        self,
+        row: dict,
+        migrated_sets: dict[str, set[int]],
+    ) -> tuple:
+        """Classify a messages row for POC dry-run.
+
+        Required FKs (skip on orphan): ``account_id``, ``conversation_id``.
+        Nullable FK (NULL-out): ``sender_id``.
+
+        :param row: Source row as plain dict.
+        :type row: dict
+        :param migrated_sets: Dest ID sets keyed by table name.
+        :type migrated_sets: dict[str, set[int]]
+        :returns: ``(outcome, reason)`` tuple.
+        :rtype: tuple
+        """
+        from src.reports.poc_reporter import Outcome
+
+        accts = migrated_sets.get("accounts", set())
+        convs = migrated_sets.get("conversations", set())
+        users = migrated_sets.get("users", set())
+
+        account_id = int(row["account_id"])
+        if account_id not in accts:
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"account_id={account_id} not in migrated accounts",
+            )
+
+        conv_id = row.get("conversation_id")
+        if conv_id is not None and int(conv_id) not in convs:
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"conversation_id={conv_id} not in migrated conversations",
+            )
+
+        sender_id = row.get("sender_id")
+        if sender_id is not None and int(sender_id) not in users:
+            return (
+                Outcome.WOULD_MIGRATE_MODIFIED,
+                f"sender_id={sender_id} not migrated → will be NULL-outed",
+            )
+        return Outcome.WOULD_MIGRATE, "clean"

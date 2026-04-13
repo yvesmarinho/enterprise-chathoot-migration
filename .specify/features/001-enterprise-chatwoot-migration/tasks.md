@@ -114,10 +114,30 @@
 
 ---
 
+## Phase POC: Dry-Run de Classificação (Pré-Migração de Produção)
+
+**Purpose**: Executar o código de migração em modo classificatório — sem escrita — para mapear
+todas as ocorrências antecipadamente antes da migração de produção.
+
+**Independent test criteria**: Run `python src/migrar.py --dry-run --poc` with mocked engines;
+verify `POCResult` classifications cover every source record and report is generated with no DB writes.
+
+**Acceptance scenarios covered**: US4 §SC-1 (all 38.868 contacts classified without INSERT),
+§SC-2 (report at `.tmp/poc_*_report.txt` with 9 tables + samples), §SC-3 (ORPHAN_FK_SKIP
+sampled), §SC-4 (no PII in report).
+
+- [x] TPOC001 Implement `src/reports/poc_reporter.py`: `Outcome` enum (`WOULD_MIGRATE`, `WOULD_MIGRATE_MODIFIED`, `ORPHAN_FK_SKIP`, `ALREADY_MIGRATED`, `COLLISION`); `RecordSample` dataclass (`id_origem`, `outcome`, `reason`, `masked_preview: dict`); `POCResult` dataclass (`table`, `total_source`, `outcome_counts: dict`, `samples: dict`; `add_record(sample)` caps at `MAX_SAMPLES=10` per outcome); `POCReporter.generate(results: list[POCResult], duration_seconds: float) -> Path` writes summary table + samples section to `.tmp/poc_YYYYMMDD_HHMMSS_report.txt` — `src/reports/poc_reporter.py`
+- [x] TPOC002 Add `poc_classify(already_migrated: set[int], migrated_sets: dict[str, set[int]]) -> POCResult` to `BaseMigrator`: abstract hooks `_table_name()` + `_fetch_all_source_rows()`; concrete loop + `_classify_row_poc()` default (WOULD_MIGRATE) + `_poc_safe_preview()`; all 9 concrete migrators implement hooks + override `_classify_row_poc` with FK-specific rules; no INSERT/UPDATE/DDL — `src/migrators/base_migrator.py` + all 9 migrators
+- [x] TPOC003 Add `--poc` flag to `src/migrar.py`: when `--dry-run --poc`, calls `poc_classify()` on each migrator in FK order using source read-only connections and no state table creation; collects `POCResult`s; calls `POCReporter.generate()` and logs report path at INFO; exits with code 0 on success — `src/migrar.py`
+- [x] TPOC004 Execute POC against real DBs: run `python src/migrar.py --dry-run --poc`; verify `.tmp/poc_*_report.txt` generated; verify all 9 tables appear with classification counts; review and document unexpected patterns — (execution task, no source changes)
+- [x] TPOC005 [P] Implement `test/unit/test_poc_reporter.py`: test all 5 `Outcome` values appear in report; test `add_record()` caps at 10 samples per outcome; test `generate()` report path matches `poc_YYYYMMDD_HHMMSS_report.txt`; test sensitive data in `masked_preview` produces masked output; test `generate()` with empty results produces valid file — `test/unit/test_poc_reporter.py`
+
+---
+
 ## Dependency Graph
 
 ```
-Phase 1 (Setup) → Phase 2 (Foundational) → Phase 3 (US1) → Phase 4 (US2) → Phase 5 (US3) → Final
+Phase 1 (Setup) → Phase 2 (Foundational) → Phase 3 (US1) → Phase 4 (US2) → Phase 5 (US3) → Final → Phase POC
 ```
 
 **User Story completion order** (by priority and dependency):
@@ -169,6 +189,7 @@ Delivers the core migration. Phase 2 Foundational tasks take ~2–3 hours. US1 m
 2. **Sprint 2**: T034–T036 → US2 idempotency proven by integration test
 3. **Sprint 3**: T037, T039 → US3 report generation (T038 removed — integrated into T024 step 6)
 4. **Sprint 4**: T040–T044 → Polish, 90% coverage gate confirmed
+5. **Sprint POC** (pré-produção): TPOC001–TPOC005 → POC report validates all migration occurrences before production run
 
 ---
 
@@ -176,15 +197,17 @@ Delivers the core migration. Phase 2 Foundational tasks take ~2–3 hours. US1 m
 
 | Metric | Value |
 |--------|-------|
-| Total tasks | 44 |
+| Total tasks | 49 |
 | Phase 1 — Setup | 5 tasks |
 | Phase 2 — Foundational | 9 tasks |
 | Phase 3 — US1 (Migração Completa) | 20 tasks |
 | Phase 4 — US2 (Idempotência) | 3 tasks |
 | Phase 5 — US3 (Relatório) | 2 tasks (T038 removed — duplicate of T024 step 6) |
 | Final — Polish | 5 tasks (T040–T044 + T045 docstrings) |
-| Parallelizable tasks [P] | 30 tasks |
+| Phase POC — Dry-Run POC | 5 tasks (TPOC001–TPOC005) |
+| Parallelizable tasks [P] | 31 tasks |
 | US1 tasks | 20 tasks |
 | US2 tasks | 3 tasks |
 | US3 tasks | 2 tasks |
+| US4 tasks | 5 tasks |
 | MVP scope (US1 only) | T001–T033 (33 tasks) |

@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import MetaData, Table
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
@@ -122,6 +124,9 @@ class ConversationsMigrator(BaseMigrator):
                 else:
                     new_row["team_id"] = None
 
+            # Regenerate uuid to avoid UniqueViolation on index_conversations_on_uuid
+            new_row["uuid"] = str(uuid.uuid4())
+
             return new_row
 
         result = self._run_batches(rows, "conversations", dest_table, remap_fn)
@@ -133,3 +138,87 @@ class ConversationsMigrator(BaseMigrator):
             len(result.failed_ids),
         )
         return result
+
+    # ------------------------------------------------------------------
+    # POC dry-run hooks
+    # ------------------------------------------------------------------
+
+    def _table_name(self) -> str:
+        """Return canonical table name.
+
+        :returns: ``"conversations"``
+        :rtype: str
+        """
+        return "conversations"
+
+    def _fetch_all_source_rows(self) -> list[dict]:
+        """Fetch all rows from source ``conversations``.
+
+        :returns: All source rows as plain dicts.
+        :rtype: list[dict]
+        """
+        src_meta = MetaData()
+        src_table = Table("conversations", src_meta, autoload_with=self.source_engine)
+        with self.source_engine.connect() as conn:
+            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+
+    def _classify_row_poc(  # type: ignore[override]
+        self,
+        row: dict,
+        migrated_sets: dict[str, set[int]],
+    ) -> tuple:
+        """Classify a conversations row for POC dry-run.
+
+        Required FKs (skip on orphan): ``account_id``, ``inbox_id``,
+        ``contact_id`` (treated as required per spec).
+        Nullable FKs (NULL-out): ``assignee_id``, ``team_id``.
+
+        :param row: Source row as plain dict.
+        :type row: dict
+        :param migrated_sets: Dest ID sets keyed by table name.
+        :type migrated_sets: dict[str, set[int]]
+        :returns: ``(outcome, reason)`` tuple.
+        :rtype: tuple
+        """
+        from src.reports.poc_reporter import Outcome
+
+        accts = migrated_sets.get("accounts", set())
+        inboxes = migrated_sets.get("inboxes", set())
+        contacts = migrated_sets.get("contacts", set())
+        users = migrated_sets.get("users", set())
+        teams = migrated_sets.get("teams", set())
+
+        account_id = int(row["account_id"])
+        if account_id not in accts:
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"account_id={account_id} not in migrated accounts",
+            )
+
+        inbox_id = int(row["inbox_id"])
+        if inbox_id not in inboxes:
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"inbox_id={inbox_id} not in migrated inboxes",
+            )
+
+        contact_id = row.get("contact_id")
+        if contact_id is not None and int(contact_id) not in contacts:
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"contact_id={contact_id} not in migrated contacts",
+            )
+
+        nulled: list[str] = []
+        assignee_id = row.get("assignee_id")
+        if assignee_id is not None and int(assignee_id) not in users:
+            nulled.append(f"assignee_id={assignee_id}")
+        team_id = row.get("team_id")
+        if team_id is not None and int(team_id) not in teams:
+            nulled.append(f"team_id={team_id}")
+        if nulled:
+            return (
+                Outcome.WOULD_MIGRATE_MODIFIED,
+                "nullable FKs NULL-outed: " + ", ".join(nulled),
+            )
+        return Outcome.WOULD_MIGRATE, "clean"

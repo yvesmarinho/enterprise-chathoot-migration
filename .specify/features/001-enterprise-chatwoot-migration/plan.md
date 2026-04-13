@@ -78,7 +78,8 @@ src/
 │   ├── log_masker.py                # Mascaramento automático de dados sensíveis
 │   └── fk_validator.py             # Validação pós-migração de integridade referencial
 └── reports/
-    └── validation_reporter.py       # Relatório final por tabela
+    ├── validation_reporter.py       # Relatório final por tabela
+    └── poc_reporter.py              # Classificação POC dry-run + report
 
 test/
 ├── unit/

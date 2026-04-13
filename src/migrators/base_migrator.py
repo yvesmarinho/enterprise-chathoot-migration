@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import Table
 from sqlalchemy.engine import Engine
 
+from src.reports.poc_reporter import Outcome, POCResult, RecordSample
 from src.repository.base_repository import BaseRepository
 from src.repository.migration_state_repository import MigrationStateRepository
 from src.utils.id_remapper import IDRemapper
@@ -103,6 +104,138 @@ class BaseMigrator(ABC):
             catastrophic failure in root entities (e.g., ``accounts``).
         """
 
+    @abstractmethod
+    def _table_name(self) -> str:
+        """Return the canonical table name for this migrator.
+
+        Used by :meth:`poc_classify` to label :class:`POCResult`.
+
+        :returns: Lowercased table name string (e.g., ``"accounts"``).
+        :rtype: str
+        """
+
+    @abstractmethod
+    def _fetch_all_source_rows(self) -> list[dict]:
+        """Fetch every row from the source table.
+
+        Read-only — MUST NOT write to source or destination.
+
+        :returns: All source rows as plain dicts.
+        :rtype: list[dict]
+        """
+
+    def _classify_row_poc(
+        self,
+        row: dict,  # noqa: ARG002
+        migrated_sets: dict[str, set[int]],  # noqa: ARG002
+    ) -> tuple[Outcome, str]:
+        """Classify a single source row for the POC dry-run.
+
+        Default implementation returns :attr:`Outcome.WOULD_MIGRATE`.
+        Concrete migrators override to add FK-specific checks.
+
+        Classification priority:
+
+        1. Required FK absent → :attr:`Outcome.ORPHAN_FK_SKIP`
+        2. Unique constraint violation expected → :attr:`Outcome.COLLISION`
+        3. Nullable FK absent → :attr:`Outcome.WOULD_MIGRATE_MODIFIED`
+        4. Otherwise → :attr:`Outcome.WOULD_MIGRATE`
+
+        :param row: Source row as plain dict.
+        :type row: dict
+        :param migrated_sets: Sets of already-migrated destination IDs keyed by
+            table name (e.g., ``{"accounts": {1, 2, 3}}``).
+        :type migrated_sets: dict[str, set[int]]
+        :returns: ``(outcome, reason)`` tuple.
+        :rtype: tuple[Outcome, str]
+        """
+        # row and migrated_sets are intentionally unused in the base default;
+        # they are referenced in all concrete overrides.
+        del row, migrated_sets
+        return Outcome.WOULD_MIGRATE, "no FK dependency"
+
+    def _poc_safe_preview(self, row: dict) -> dict:
+        """Return a non-sensitive field subset for sample preview.
+
+        Concrete migrators may override to include table-specific safe columns.
+        Default includes only ``id`` and ``created_at`` (non-PII).
+
+        :param row: Source row as plain dict.
+        :type row: dict
+        :returns: Dict safe for inclusion in the POC report.
+        :rtype: dict
+        """
+        return {
+            "id": row.get("id"),
+            "created_at": str(row.get("created_at", "")),
+        }
+
+    def poc_classify(
+        self,
+        already_migrated: set[int],
+        migrated_sets: dict[str, set[int]],
+    ) -> POCResult:
+        """Classify all source rows without writing to the destination.
+
+        Reads every source row, classifies each into one of five
+        :class:`~src.reports.poc_reporter.Outcome` categories, and collects up
+        to ``MAX_SAMPLES`` (10) records per category.  No INSERT, UPDATE, or
+        DDL is executed.
+
+        Classification steps per record:
+
+        1. ``id_origem`` in *already_migrated* → ``ALREADY_MIGRATED``
+        2. Required FK absent in *migrated_sets* → ``ORPHAN_FK_SKIP``
+        3. Unique constraint violation expected → ``COLLISION``
+        4. Nullable FK absent → ``WOULD_MIGRATE_MODIFIED``
+        5. Otherwise → ``WOULD_MIGRATE``
+
+        :param already_migrated: Set of ``id_origem`` values already present in
+            ``migration_state`` for this table.
+        :type already_migrated: set[int]
+        :param migrated_sets: Destination ID sets per table, used by
+            :meth:`_classify_row_poc` to check FK existence.
+        :type migrated_sets: dict[str, set[int]]
+        :returns: Aggregated classification result for this table.
+        :rtype: POCResult
+
+        >>> # doctest: skip (requires live DB)
+        >>> result = migrator.poc_classify(
+        ...     already_migrated=set(),
+        ...     migrated_sets={"accounts": {1, 2}},
+        ... )
+        >>> isinstance(result, POCResult)
+        True
+        """
+        source_rows = self._fetch_all_source_rows()
+        table = self._table_name()
+        result = POCResult(table=table, total_source=len(source_rows))
+
+        for row in source_rows:
+            id_orig = int(row["id"])
+            if id_orig in already_migrated:
+                outcome = Outcome.ALREADY_MIGRATED
+                reason = "id_origem already in migration_state"
+            else:
+                outcome, reason = self._classify_row_poc(row, migrated_sets)
+
+            result.add_record(
+                RecordSample(
+                    id_origem=id_orig,
+                    outcome=outcome,
+                    reason=reason,
+                    masked_preview=self._poc_safe_preview(row),
+                )
+            )
+
+        self.logger.info(
+            "POC classify %s: total=%d counts=%s",
+            table,
+            result.total_source,
+            result.outcome_counts,
+        )
+        return result
+
     def _run_batches(
         self,
         source_rows: list[dict],
@@ -143,8 +276,7 @@ class BaseMigrator(ABC):
 
         # Split into batches
         batches = [
-            source_rows[i : i + _BATCH_SIZE]
-            for i in range(0, len(source_rows), _BATCH_SIZE)
+            source_rows[i : i + _BATCH_SIZE] for i in range(0, len(source_rows), _BATCH_SIZE)
         ]
 
         total_batches = len(batches)
@@ -197,13 +329,14 @@ class BaseMigrator(ABC):
                 with self.dest_engine.connect() as dest_conn:
                     with dest_conn.begin():
                         self._repo.bulk_insert(dest_conn, dest_table, rows_to_insert)
-                        for id_origem, remapped in pending:
-                            self.state_repo.record_success(
-                                dest_conn,
-                                table_name,
-                                id_origem,
-                                int(remapped.get("id", id_origem)),
-                            )
+                        self.state_repo.record_success_bulk(
+                            dest_conn,
+                            table_name,
+                            [
+                                (id_origem, int(remapped.get("id", id_origem)))
+                                for id_origem, remapped in pending
+                            ],
+                        )
                 migrated += len(pending)
             except Exception as exc:  # noqa: BLE001
                 self.logger.error(
@@ -226,11 +359,12 @@ class BaseMigrator(ABC):
                                     id_origem,
                                     str(exc)[:100],
                                 )
-                except Exception:  # noqa: BLE001
+                except Exception as rec_exc:  # noqa: BLE001
                     self.logger.warning(
-                        "Table %s: could not record failure state for batch %d",
+                        "Table %s: could not record failure state for batch %d: %s",
                         table_name,
                         batch_num,
+                        rec_exc,
                     )
 
         self.logger.info(

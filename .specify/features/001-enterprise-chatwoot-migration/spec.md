@@ -123,6 +123,39 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
 
 ---
 
+### User Story 4 — Executar POC Dry-Run de Validação (Priority: P0 — Pré-Migração)
+
+O DBA executa `python src/migrar.py --dry-run --poc` e obtém um relatório completo de todas
+as ocorrências previstas durante a migração real: quais registros seriam migrados, quais pulados
+por FK órfã, quais colidiriam com dados existentes, quais já foram migrados — sem realizar
+nenhuma escrita no banco destino.
+
+**Why this priority**: Execução cega sobre 418k registros é arriscada. O POC mapeia todas as
+ocorrências antecipadamente, permitindo identificar e corrigir problemas antes da migração de produção.
+
+**Independent Test**: Executar `--dry-run --poc` com engines mockados; verificar que `POCResult`
+contains classifications for each source record and the report is generated without any INSERT
+or DDL in the destination database.
+
+**Acceptance Scenarios**:
+
+1. **Given** `chatwoot_dev1_db` tem 38.868 contacts, **When** `python src/migrar.py --dry-run --poc`
+   é executado, **Then** cada contact é classificado como `WOULD_MIGRATE`, `WOULD_MIGRATE_MODIFIED`,
+   `ORPHAN_FK_SKIP`, `ALREADY_MIGRATED` ou `COLLISION` — sem nenhum INSERT em `chatwoot004_dev1_db`.
+
+2. **Given** o POC foi executado, **Then** o relatório em `.tmp/poc_YYYYMMDD_HHMMSS_report.txt`
+   contém: por tabela, contagem por categoria de ocorrência e até 10 amostras de registros por
+   categoria.
+
+3. **Given** conversas com `contact_id` inválido existem na SOURCE, **Then** o POC as classifica
+   como `ORPHAN_FK_SKIP` e inclui até 10 amostras, sem interromper a classificação das demais
+   entidades.
+
+4. **Given** o relatório POC é salvo em arquivo, **Then** nenhuma linha contém dado sensível
+   (e-mail, nome, telefone, conteúdo de mensagem).
+
+---
+
 ### Edge Cases
 
 - O que acontece quando `chatwoot_dev1_db` está inacessível no momento da execução?
@@ -283,7 +316,23 @@ migradas com contagens coerentes e sem exposição de dados de usuários.
   constraint UNIQUE. O Chatwoot regenera o token automaticamente quando necessário.
   Scripts SQL legados (`docs/sql_code_old/`) confirmam este padrão com `pubsub_token = null`
   explícito em todos os INSERTs.
+- **FR-014**: O sistema DEVE suportar o flag `--poc` (em conjunto com `--dry-run`) que ativa o
+  modo de classificação sem escrita. Neste modo, cada migrator lê TODOS os registros da origem
+  e classifica cada um em uma das cinco categorias definidas em `src/reports/poc_reporter.py`:
+  `WOULD_MIGRATE` (inserção limpa com IDs remapeados), `WOULD_MIGRATE_MODIFIED` (FK nulável
+  ausente → inserido com NULL), `ORPHAN_FK_SKIP` (FK obrigatória ausente → descartado),
+  `ALREADY_MIGRATED` (já em `migration_state` → pulado), `COLLISION` (constraint única →
+  violação esperada). Nenhum INSERT, UPDATE ou DDL é executado durante `--poc`.
 
+- **FR-015**: No modo `--dry-run --poc`, o sistema DEVE coletar até 10 amostras de registros
+  por categoria de ocorrência por tabela. Cada amostra contém: `id_origem`, `outcome`, `reason`
+  e `masked_preview` (campos não-sensíveis; campos sensíveis mascarados conforme FR-006).
+
+- **FR-016**: O sistema DEVE gerar o relatório POC em `.tmp/poc_YYYYMMDD_HHMMSS_report.txt`
+  com: (a) tabela-resumo de contagens por categoria × tabela; (b) seção de amostras por tabela
+  e categoria; (c) duração total da classificação. O relatório obedece as mesmas regras de
+  mascaramento de FR-006. Nenhuma escrita no banco destino é realizada antes ou após a geração
+  do relatório POC.
 ---
 
 ### Key Entities

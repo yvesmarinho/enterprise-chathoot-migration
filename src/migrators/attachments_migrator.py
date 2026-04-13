@@ -102,3 +102,58 @@ class AttachmentsMigrator(BaseMigrator):
             len(result.failed_ids),
         )
         return result
+
+    # ------------------------------------------------------------------
+    # POC dry-run hooks
+    # ------------------------------------------------------------------
+
+    def _table_name(self) -> str:
+        """Return canonical table name.
+
+        :returns: ``"attachments"``
+        :rtype: str
+        """
+        return "attachments"
+
+    def _fetch_all_source_rows(self) -> list[dict]:
+        """Fetch all rows from source ``attachments``.
+
+        :returns: All source rows as plain dicts.
+        :rtype: list[dict]
+        """
+        src_meta = MetaData()
+        src_table = Table("attachments", src_meta, autoload_with=self.source_engine)
+        with self.source_engine.connect() as conn:
+            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+
+    def _classify_row_poc(  # type: ignore[override]
+        self,
+        row: dict,
+        migrated_sets: dict[str, set[int]],
+    ) -> tuple:
+        """Classify an attachments row for POC dry-run.
+
+        Required FKs (skip on orphan): ``message_id``, ``account_id``.
+
+        :param row: Source row as plain dict.
+        :type row: dict
+        :param migrated_sets: Dest ID sets keyed by table name.
+        :type migrated_sets: dict[str, set[int]]
+        :returns: ``(outcome, reason)`` tuple.
+        :rtype: tuple
+        """
+        from src.reports.poc_reporter import Outcome
+
+        message_id = int(row["message_id"])
+        if message_id not in migrated_sets.get("messages", set()):
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"message_id={message_id} not in migrated messages",
+            )
+        account_id = int(row["account_id"])
+        if account_id not in migrated_sets.get("accounts", set()):
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"account_id={account_id} not in migrated accounts",
+            )
+        return Outcome.WOULD_MIGRATE, "clean"

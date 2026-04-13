@@ -156,3 +156,135 @@ def test_accounts_no_exit_on_success():
             mock_table.return_value = MagicMock()
             result = migrator.migrate()
     assert result.migrated == 1
+
+
+# ---------------------------------------------------------------------------
+# T025-5 — Merge rule: account with same id+name skips INSERT, alias registered
+# ---------------------------------------------------------------------------
+
+
+def _make_migrator_with_dest_accounts(source_rows, dest_accounts_rows, already_migrated=None):
+    """Build AccountsMigrator where dest DB returns specific account rows."""
+    already_migrated = already_migrated or set()
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    # Source connection: returns source_rows for table select
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = source_rows
+    source_engine.connect.return_value = src_conn
+
+    # Dest connection: first execute call returns dest_accounts_rows (for merge check),
+    # subsequent calls return already_migrated set (for _run_batches)
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    # text() query returns dest_accounts_rows as (id, name) tuples
+    dest_conn.execute.return_value.fetchall.return_value = dest_accounts_rows
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.return_value = already_migrated
+
+    remapper = IDRemapper({"accounts": 43})
+    logger = logging.getLogger("test_accounts_merge")
+
+    return (
+        AccountsMigrator(
+            source_engine=source_engine,
+            dest_engine=dest_engine,
+            id_remapper=remapper,
+            state_repo=state_repo,
+            logger=logger,
+        ),
+        remapper,
+        state_repo,
+    )
+
+
+def test_accounts_merge_rule_skips_insert_and_registers_alias():
+    """Accounts with same id+name in DEST: alias registered, record_success called, INSERT skipped."""
+    src_rows = [
+        {"id": 1, "name": "Vya Digital", "created_at": None, "updated_at": None},
+        {"id": 4, "name": "Sol Copernico", "created_at": None, "updated_at": None},
+    ]
+    # DEST has id=1 "Vya Digital" — should trigger merge rule
+    dst_rows = [(1, "Vya Digital"), (20, "Other Account")]
+
+    migrator, remapper, state_repo = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    with patch.object(
+        migrator,
+        "_run_batches",
+        return_value=MigrationResult(table="accounts", total_source=2, migrated=1, skipped=0),
+    ):
+        with patch("src.migrators.accounts_migrator.Table"):
+            migrator.migrate()
+
+    # Alias registered: remapping id=1 should return 1 (not 1+43=44)
+    assert remapper.remap(1, "accounts") == 1
+
+    # Offset still applied for unmatched id=4
+    assert remapper.remap(4, "accounts") == 47
+
+    # record_success called for merged account (id_origem=1, id_destino=1)
+    calls = state_repo.record_success.call_args_list
+    merged_call = next(
+        (c for c in calls if c.args[1] == "accounts" and c.args[2] == 1 and c.args[3] == 1),
+        None,
+    )
+    assert merged_call is not None, "record_success not called for merged account id=1"
+
+
+def test_accounts_merge_rule_no_match_uses_offset():
+    """When no account matches by id+name, all IDs use offset normally."""
+    src_rows = [
+        {"id": 4, "name": "Sol Copernico", "created_at": None, "updated_at": None},
+    ]
+    # DEST has no account matching id=4 + "Sol Copernico"
+    dst_rows = [(1, "Vya Digital"), (17, "Unimed Poços PJ")]
+
+    migrator, remapper, state_repo = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    with patch.object(
+        migrator,
+        "_run_batches",
+        return_value=MigrationResult(table="accounts", total_source=1, migrated=1, skipped=0),
+    ):
+        with patch("src.migrators.accounts_migrator.Table"):
+            migrator.migrate()
+
+    # No alias; offset applied: 4 + 43 = 47
+    assert remapper.remap(4, "accounts") == 47
+
+    # record_success NOT called with merge (no matching merge found)
+    merge_calls = [c for c in state_repo.record_success.call_args_list if c.args[1] == "accounts"]
+    # Should be empty since merge rule did not fire
+    assert len(merge_calls) == 0
+
+
+def test_accounts_merge_rule_name_mismatch_no_alias():
+    """Same id but different name in DEST does NOT trigger merge rule."""
+    src_rows = [
+        {"id": 1, "name": "Vya Digital NEW", "created_at": None, "updated_at": None},
+    ]
+    # DEST has id=1 but different name
+    dst_rows = [(1, "Vya Digital")]
+
+    migrator, remapper, _ = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    with patch.object(
+        migrator,
+        "_run_batches",
+        return_value=MigrationResult(table="accounts", total_source=1, migrated=1, skipped=0),
+    ):
+        with patch("src.migrators.accounts_migrator.Table"):
+            migrator.migrate()
+
+    # No alias registered — remap uses offset: 1 + 43 = 44
+    assert remapper.remap(1, "accounts") == 44

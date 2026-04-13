@@ -100,6 +100,31 @@ class MigrationStateRepository:
         ).fetchall()
         return {int(row[0]) for row in rows}
 
+    def get_migrated_id_pairs(self, conn: Connection, tabela: str) -> list[tuple[int, int]]:
+        """Return ``(id_origem, id_destino)`` pairs already migrated with status ``'ok'``.
+
+        Used to pre-seed :class:`~src.utils.id_remapper.IDRemapper` aliases
+        at startup so that restart-safe FK remapping is correct across runs.
+
+        :param conn: Active SQLAlchemy Core connection.
+        :type conn: Connection
+        :param tabela: Table name to filter by.
+        :type tabela: str
+        :returns: List of ``(id_origem, id_destino)`` tuples.
+        :rtype: list[tuple[int, int]]
+        """
+        rows = conn.execute(
+            select(
+                migration_state_table.c.id_origem,
+                migration_state_table.c.id_destino,
+            ).where(
+                migration_state_table.c.tabela == tabela,
+                migration_state_table.c.status == "ok",
+                migration_state_table.c.id_destino.isnot(None),
+            )
+        ).fetchall()
+        return [(int(r[0]), int(r[1])) for r in rows]
+
     def record_success(
         self,
         conn: Connection,
@@ -129,6 +154,44 @@ class MigrationStateRepository:
                 id_destino=id_destino,
                 status="ok",
                 migrated_at=datetime.now(tz=UTC).replace(tzinfo=None),
+            )
+            .on_conflict_do_nothing(constraint="uq_migration_state")
+        )
+
+    def record_success_bulk(
+        self,
+        conn: Connection,
+        tabela: str,
+        pairs: list[tuple[int, int]],
+    ) -> None:
+        """Record multiple successfully migrated rows in a single INSERT.
+
+        Uses a single multi-row ``INSERT ... ON CONFLICT DO NOTHING`` for
+        efficiency — avoids N round-trips to PostgreSQL.
+
+        :param conn: Active SQLAlchemy Core connection.
+        :type conn: Connection
+        :param tabela: Table name.
+        :type tabela: str
+        :param pairs: List of ``(id_origem, id_destino)`` tuples.
+        :type pairs: list[tuple[int, int]]
+        """
+        if not pairs:
+            return
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
+        conn.execute(
+            insert(migration_state_table)
+            .values(
+                [
+                    {
+                        "tabela": tabela,
+                        "id_origem": src,
+                        "id_destino": dst,
+                        "status": "ok",
+                        "migrated_at": now,
+                    }
+                    for src, dst in pairs
+                ]
             )
             .on_conflict_do_nothing(constraint="uq_migration_state")
         )

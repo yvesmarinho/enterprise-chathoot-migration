@@ -1,21 +1,27 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-10T18:10:00Z (Session 2026-04-10 — encerramento) ✅ Análise + Diagnóstico Concluídos
+**Last Updated**: 2026-04-13T16:50Z (Session 2026-04-13 encerrada — RUN-8 completo, 276.819 registros migrados)
 **Status**: 🟢 Em andamento
 
 ---
 
 ## 🟠 Em Progresso
 
-### P0 — Implementação (Próxima Sessão)
-- [ ] Gerar `speckit.tasks` — último passo pré-implementação (**P0 imediato**)
-- [ ] Investigar anomalia E5-INV: `content_attributes` 23.530 registros — verificar formato real
-- [ ] Verificar colisões de `source_id` entre SOURCE e DEST (prerequisito FR-003)
-- [ ] Implementar `src/factory/connection_factory.py`
-- [ ] Implementar `src/utils/id_remapper.py` + `log_masker.py` + `fk_validator.py`
-- [ ] Implementar `src/repository/base_repository.py` + `migration_state_repository.py`
-- [ ] Implementar `src/migrators/base_migrator.py` + migrators por entidade (ordem FK)
-- [ ] Implementar `src/migrar.py` (entrypoint)
+### P0 — Validação Pós-Migração
+- [ ] Investigar 639 contacts failed — confirmar se orphan account_ids 2,3,5,6,10 são aceitáveis
+- [ ] Validar integridade referencial no DEST após RUN-8
+- [ ] Documentar decisão sobre contacts orphans (D4 ou adendo a D3)
+
+### P1 — Qualidade de Código
+- [ ] Adicionar testes unitários cobrindo os 10 bug fixes da sessão 2026-04-13
+- [ ] Documentar APIs/interfaces (`src/`)
+
+### P0 — POC Dry-Run (Pré-Migração de Produção) — ✅ Concluído
+- [x] TPOC001: Implementar `src/reports/poc_reporter.py` (`Outcome` enum, `RecordSample`, `POCResult`, `POCReporter`)
+- [x] TPOC002: Adicionar `poc_classify()` a `BaseMigrator` + 9 migrators concretos (`_table_name`, `_fetch_all_source_rows`, `_classify_row_poc`)
+- [x] TPOC003: Adicionar flag `--poc` a `src/migrar.py`
+- [x] TPOC004: Executar `python src/migrar.py --dry-run --poc` contra bancos reais e validar report
+- [x] TPOC005: Implementar `test/unit/test_poc_reporter.py`
 
 ## 🔵 Pendente
 
@@ -31,10 +37,10 @@
 - [ ] Rastrear `.scaffold-state.yaml` no git (arquivo não monitorado)
 
 ### P2 — Desenvolvimento
-- [ ] Implementar conector origem (Chatwoot API ou DB direto)
-- [ ] Implementar conector destino
-- [ ] Implementar lógica de transformação de dados
-- [ ] Adicionar testes unitários
+- [x] Implementar conector origem (DB direto via `ConnectionFactory`)
+- [x] Implementar conector destino
+- [x] Implementar lógica de transformação de dados
+- [x] Adicionar testes unitários
 - [ ] Documentar APIs/interfaces
 
 ## ✅ Concluído
@@ -54,3 +60,7 @@
 - [x] `speckit.clarify` segunda rodada — Q1–Q5 respondidas (2026-04-10)
 - [x] Spec atualizada: FR-002, 003, 004, 005, 007, 013 + SC-001 corrigido (2026-04-10)
 - [x] Commit `5dafbdc` + push origin/001-enterprise-chatwoot-migration (2026-04-10)
+- [x] `speckit.tasks` gerado — T001–T045 documentados (2026-04-10)
+- [x] Implementação T001–T045 concluída: `src/` inteiramente implementado (9 migrators + infra + testes) (2026-04-13)
+- [x] RUN-8 completo: conversations 33.255 + messages 221.933 + attachments 21.581 migrados com 0 failed (2026-04-13)
+- [x] 10 bug fixes aplicados (FIX-01 a FIX-10) — bugs de UniqueViolation, FK drift, token collision corrigidos (2026-04-13)

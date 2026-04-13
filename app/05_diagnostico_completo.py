@@ -177,12 +177,8 @@ def bloco_inventario(sc, dc) -> None:
 def bloco_migrations(sc, dc) -> None:
     section("BLOCO 2 — SCHEMA MIGRATIONS DIFF (T2)")
 
-    src_migs = {
-        r["version"] for r in fetchall(sc, "SELECT version FROM schema_migrations")
-    }
-    dst_migs = {
-        r["version"] for r in fetchall(dc, "SELECT version FROM schema_migrations")
-    }
+    src_migs = {r["version"] for r in fetchall(sc, "SELECT version FROM schema_migrations")}
+    dst_migs = {r["version"] for r in fetchall(dc, "SELECT version FROM schema_migrations")}
 
     only_src = sorted(src_migs - dst_migs)
     only_dst = sorted(dst_migs - src_migs)
@@ -241,19 +237,13 @@ def bloco_field_types(sc, dc) -> None:
 def bloco_accounts(sc, dc) -> None:
     section("BLOCO 4 — ACCOUNTS — COLISÃO DE NOMES (T3)")
 
-    src_accounts = fetchall(
-        sc, "SELECT id, name, status FROM public.accounts ORDER BY id"
-    )
-    dst_accounts = fetchall(
-        dc, "SELECT id, name, status FROM public.accounts ORDER BY id"
-    )
+    src_accounts = fetchall(sc, "SELECT id, name, status FROM public.accounts ORDER BY id")
+    dst_accounts = fetchall(dc, "SELECT id, name, status FROM public.accounts ORDER BY id")
 
     dst_by_name = {r["name"]: r for r in dst_accounts}
     src_by_name = {r["name"]: r for r in src_accounts}
 
-    print(
-        f"\n  SOURCE: {len(src_accounts)} accounts  |  DEST: {len(dst_accounts)} accounts"
-    )
+    print(f"\n  SOURCE: {len(src_accounts)} accounts  |  DEST: {len(dst_accounts)} accounts")
 
     subsection("Accounts da SOURCE — mapeamento no DEST")
     print(f"\n  {'SRC_ID':>8}  {'DEST_ID':>8}  {'STATUS':>8}  {'RESULTADO':<25}  NOME")
@@ -293,9 +283,7 @@ def bloco_users(sc, dc) -> None:
 
     print(f"\n  SOURCE total users:                {len(src_uids):>6,}")
     print(f"  DEST   total users:                {len(dst_uids):>6,}")
-    print(
-        f"  Com match por UID/email:           {len(match):>6,}  ← esses serão mapeados"
-    )
+    print(f"  Com match por UID/email:           {len(match):>6,}  ← esses serão mapeados")
     print(
         f"  SOURCE sem match (sem conta DEST): {len(only_src):>6,}  ← assignee_id ficará NULL em conversas"
     )
@@ -363,9 +351,7 @@ def bloco_simples(sc, dc) -> None:
 
         print(f"\n  SOURCE total: {len(src_all):>6,}")
         print(f"  DEST   total: {len(dst_all):>6,}")
-        print(
-            f"  Match (account_id + {key_col}):  {match:>6,}  ← reutilizar id destino"
-        )
+        print(f"  Match (account_id + {key_col}):  {match:>6,}  ← reutilizar id destino")
         print(f"  Sem match (novos no DEST):       {no_match:>6,}  ← inserir novo")
 
 
@@ -379,19 +365,13 @@ def bloco_contacts(sc, dc) -> None:
     dst_total = count_table(dc, "contacts")
 
     # Rastreio
-    dst_with_src_id = count_where(
-        dc, "contacts", "custom_attributes->>'src_id' IS NOT NULL"
-    )
+    dst_with_src_id = count_where(dc, "contacts", "custom_attributes->>'src_id' IS NOT NULL")
     dst_without_src = dst_total - dst_with_src_id
 
     # Preenchimento de campos de chave no SOURCE
     src_with_email = count_where(sc, "contacts", "email IS NOT NULL AND email != ''")
-    src_with_phone = count_where(
-        sc, "contacts", "phone_number IS NOT NULL AND phone_number != ''"
-    )
-    src_with_ident = count_where(
-        sc, "contacts", "identifier IS NOT NULL AND identifier != ''"
-    )
+    src_with_phone = count_where(sc, "contacts", "phone_number IS NOT NULL AND phone_number != ''")
+    src_with_ident = count_where(sc, "contacts", "identifier IS NOT NULL AND identifier != ''")
     src_with_nothing = count_where(
         sc, "contacts", "email IS NULL AND phone_number IS NULL AND identifier IS NULL"
     )
@@ -406,15 +386,9 @@ def bloco_contacts(sc, dc) -> None:
     )
 
     print(f"\n  SOURCE — preenchimento de campos de chave de negócio:")
-    print(
-        f"    com email:      {fmt(src_with_email)}  ({pct(src_with_email, src_total)})"
-    )
-    print(
-        f"    com phone:      {fmt(src_with_phone)}  ({pct(src_with_phone, src_total)})"
-    )
-    print(
-        f"    com identifier: {fmt(src_with_ident)}  ({pct(src_with_ident, src_total)})"
-    )
+    print(f"    com email:      {fmt(src_with_email)}  ({pct(src_with_email, src_total)})")
+    print(f"    com phone:      {fmt(src_with_phone)}  ({pct(src_with_phone, src_total)})")
+    print(f"    com identifier: {fmt(src_with_ident)}  ({pct(src_with_ident, src_total)})")
     print(
         f"    sem nenhum:     {fmt(src_with_nothing)}  ({pct(src_with_nothing, src_total)})  ← fallback: name+account"
     )
@@ -440,9 +414,7 @@ def bloco_contacts(sc, dc) -> None:
     # Nota: esta query roda somente no SOURCE conectando ao SOURCE,
     # a comparação cross-DB é aproximada via Python (email/phone sets não carregados por privacidade)
     # — para maior precisão, use dblink ou importação temporária.
-    print(
-        f"\n  ⚠  Comparação cross-DB exata de emails/phones requer dblink ou CSV temporário."
-    )
+    print(f"\n  ⚠  Comparação cross-DB exata de emails/phones requer dblink ou CSV temporário.")
     print(
         f"     As contagens abaixo são internamente no SOURCE (verifica se o SOURCE tem duplicatas próprias).\n"
     )
@@ -518,12 +490,8 @@ def bloco_conversations(sc, dc) -> None:
     src_total = count_table(sc, "conversations")
     dst_total = count_table(dc, "conversations")
 
-    src_with_src_id = count_where(
-        sc, "conversations", "custom_attributes->>'src_id' IS NOT NULL"
-    )
-    dst_with_src_id = count_where(
-        dc, "conversations", "custom_attributes->>'src_id' IS NOT NULL"
-    )
+    src_with_src_id = count_where(sc, "conversations", "custom_attributes->>'src_id' IS NOT NULL")
+    dst_with_src_id = count_where(dc, "conversations", "custom_attributes->>'src_id' IS NOT NULL")
     dst_without_src = dst_total - dst_with_src_id
 
     # UUID duplicado — conversations no SOURCE
@@ -600,9 +568,7 @@ def bloco_conversations(sc, dc) -> None:
     print(f"  DEST   com src_id (já migrados):         {fmt(dst_with_src_id)}")
     print(f"  DEST   sem src_id (nativas/chatwoot):    {fmt(dst_without_src)}")
 
-    print(
-        f"\n  UUIDs duplicados — SOURCE: {src_dup_uuid:>6,}  |  DEST: {dst_dup_uuid:>6,}"
-    )
+    print(f"\n  UUIDs duplicados — SOURCE: {src_dup_uuid:>6,}  |  DEST: {dst_dup_uuid:>6,}")
     print(f"     ↳ todos UUID DEVEM ser regenerados na migração (campo UNIQUE global)")
 
     print(f"\n  Qualidade SOURCE:")
@@ -632,12 +598,8 @@ def bloco_messages(sc, dc) -> None:
     src_total = count_table(sc, "messages")
     dst_total = count_table(dc, "messages")
 
-    src_with_src_id = count_where(
-        sc, "messages", "additional_attributes->>'src_id' IS NOT NULL"
-    )
-    dst_with_src_id = count_where(
-        dc, "messages", "additional_attributes->>'src_id' IS NOT NULL"
-    )
+    src_with_src_id = count_where(sc, "messages", "additional_attributes->>'src_id' IS NOT NULL")
+    dst_with_src_id = count_where(dc, "messages", "additional_attributes->>'src_id' IS NOT NULL")
 
     # Qualidade: messages sem conversation válida na própria base
     src_broken_conv = (
@@ -687,9 +649,7 @@ def bloco_messages(sc, dc) -> None:
         f"    conversation_id FK quebrada:   {fmt(src_broken_conv)}  ({pct(src_broken_conv, src_total)})"
     )
 
-    print(
-        f"\n  content_attributes NÃO NULL (serão forçados para NULL na migração — E5):"
-    )
+    print(f"\n  content_attributes NÃO NULL (serão forçados para NULL na migração — E5):")
     print(f"    SOURCE: {fmt(src_ca_not_null)}  ({pct(src_ca_not_null, src_total)})")
     print(f"    DEST:   {fmt(dst_ca_not_null)}  ({pct(dst_ca_not_null, dst_total)})")
 
@@ -741,12 +701,8 @@ def bloco_attachments(sc, dc) -> None:
 
     print(f"\n  SOURCE total attachments:  {fmt(src_total)}")
     print(f"  DEST   total attachments:  {fmt(dst_total)}")
-    print(
-        f"\n  SOURCE message_id FK quebrada:  {fmt(src_broken)}  ({pct(src_broken, src_total)})"
-    )
-    print(
-        f"  SOURCE sem external_url (S3):   {fmt(no_url)}    ({pct(no_url, src_total)})"
-    )
+    print(f"\n  SOURCE message_id FK quebrada:  {fmt(src_broken)}  ({pct(src_broken, src_total)})")
+    print(f"  SOURCE sem external_url (S3):   {fmt(no_url)}    ({pct(no_url, src_total)})")
 
     print(f"\n  Tipos de arquivo (SOURCE):")
     type_map = {
@@ -796,16 +752,12 @@ def bloco_contact_inboxes(sc, dc) -> None:
 
     print(f"\n  SOURCE total contact_inboxes: {fmt(src_total)}")
     print(f"  DEST   total contact_inboxes: {fmt(dst_total)}")
-    print(
-        f"\n  pubsub_token NULL  — SOURCE: {src_pubsub_null:>8,}  |  DEST: {dst_pubsub_null:>8,}"
-    )
+    print(f"\n  pubsub_token NULL  — SOURCE: {src_pubsub_null:>8,}  |  DEST: {dst_pubsub_null:>8,}")
     print(f"  source_id NULL     — SOURCE: {src_source_null:>8,}")
     print(f"\n  Colisão de pubsub_token entre SOURCE e DEST: {token_collision:>6,}")
     if token_collision > 0:
         print(f"  ⚠  CRÍTICO: {token_collision} tokens idênticos nos dois bancos!")
-        print(
-            f"     Confirma obrigatoriedade da regra: pubsub_token = NULL na inserção."
-        )
+        print(f"     Confirma obrigatoriedade da regra: pubsub_token = NULL na inserção.")
     else:
         print(f"  ✓ Nenhuma colisão de token encontrada.")
 
@@ -836,19 +788,13 @@ def bloco_offsets(sc, dc) -> None:
 
     for table in tables_with_seq:
         try:
-            max_src = (
-                scalar(sc, f"SELECT COALESCE(MAX(id), 0) FROM public.{table}") or 0
-            )
-            max_dst = (
-                scalar(dc, f"SELECT COALESCE(MAX(id), 0) FROM public.{table}") or 0
-            )
+            max_src = scalar(sc, f"SELECT COALESCE(MAX(id), 0) FROM public.{table}") or 0
+            max_dst = scalar(dc, f"SELECT COALESCE(MAX(id), 0) FROM public.{table}") or 0
             offset = max_dst
             new_min = max_src + max_dst if max_src > 0 else 0
             # Exemplo: id_origem=1 + offset=max_dst → novo_id = id_origem + max_dst
             # menor novo_id = 1 + max_dst
-            smallest_src = (
-                scalar(sc, f"SELECT COALESCE(MIN(id), 0) FROM public.{table}") or 0
-            )
+            smallest_src = scalar(sc, f"SELECT COALESCE(MIN(id), 0) FROM public.{table}") or 0
             new_min_real = smallest_src + offset if smallest_src > 0 else max_dst + 1
             print(
                 f"  {table:<25}  {max_src:>14,}  {max_dst:>12,}  {offset:>18,}  {new_min_real:>12,}"
@@ -877,10 +823,7 @@ def bloco_qualidade_geral(sc, dc) -> None:
     checks = []
 
     # Conversations sem contact_id
-    n = (
-        scalar(sc, "SELECT COUNT(1) FROM public.conversations WHERE contact_id IS NULL")
-        or 0
-    )
+    n = scalar(sc, "SELECT COUNT(1) FROM public.conversations WHERE contact_id IS NULL") or 0
     checks.append(("⚠ ALTO", f"Conversations SOURCE sem contact_id", n))
 
     # Conversations com contact_id FK broken
@@ -946,9 +889,7 @@ def bloco_qualidade_geral(sc, dc) -> None:
         )
         or 0
     )
-    checks.append(
-        ("⚠ ALTO", f"Messages SOURCE com content_attributes (perda de dados)", n)
-    )
+    checks.append(("⚠ ALTO", f"Messages SOURCE com content_attributes (perda de dados)", n))
 
     # Conversations com uuid nulo
     n = scalar(sc, "SELECT COUNT(1) FROM public.conversations WHERE uuid IS NULL") or 0
@@ -1002,16 +943,10 @@ def bloco_estimativa(sc, dc) -> None:
         slow_s = batches * latency_dedup_ms / 1_000
         total_fast += fast_s
         total_slow += slow_s
-        print(
-            f"  {table:<20}  {n:>14,}  {batches:>8,}  "
-            f"{fast_s:>9.1f}s  {slow_s:>9.1f}s"
-        )
+        print(f"  {table:<20}  {n:>14,}  {batches:>8,}  " f"{fast_s:>9.1f}s  {slow_s:>9.1f}s")
 
     print(f"  {'-'*20}  {'-'*14}  {'-'*8}  {'-'*10}  {'-'*10}")
-    print(
-        f"  {'TOTAL':<20}  {'':>14}  {'':>8}  "
-        f"{total_fast:>9.1f}s  {total_slow:>9.1f}s"
-    )
+    print(f"  {'TOTAL':<20}  {'':>14}  {'':>8}  " f"{total_fast:>9.1f}s  {total_slow:>9.1f}s")
 
     print(
         f"""
@@ -1027,6 +962,367 @@ def bloco_estimativa(sc, dc) -> None:
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
+
+
+# ── Bloco 15 — Diff de Colunas entre Schemas ─────────────────────────────────
+
+
+def bloco_diff_colunas(sc, dc) -> None:
+    section("BLOCO 15 — DIFF DE COLUNAS ENTRE SCHEMAS (migrations divergentes)")
+
+    main_tables_all = [
+        "accounts",
+        "users",
+        "teams",
+        "labels",
+        "inboxes",
+        "contacts",
+        "conversations",
+        "messages",
+        "attachments",
+        "contact_inboxes",
+    ]
+
+    def get_columns(conn, table: str) -> dict[str, dict]:
+        """Retorna {column_name: {data_type, is_nullable, column_default}}."""
+        rows = fetchall(
+            conn,
+            """
+            SELECT column_name, udt_name AS data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            (table,),
+        )
+        return {r["column_name"]: r for r in rows}
+
+    total_only_src = 0
+    total_only_dst = 0
+    total_type_diff = 0
+
+    for table in main_tables_all:
+        src_cols = get_columns(sc, table)
+        dst_cols = get_columns(dc, table)
+
+        only_src = sorted(set(src_cols) - set(dst_cols))
+        only_dst = sorted(set(dst_cols) - set(src_cols))
+        type_diff = sorted(
+            col
+            for col in set(src_cols) & set(dst_cols)
+            if src_cols[col]["data_type"] != dst_cols[col]["data_type"]
+        )
+
+        total_only_src += len(only_src)
+        total_only_dst += len(only_dst)
+        total_type_diff += len(type_diff)
+
+        if not only_src and not only_dst and not type_diff:
+            print(f"\n  {table:<22}  ✓ schemas idênticos")
+            continue
+
+        print(f"\n  {table:<22}  ⚠  diffs encontrados")
+
+        if only_src:
+            print(f"    Colunas APENAS na SOURCE (dados que seriam perdidos no INSERT):")
+            for col in only_src:
+                t = src_cols[col]["data_type"]
+                print(f"      - {col:<35}  tipo={t}")
+
+        if only_dst:
+            print(f"    Colunas APENAS no DEST (risco de NOT NULL sem provider):")
+            for col in only_dst:
+                d = dst_cols[col]
+                nullable = "nullable" if d["is_nullable"] == "YES" else "NOT NULL"
+                default = f"  default={d['column_default']}" if d["column_default"] else ""
+                risk = (
+                    "✓ ok"
+                    if d["is_nullable"] == "YES" or d["column_default"]
+                    else "⚠ INSERT FALHARÁ"
+                )
+                print(f"      - {col:<35}  tipo={d['data_type']}  {nullable}{default}  {risk}")
+
+        if type_diff:
+            print(f"    Colunas com TIPO DIVERGENTE:")
+            for col in type_diff:
+                t_src = src_cols[col]["data_type"]
+                t_dst = dst_cols[col]["data_type"]
+                print(f"      - {col:<35}  SOURCE={t_src}  DEST={t_dst}")
+
+    print(f"\n  {SEP2}")
+    print(f"  RESUMO TOTAL:")
+    print(f"    Colunas só na SOURCE (perda de dados): {total_only_src:>5}")
+    print(f"    Colunas só no DEST   (risco INSERT):   {total_only_dst:>5}")
+    print(f"    Colunas com tipo divergente:           {total_type_diff:>5}")
+    if total_only_src == 0 and total_only_dst == 0 and total_type_diff == 0:
+        print(f"\n  ✓ Todos os schemas das tabelas principais são idênticos.")
+    else:
+        print(f"\n  ⚠  Ação requerida antes da migração — revisar colunas acima.")
+
+
+# ── Bloco 16 — Sobreposição cross-DB de Contacts ─────────────────────────────
+
+
+def bloco_overlap_contacts(sc, dc) -> None:
+    section("BLOCO 16 — SOBREPOSIÇÃO CROSS-DB DE CONTACTS (deduplicação)")
+
+    # A chave de deduplicação é (account_id, phone) e (account_id, email).
+    # O mesmo phone em contas distintas representa contacts legítimos diferentes;
+    # só há duplicata quando account_id + campo de contato coincidem nos dois bancos.
+
+    print(f"\n  Nota: chave de deduplicação = (account_id, phone) e (account_id, email)")
+    print(f"  Valores brutos não são impressos.\n")
+
+    # ── Carregar tuplas (account_id, phone) ──────────────────────────────────
+    src_phones: set[tuple] = {
+        (r["account_id"], str(r["phone_number"]).strip().lower())
+        for r in fetchall(
+            sc,
+            "SELECT account_id, phone_number FROM public.contacts "
+            "WHERE phone_number IS NOT NULL AND phone_number != ''",
+        )
+    }
+    dst_phones: set[tuple] = {
+        (r["account_id"], str(r["phone_number"]).strip().lower())
+        for r in fetchall(
+            dc,
+            "SELECT account_id, phone_number FROM public.contacts "
+            "WHERE phone_number IS NOT NULL AND phone_number != ''",
+        )
+    }
+
+    # ── Carregar tuplas (account_id, email) ──────────────────────────────────
+    src_emails: set[tuple] = {
+        (r["account_id"], str(r["email"]).strip().lower())
+        for r in fetchall(
+            sc,
+            "SELECT account_id, email FROM public.contacts "
+            "WHERE email IS NOT NULL AND email != ''",
+        )
+    }
+    dst_emails: set[tuple] = {
+        (r["account_id"], str(r["email"]).strip().lower())
+        for r in fetchall(
+            dc,
+            "SELECT account_id, email FROM public.contacts "
+            "WHERE email IS NOT NULL AND email != ''",
+        )
+    }
+
+    phone_overlap = len(src_phones & dst_phones)
+    email_overlap = len(src_emails & dst_emails)
+    phone_only_src = len(src_phones - dst_phones)
+    email_only_src = len(src_emails - dst_emails)
+
+    print(f"  {'':38}  {'SOURCE':>10}  {'DEST':>10}  {'OVERLAP':>10}  {'SÓ SRC':>10}")
+    print(f"  {'-'*38}  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*10}")
+    print(
+        f"  {'(account_id, phone) únicos':<38}  {len(src_phones):>10,}  {len(dst_phones):>10,}"
+        f"  {phone_overlap:>10,}  {phone_only_src:>10,}"
+    )
+    print(
+        f"  {'(account_id, email) únicos':<38}  {len(src_emails):>10,}  {len(dst_emails):>10,}"
+        f"  {email_overlap:>10,}  {email_only_src:>10,}"
+    )
+
+    # ── Contacts SOURCE com match → seriam duplicados ─────────────────────────
+    src_rows_phones = fetchall(
+        sc,
+        "SELECT id, account_id, phone_number FROM public.contacts "
+        "WHERE phone_number IS NOT NULL AND phone_number != ''",
+    )
+    src_rows_emails = fetchall(
+        sc,
+        "SELECT id, account_id, email FROM public.contacts "
+        "WHERE email IS NOT NULL AND email != ''",
+    )
+
+    contacts_with_phone_match = {
+        r["id"]
+        for r in src_rows_phones
+        if (r["account_id"], str(r["phone_number"]).strip().lower()) in dst_phones
+    }
+    contacts_with_email_match = {
+        r["id"]
+        for r in src_rows_emails
+        if (r["account_id"], str(r["email"]).strip().lower()) in dst_emails
+    }
+    contacts_with_any_match = contacts_with_phone_match | contacts_with_email_match
+
+    src_total = scalar(sc, "SELECT COUNT(1) FROM public.contacts") or 0
+    print(f"\n  Contacts SOURCE com duplicata no DEST (mesmo account_id + phone OU email):")
+    print(
+        f"    Por (account_id, phone):  {len(contacts_with_phone_match):>8,}  ({pct(len(contacts_with_phone_match), src_total)})"
+    )
+    print(
+        f"    Por (account_id, email):  {len(contacts_with_email_match):>8,}  ({pct(len(contacts_with_email_match), src_total)})"
+    )
+    print(
+        f"    Por qualquer um:          {len(contacts_with_any_match):>8,}  ({pct(len(contacts_with_any_match), src_total)})"
+    )
+    print(
+        f"\n  → {len(contacts_with_any_match):,} contacts SOURCE devem ser MAPEADOS para o id DEST existente (sem INSERT)."
+    )
+    print(
+        f"  → {src_total - len(contacts_with_any_match):,} contacts SOURCE sem duplicata → inserir com id remapeado."
+    )
+
+    # ── Por account: quantos contacts da SOURCE têm match no DEST ────────────
+    src_accounts_with_contacts = fetchall(
+        sc,
+        "SELECT account_id, COUNT(1) AS total FROM public.contacts GROUP BY account_id ORDER BY account_id",
+    )
+    if src_accounts_with_contacts:
+        print(f"\n  Distribuição por account_id (SOURCE):")
+        print(f"  {'ACCOUNT_ID':>12}  {'TOTAL SRC':>12}  {'COM MATCH':>12}  {'SEM MATCH':>12}")
+        print(f"  {'-'*12}  {'-'*12}  {'-'*12}  {'-'*12}")
+
+        # Mapear contact_id → account_id na SOURCE para contagem por conta
+        id_to_acct: dict[int, int] = {}
+        for r in fetchall(sc, "SELECT id, account_id FROM public.contacts"):
+            id_to_acct[r["id"]] = r["account_id"]
+
+        acct_match: dict[int, int] = {}
+        for cid in contacts_with_any_match:
+            acct = id_to_acct.get(cid)
+            if acct is not None:
+                acct_match[acct] = acct_match.get(acct, 0) + 1
+
+        for row in src_accounts_with_contacts:
+            acct_id = row["account_id"]
+            total = row["total"]
+            matched = acct_match.get(acct_id, 0)
+            print(f"  {acct_id:>12}  {total:>12,}  {matched:>12,}  {total - matched:>12,}")
+
+    print(
+        f"""
+  Regra de deduplicação (chave composta):
+    1. Se (account_id_src, phone) existe no DEST → mapear contact_id SOURCE → contact_id DEST (não inserir)
+    2. Se (account_id_src, email) existe no DEST → idem (phone tem precedência se ambos batem)
+    3. Se sem match na mesma account → inserir com id remapeado normalmente
+    Observação: account_id_src = account_id_dest para accounts com match de id+nome (Bloco 17)
+"""
+    )
+
+
+# ── Bloco 17 — Accounts com id+nome iguais: regra de merge ───────────────────
+
+
+def bloco_accounts_merge(sc, dc) -> None:
+    section("BLOCO 17 — ACCOUNTS COM id+NOME IGUAIS — REGRA DE MERGE")
+
+    src_accounts = fetchall(sc, "SELECT id, name FROM public.accounts ORDER BY id")
+    dst_accounts = fetchall(dc, "SELECT id, name FROM public.accounts ORDER BY id")
+
+    dst_by_id_name = {(r["id"], r["name"]): r for r in dst_accounts}
+
+    # Accounts com mesmo id E mesmo nome
+    matched = [r for r in src_accounts if (r["id"], r["name"]) in dst_by_id_name]
+    not_matched = [r for r in src_accounts if (r["id"], r["name"]) not in dst_by_id_name]
+
+    print(f"\n  Regra: conta com mesmo id E mesmo nome → reutilizar dest_id (sem INSERT)")
+    print(f"         dados filhos inexistentes no DEST → importar com FK mapeada para dest_id")
+    print(f"\n  Accounts SOURCE com MATCH (id+nome):")
+    print(f"  {'SRC_ID':>8}  {'DEST_ID':>8}  NOME")
+    print(f"  {'-'*8}  {'-'*8}  {'-'*40}")
+    for r in matched:
+        print(f"  {r['id']:>8}  {r['id']:>8}  {r['name'][:50]}")
+
+    print(f"\n  Accounts SOURCE SEM match (serão inseridas com id remapeado):")
+    print(f"  {'SRC_ID':>8}  {'NOVO_ID':>8}  NOME")
+    print(f"  {'-'*8}  {'-'*8}  {'-'*40}")
+    dst_max_id = max((r["id"] for r in dst_accounts), default=0)
+    for r in not_matched:
+        novo_id = r["id"] + dst_max_id
+        print(f"  {r['id']:>8}  {novo_id:>8}  {r['name'][:50]}")
+
+    # Para cada account com match, listar dados filhos SOURCE vs DEST
+    child_entities = [
+        ("inboxes", "account_id", "name"),
+        ("teams", "account_id", "name"),
+        ("labels", "account_id", "title"),
+        ("contacts", "account_id", None),
+        ("conversations", "account_id", None),
+        ("users", None, None),  # account_users como proxy
+    ]
+
+    for acc in matched:
+        acc_id = acc["id"]
+        acc_name = acc["name"]
+        subsection(f"Account id={acc_id} — '{acc_name}'")
+
+        for entity, fk_col, name_col in child_entities:
+            if fk_col is None:
+                continue
+
+            if not table_exists(sc, entity):
+                continue
+
+            src_count = count_where(sc, entity, f"{fk_col} = %s", (acc_id,))
+            dst_count = count_where(dc, entity, f"{fk_col} = %s", (acc_id,))
+
+            if name_col:
+                # Comparar por nome para ver quais existem só na SOURCE
+                src_names = {
+                    r[name_col]
+                    for r in fetchall(
+                        sc,
+                        f"SELECT {name_col} FROM public.{entity} WHERE {fk_col} = %s",
+                        (acc_id,),
+                    )
+                    if r[name_col]
+                }
+                dst_names = {
+                    r[name_col]
+                    for r in fetchall(
+                        dc,
+                        f"SELECT {name_col} FROM public.{entity} WHERE {fk_col} = %s",
+                        (acc_id,),
+                    )
+                    if r[name_col]
+                }
+                only_src_names = sorted(src_names - dst_names)
+                already_in_dst = sorted(src_names & dst_names)
+
+                print(f"\n    {entity.upper():<18}  SOURCE={src_count:>6,}  DEST={dst_count:>6,}")
+                if already_in_dst:
+                    print(
+                        f"      Já existem no DEST (não importar): {', '.join(already_in_dst[:5])}"
+                        + (f" ... +{len(already_in_dst)-5}" if len(already_in_dst) > 5 else "")
+                    )
+                if only_src_names:
+                    print(
+                        f"      Apenas na SOURCE (importar):       {', '.join(only_src_names[:5])}"
+                        + (f" ... +{len(only_src_names)-5}" if len(only_src_names) > 5 else "")
+                    )
+                if not only_src_names and not already_in_dst:
+                    print(f"      ✓ nenhuma entrada na SOURCE")
+            else:
+                # Sem comparação por nome — só contagens
+                print(
+                    f"\n    {entity.upper():<18}  SOURCE={src_count:>6,}  DEST={dst_count:>6,}"
+                    + (
+                        f"  → {src_count} registros a avaliar para merge"
+                        if src_count > 0
+                        else "  ✓ vazio"
+                    )
+                )
+
+        # account_users (join table) — via conta
+        src_au = count_where(sc, "account_users", "account_id = %s", (acc_id,))
+        dst_au = count_where(dc, "account_users", "account_id = %s", (acc_id,))
+        print(f"\n    {'ACCOUNT_USERS':<18}  SOURCE={src_au:>6,}  DEST={dst_au:>6,}")
+
+    print(
+        f"""
+  Resumo da regra de importação para accounts com match:
+    • A account NÃO é reinserida — dest_id existente é reutilizado como FK
+    • Entidades filhas com mesmo nome → não importar (já existem)
+    • Entidades filhas sem correspondência → importar com FK = dest_id da account
+    • IDs das filhas migradas → offset normal (id_origem + MAX(id_dest) por tabela)
+    • Conversations/Messages/Contacts → verificar sobreposição individualmente (Blocos 7/8/16)
+"""
+    )
 
 
 def main() -> None:
@@ -1057,6 +1353,9 @@ def main() -> None:
         bloco_offsets(sc, dc)
         bloco_qualidade_geral(sc, dc)
         bloco_estimativa(sc, dc)
+        bloco_diff_colunas(sc, dc)
+        bloco_overlap_contacts(sc, dc)
+        bloco_accounts_merge(sc, dc)
 
         print(f"\n{SEP}")
         print(f"  FIM DO DIAGNÓSTICO")
@@ -1069,9 +1368,7 @@ def main() -> None:
     if salvar:
         out_dir = Path(__file__).parent.parent / "tmp"
         out_dir.mkdir(exist_ok=True)
-        print(
-            f"\n  Use: python 05_diagnostico_completo.py 2>&1 | tee ../tmp/diagnostico_{ts}.txt"
-        )
+        print(f"\n  Use: python 05_diagnostico_completo.py 2>&1 | tee ../tmp/diagnostico_{ts}.txt")
 
 
 if __name__ == "__main__":

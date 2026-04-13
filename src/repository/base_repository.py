@@ -45,6 +45,5 @@ class BaseRepository:
         """
         if not records:
             return 0
-        with conn.begin():
-            conn.execute(insert(table), records)
+        conn.execute(insert(table), records)
         return len(records)
