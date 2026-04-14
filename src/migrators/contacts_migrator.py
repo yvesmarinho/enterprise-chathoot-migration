@@ -73,12 +73,13 @@ class ContactsMigrator(BaseMigrator):
             #               (account_id, normalised_email) → dest_id
             dst_phone_lkp: dict[tuple[int, str], int] = {}
             dst_email_lkp: dict[tuple[int, str], int] = {}
+            dst_identifier_lkp: dict[tuple[int, str], int] = {}
 
             with self.dest_engine.connect() as dest_conn:
                 for acct_id in merged_account_ids:
                     for r in dest_conn.execute(
                         text(
-                            "SELECT id, phone_number, email "
+                            "SELECT id, phone_number, email, identifier "
                             "FROM public.contacts WHERE account_id = :a"
                         ),
                         {"a": acct_id},
@@ -89,6 +90,10 @@ class ContactsMigrator(BaseMigrator):
                             )
                         if r["email"]:
                             dst_email_lkp[(acct_id, str(r["email"]).strip().lower())] = int(r["id"])
+                        if r["identifier"]:
+                            dst_identifier_lkp[(acct_id, str(r["identifier"]).strip().lower())] = (
+                                int(r["id"])
+                            )
 
             dedup_records: list[tuple[int, int]] = []  # (src_id, dest_id)
             for row in rows:
@@ -104,6 +109,10 @@ class ContactsMigrator(BaseMigrator):
                     email = row.get("email")
                     if email:
                         dest_id = dst_email_lkp.get((acct_id, str(email).strip().lower()))
+                if dest_id is None:
+                    identifier = row.get("identifier")
+                    if identifier:
+                        dest_id = dst_identifier_lkp.get((acct_id, str(identifier).strip().lower()))
                 if dest_id is not None:
                     self.id_remapper.register_alias("contacts", src_id, dest_id)
                     dedup_records.append((src_id, dest_id))

@@ -1,16 +1,16 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-13T16:50Z (Session 2026-04-13 encerrada — RUN-8 completo, 276.819 registros migrados)
+**Last Updated**: 2026-04-14T15:30Z (Session 2026-04-14 encerrada — RUN-11 completo, EXIT:0, FK violations=0, relatorio_consolidado_pipeline criado)
 **Status**: 🟢 Em andamento
 
 ---
 
 ## 🟠 Em Progresso
 
-### P0 — Validação Pós-Migração
-- [ ] Investigar 639 contacts failed — confirmar se orphan account_ids 2,3,5,6,10 são aceitáveis
-- [ ] Validar integridade referencial no DEST após RUN-8
-- [ ] Documentar decisão sobre contacts orphans (D4 ou adendo a D3)
+### P0 — Validação Pós-Migração ✅ Concluído (2026-04-14)
+- [x] Investigar 639 contacts failed — confirmado: orphan account_ids 2,3,5,6,10 são skip intencional (D4)
+- [x] Validar integridade referencial no DEST após RUN-8 / RUN-11 — FK violations = 0 ✅
+- [x] Documentar decisão sobre contacts orphans — D4 formalizado em `docs/debates/D4-DEBATE-CONTACTS-ORPHANS-2026-04-14.md`
 
 ### P1 — Qualidade de Código
 - [ ] Adicionar testes unitários cobrindo os 10 bug fixes da sessão 2026-04-13
@@ -45,6 +45,9 @@
 
 ## ✅ Concluído
 
+- [x] RUN-11 completo: Exit:0 — contacts 5.966 + conversations 36.016 + messages 239.439 + attachments 22.841 migrados (2026-04-14)
+- [x] D4 formalizado: contacts orphans account_ids {2,3,5,6,10} → skip intencional, não falha (2026-04-14)
+- [x] `scripts/reports/relatorio_consolidado_pipeline.py` criado — relatório comparativo F1→F2→F3 (2026-04-14)
 - [x] Scaffold inicial gerado (2026-04-09T11:37:54Z)
 - [x] Primeira sessão inicializada e documentada (2026-04-09)
 - [x] Pre-spec analysis concluído — D1 resolvida (schema_sha1 idêntico) (2026-04-09)

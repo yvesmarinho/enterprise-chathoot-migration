@@ -12,7 +12,7 @@
             tabela      VARCHAR(100) NOT NULL,
             id_origem   BIGINT       NOT NULL,
             id_destino  BIGINT,
-            status      VARCHAR(20)  NOT NULL DEFAULT 'ok',
+            status      VARCHAR(500) NOT NULL DEFAULT 'ok',
             migrated_at TIMESTAMP    NOT NULL DEFAULT NOW(),
             CONSTRAINT uq_migration_state UNIQUE (tabela, id_origem)
         );
@@ -47,7 +47,7 @@ migration_state_table = Table(
     Column("tabela", String(100), nullable=False),
     Column("id_origem", BigInteger, nullable=False),
     Column("id_destino", BigInteger, nullable=True),
-    Column("status", String(20), nullable=False, default="ok"),
+    Column("status", String(500), nullable=False, default="ok"),
     Column("migrated_at", DateTime(timezone=False), nullable=False),
     UniqueConstraint("tabela", "id_origem", name="uq_migration_state"),
 )
