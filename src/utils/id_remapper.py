@@ -135,3 +135,26 @@ class IDRemapper:
         47
         """
         self._aliases.setdefault(table, {})[src_id] = dest_id
+
+    def has_alias(self, table: str, src_id: int) -> bool:
+        """Return True if an explicit alias is registered for (table, src_id).
+
+        Used by :class:`ContactsMigrator` to detect accounts that were merged
+        by :class:`AccountsMigrator` (regardless of whether src_id == dest_id).
+
+        :param table: Table name.
+        :type table: str
+        :param src_id: Source record ID.
+        :type src_id: int
+        :returns: ``True`` if a :meth:`register_alias` call exists for this pair.
+        :rtype: bool
+
+        >>> r = IDRemapper({"accounts": 43})
+        >>> r.has_alias("accounts", 1)
+        False
+        >>> r.register_alias("accounts", 1, 20)
+        >>> r.has_alias("accounts", 1)
+        True
+        """
+        tbl = self._aliases.get(table)
+        return tbl is not None and src_id in tbl

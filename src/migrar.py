@@ -37,6 +37,7 @@ from pathlib import Path
 from src.factory.connection_factory import ConnectionFactory
 from src.migrators.accounts_migrator import AccountsMigrator
 from src.migrators.attachments_migrator import AttachmentsMigrator
+from src.migrators.contact_inboxes_migrator import ContactInboxesMigrator
 from src.migrators.contacts_migrator import ContactsMigrator
 from src.migrators.conversations_migrator import ConversationsMigrator
 from src.migrators.inboxes_migrator import InboxesMigrator
@@ -59,6 +60,7 @@ _MIGRATION_ORDER = [
     "teams",
     "labels",
     "contacts",
+    "contact_inboxes",
     "conversations",
     "messages",
     "attachments",
@@ -71,6 +73,7 @@ _MIGRATOR_MAP = {
     "teams": TeamsMigrator,
     "labels": LabelsMigrator,
     "contacts": ContactsMigrator,
+    "contact_inboxes": ContactInboxesMigrator,
     "conversations": ConversationsMigrator,
     "messages": MessagesMigrator,
     "attachments": AttachmentsMigrator,

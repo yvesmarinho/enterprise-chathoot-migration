@@ -53,10 +53,13 @@ class UsersMigrator(BaseMigrator):
 
         # Load existing emails in destination for collision detection
         with self.dest_engine.connect() as conn:
-            existing_emails: set[str] = {
-                str(row[0]).lower()
+            # Build email→dest_id lookup for merge detection.
+            # When a source user's email already exists in DEST we register an
+            # alias (src_id → dest_id) instead of inserting with a renamed email.
+            existing_email_to_dest_id: dict[str, int] = {
+                str(row[0]).lower(): int(row[1])
                 for row in conn.execute(
-                    text("SELECT email FROM users WHERE email IS NOT NULL")
+                    text("SELECT email, id FROM users WHERE email IS NOT NULL")
                 ).fetchall()
             }
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
@@ -79,16 +82,51 @@ class UsersMigrator(BaseMigrator):
         with self.dest_engine.connect() as conn:
             migrated_user_ids.update(self.state_repo.get_migrated_ids(conn, "users"))
 
+        # ── Merge rule: source users whose email already exists in DEST ──────
+        # Instead of inserting with a modified email (the old "+migrated" approach),
+        # we register an alias src_id → dest_id so downstream entities
+        # (account_users, conversations.assignee_id, messages.sender_id) reference
+        # the correct existing user in DEST.
+        merged_users: list[tuple[int, int]] = []  # (src_id, dest_id)
+        for row in rows:
+            src_id = int(row["id"])
+            email = (row.get("email") or "").strip().lower()
+            dest_id = existing_email_to_dest_id.get(email) if email else None
+            if dest_id is not None:
+                self.id_remapper.register_alias("users", src_id, dest_id)
+                merged_users.append((src_id, dest_id))
+                migrated_user_ids.add(src_id)
+
+        if merged_users:
+            with self.dest_engine.connect() as dest_conn:
+                with dest_conn.begin():
+                    for src_id, dest_id in merged_users:
+                        self.state_repo.record_success(dest_conn, "users", src_id, dest_id)
+            self.logger.info(
+                "UsersMigrator: %d users matched by email — reusing dest_id, skipping INSERT",
+                len(merged_users),
+            )
+        # ─────────────────────────────────────────────────────────────────────
+
+        # Keep track of emails that will be inserted so within-batch collisions
+        # are still caught (two source users with the same email, edge case).
+        _inserting_emails: set[str] = set(existing_email_to_dest_id.keys())
+
         def remap_fn(row: dict) -> dict | None:
-            """Remap PK and deduplicate email for a users row.
+            """Remap PK for a users row; merged users are skipped (alias registered).
 
             :param row: Source row as plain dict.
             :type row: dict
             :returns: Destination row, or ``None`` to skip.
             :rtype: dict | None
             """
+            src_id = int(row["id"])
+            # Merged users are already registered in migration_state — skip INSERT.
+            if self.id_remapper.has_alias("users", src_id):
+                return None
+
             new_row = dict(row)
-            new_row["id"] = self.id_remapper.remap(int(row["id"]), "users")
+            new_row["id"] = self.id_remapper.remap(src_id, "users")
 
             # Regenerate pubsub_token to avoid unique constraint collision with
             # existing tokens in the destination database.
@@ -101,26 +139,19 @@ class UsersMigrator(BaseMigrator):
             new_row["reset_password_sent_at"] = None
             new_row["confirmation_token"] = None
 
-            # Handle email collision
             email = (new_row.get("email") or "").strip()
-            if email and email.lower() in existing_emails:
-                local, _, domain = email.partition("@")
-                new_email = f"{local}+migrated@{domain}"
-                self.logger.warning(
-                    "UsersMigrator: email collision for user id_origem=%d — "
-                    "rewriting email (masked)",
-                    row["id"],
-                )
-                new_row["email"] = new_email
-                # Sync uid (Devise) with rewritten email if it matches original
-                if str(new_row.get("uid") or "") == email:
-                    new_row["uid"] = new_email
-                # Register new email to prevent further collisions within batch
-                existing_emails.add(new_email.lower())
-            elif email:
-                existing_emails.add(email.lower())
+            if email:
+                # Guard against within-batch collisions (edge case: two source
+                # users sharing an email that is NOT yet in DEST).
+                if email.lower() in _inserting_emails:
+                    self.logger.warning(
+                        "UsersMigrator: within-batch email collision for id_origem=%d — skipping",
+                        src_id,
+                    )
+                    return None
+                _inserting_emails.add(email.lower())
 
-            migrated_user_ids.add(int(row["id"]))
+            migrated_user_ids.add(src_id)
             return new_row
 
         result = self._run_batches(rows, "users", dest_users, remap_fn)

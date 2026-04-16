@@ -62,36 +62,44 @@ class ContactsMigrator(BaseMigrator):
         # Contacts in unmatched accounts (new accounts with offset IDs) cannot
         # have duplicates in DEST because those accounts don't exist there yet.
         src_account_ids = {int(r["account_id"]) for r in rows if r.get("account_id") is not None}
+        # An account is "merged" whenever AccountsMigrator registered an alias for it
+        # (via IDRemapper.register_alias).  We use has_alias() so this is true
+        # regardless of whether src_id == dest_id (IDs can diverge between instances).
         merged_account_ids: set[int] = {
             acct_id
             for acct_id in src_account_ids
-            if self.id_remapper.remap(acct_id, "accounts") == acct_id
+            if self.id_remapper.has_alias("accounts", acct_id)
         }
 
         if merged_account_ids:
-            # Build lookup: (account_id, normalised_phone) → dest_id
-            #               (account_id, normalised_email) → dest_id
+            # Build lookup: (src_account_id, normalised_phone) → dest_id
+            #               (src_account_id, normalised_email)  → dest_id
+            # Query uses dest_acct_id (remapped) because that is the account_id
+            # stored in the destination contacts table.
             dst_phone_lkp: dict[tuple[int, str], int] = {}
             dst_email_lkp: dict[tuple[int, str], int] = {}
             dst_identifier_lkp: dict[tuple[int, str], int] = {}
 
             with self.dest_engine.connect() as dest_conn:
-                for acct_id in merged_account_ids:
+                for src_acct_id in merged_account_ids:
+                    dest_acct_id = self.id_remapper.remap(src_acct_id, "accounts")
                     for r in dest_conn.execute(
                         text(
                             "SELECT id, phone_number, email, identifier "
                             "FROM public.contacts WHERE account_id = :a"
                         ),
-                        {"a": acct_id},
+                        {"a": dest_acct_id},
                     ).mappings():
+                        # Keys use src_acct_id so the dedup loop below can match
+                        # using the source row's account_id directly.
                         if r["phone_number"]:
-                            dst_phone_lkp[(acct_id, str(r["phone_number"]).strip().lower())] = int(
+                            dst_phone_lkp[(src_acct_id, str(r["phone_number"]).strip().lower())] = int(
                                 r["id"]
                             )
                         if r["email"]:
-                            dst_email_lkp[(acct_id, str(r["email"]).strip().lower())] = int(r["id"])
+                            dst_email_lkp[(src_acct_id, str(r["email"]).strip().lower())] = int(r["id"])
                         if r["identifier"]:
-                            dst_identifier_lkp[(acct_id, str(r["identifier"]).strip().lower())] = (
+                            dst_identifier_lkp[(src_acct_id, str(r["identifier"]).strip().lower())] = (
                                 int(r["id"])
                             )
 

@@ -47,23 +47,27 @@ class AccountsMigrator(BaseMigrator):
 
         self.logger.info("AccountsMigrator: %d source rows fetched", len(rows))
 
-        # ── Merge rule: accounts with same id AND name already exist in DEST ──
-        # These accounts are not re-inserted; their dest_id is reused as-is.
-        # We register an alias so downstream migrators (contacts, conversations)
-        # receive the correct dest_id when remapping account_id.
+        # ── Merge rule: accounts matched by name already exist in DEST ──────
+        # Matching is done by name only (case-insensitive) so that accounts
+        # whose IDs diverged between instances (e.g. SOURCE id=1 / DEST id=20)
+        # are still correctly merged.  The dest_id is registered as an alias so
+        # downstream migrators (contacts, conversations, inboxes …) receive the
+        # correct dest_id when remapping account_id.
         with self.dest_engine.connect() as dest_conn:
-            dst_id_name: set[tuple[int, str]] = {
-                (int(r[0]), str(r[1]))
+            dst_name_id: dict[str, int] = {
+                str(r[1]).strip().lower(): int(r[0])
                 for r in dest_conn.execute(text("SELECT id, name FROM public.accounts")).fetchall()
+                if r[1]
             }
 
         merged: list[tuple[int, int]] = []  # (src_id, dest_id)
         for row in rows:
             src_id = int(row["id"])
-            src_name = str(row.get("name") or "")
-            if (src_id, src_name) in dst_id_name:
-                self.id_remapper.register_alias("accounts", src_id, src_id)
-                merged.append((src_id, src_id))
+            src_name = str(row.get("name") or "").strip().lower()
+            dest_id = dst_name_id.get(src_name)
+            if dest_id is not None:
+                self.id_remapper.register_alias("accounts", src_id, dest_id)
+                merged.append((src_id, dest_id))
 
         if merged:
             with self.dest_engine.connect() as dest_conn:
@@ -71,7 +75,7 @@ class AccountsMigrator(BaseMigrator):
                     for src_id, dest_id in merged:
                         self.state_repo.record_success(dest_conn, "accounts", src_id, dest_id)
             self.logger.info(
-                "AccountsMigrator: %d accounts matched by id+name — reusing dest_id, skipping INSERT",
+                "AccountsMigrator: %d accounts matched by name — reusing dest_id, skipping INSERT",
                 len(merged),
             )
         # ──────────────────────────────────────────────────────────────────────

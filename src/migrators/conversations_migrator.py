@@ -5,7 +5,7 @@
     * ``id``               → ``id + offset_conversations``
     * ``account_id``       → ``account_id + offset_accounts``  (required — skip on orphan)
     * ``inbox_id``         → ``inbox_id + offset_inboxes``     (required — skip on orphan)
-    * ``contact_id``       → ``contact_id + offset_contacts``  (nullable — skip on orphan)
+    * ``contact_id``       → ``contact_id + offset_contacts``  (nullable — NULL-out if orphan)
     * ``assignee_id``      → ``assignee_id + offset_users``    (nullable — NULL-out if unmigrated)
     * ``team_id``          → ``team_id + offset_teams``        (nullable — NULL-out if unmigrated)
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import MetaData, Table
+from sqlalchemy import MetaData, Table, text
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
 
@@ -54,6 +54,16 @@ class ConversationsMigrator(BaseMigrator):
             migrated_contacts = self.state_repo.get_migrated_ids(conn, "contacts")
             migrated_users = self.state_repo.get_migrated_ids(conn, "users")
             migrated_teams = self.state_repo.get_migrated_ids(conn, "teams")
+            # BUG-04 fix: pre-load MAX(display_id) per account in DEST so we can
+            # resequence display_id for each migrated conversation without collisions.
+            _display_id_counters: dict[int, int] = {}
+            for dest_acct_id_row in conn.execute(
+                text(
+                    "SELECT account_id, COALESCE(MAX(display_id), 0) "
+                    "FROM public.conversations GROUP BY account_id"
+                )
+            ).fetchall():
+                _display_id_counters[int(dest_acct_id_row[0])] = int(dest_acct_id_row[1])
 
         with self.source_engine.connect() as conn:
             rows = [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
@@ -93,18 +103,23 @@ class ConversationsMigrator(BaseMigrator):
             new_row["account_id"] = self.id_remapper.remap(account_id_origin, "accounts")
             new_row["inbox_id"] = self.id_remapper.remap(inbox_id_origin, "inboxes")
 
-            # Nullable FK: contact_id — skip record if orphan
+            # Nullable FK: contact_id — NULL-out if orphan (BUG-03 fix).
+            # Skipping the whole conversation when contact_id is unmigrated causes
+            # cascade loss of all messages and attachments for that conversation,
+            # violating the 100%-migration goal.  A NULL contact_id is acceptable
+            # in Chatwoot (contact can be re-linked manually later).
             contact_id = row.get("contact_id")
             if contact_id is not None:
                 contact_id_origin = int(contact_id)
                 if contact_id_origin not in migrated_contacts:
                     self.logger.warning(
-                        "ConversationsMigrator: id=%d skipped — orphan contact_id=%d",
+                        "ConversationsMigrator: id=%d contact_id=%d not migrated — nulling out",
                         id_origin,
                         contact_id_origin,
                     )
-                    return None
-                new_row["contact_id"] = self.id_remapper.remap(contact_id_origin, "contacts")
+                    new_row["contact_id"] = None
+                else:
+                    new_row["contact_id"] = self.id_remapper.remap(contact_id_origin, "contacts")
 
             # Nullable FK: assignee_id — NULL-out if unmigrated
             assignee_id = row.get("assignee_id")
@@ -126,6 +141,12 @@ class ConversationsMigrator(BaseMigrator):
 
             # Regenerate uuid to avoid UniqueViolation on index_conversations_on_uuid
             new_row["uuid"] = str(uuid.uuid4())
+
+            # BUG-04 fix: resequence display_id per account so it never collides
+            # with display_ids already present in DEST for the same account.
+            dest_acct_id = new_row["account_id"]
+            _display_id_counters[dest_acct_id] = _display_id_counters.get(dest_acct_id, 0) + 1
+            new_row["display_id"] = _display_id_counters[dest_acct_id]
 
             return new_row
 
@@ -203,13 +224,10 @@ class ConversationsMigrator(BaseMigrator):
             )
 
         contact_id = row.get("contact_id")
-        if contact_id is not None and int(contact_id) not in contacts:
-            return (
-                Outcome.ORPHAN_FK_SKIP,
-                f"contact_id={contact_id} not in migrated contacts",
-            )
-
         nulled: list[str] = []
+        if contact_id is not None and int(contact_id) not in contacts:
+            nulled.append(f"contact_id={contact_id}")  # null-out, do not skip
+
         assignee_id = row.get("assignee_id")
         if assignee_id is not None and int(assignee_id) not in users:
             nulled.append(f"assignee_id={assignee_id}")
