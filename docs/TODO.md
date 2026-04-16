@@ -1,20 +1,28 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-14T15:30Z (Session 2026-04-14 encerrada — RUN-11 completo, EXIT:0, FK violations=0, relatorio_consolidado_pipeline criado)
+**Last Updated**: 2026-04-16T14:50Z (Session 2026-04-16 encerrada — BUG-03→BUG-06 corrigidos, pipeline completo 311.539 registros, 0 falhas, exit:0)
 **Status**: 🟢 Em andamento
 
 ---
 
 ## 🟠 Em Progresso
 
-### P0 — Validação Pós-Migração ✅ Concluído (2026-04-14)
-- [x] Investigar 639 contacts failed — confirmado: orphan account_ids 2,3,5,6,10 são skip intencional (D4)
-- [x] Validar integridade referencial no DEST após RUN-8 / RUN-11 — FK violations = 0 ✅
-- [x] Documentar decisão sobre contacts orphans — D4 formalizado em `docs/debates/D4-DEBATE-CONTACTS-ORPHANS-2026-04-14.md`
+### P0 — Pipeline Pós-BUG-06 ✅ Concluído (2026-04-16)
+- [x] BUG-03: `conversations_migrator` — contact_id orphan → null-out em vez de skip
+- [x] BUG-04: `conversations_migrator` — display_id resequenciado por account (MAX DEST)
+- [x] BUG-05: Criado `src/migrators/contact_inboxes_migrator.py` (novo migrador)
+- [x] BUG-06: `users_migrator` — merge por email em vez de `+migrated`
+- [x] Pipeline executado: 311.539 migrados, 0 falhas, exit:0 ✅
+- [x] Validação manual: conv_id=42070 ✅ | FK violations novas = 0 ✅
 
 ### P1 — Qualidade de Código
-- [ ] Adicionar testes unitários cobrindo os 10 bug fixes da sessão 2026-04-13
+- [ ] Adicionar testes unitários BUG-01 a BUG-06 (`test/unit/`)
+- [ ] Adicionar testes unitários FIX-01 a FIX-10 (`test/unit/`)
 - [ ] Documentar APIs/interfaces (`src/`)
+
+### P0 — FK Violations Pré-existentes no DEST
+- [ ] Avaliar FK violations pré-existentes detectadas no relatório 2026-04-16 — D5 necessário?
+- [ ] Decidir: limpeza de orphans ou aceitar como data decay (similar a D4)
 
 ### P0 — POC Dry-Run (Pré-Migração de Produção) — ✅ Concluído
 - [x] TPOC001: Implementar `src/reports/poc_reporter.py` (`Outcome` enum, `RecordSample`, `POCResult`, `POCReporter`)
@@ -45,6 +53,8 @@
 
 ## ✅ Concluído
 
+- [x] RUN-20260416 completo: Exit:0 — BUG-01→BUG-06 corrigidos, 311.539 registros migrados (0 falhas) (2026-04-16)
+- [x] `src/migrators/contact_inboxes_migrator.py` criado — `contact_inboxes` adicionado ao pipeline (2026-04-16)
 - [x] RUN-11 completo: Exit:0 — contacts 5.966 + conversations 36.016 + messages 239.439 + attachments 22.841 migrados (2026-04-14)
 - [x] D4 formalizado: contacts orphans account_ids {2,3,5,6,10} → skip intencional, não falha (2026-04-14)
 - [x] `scripts/reports/relatorio_consolidado_pipeline.py` criado — relatório comparativo F1→F2→F3 (2026-04-14)

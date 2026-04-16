@@ -78,7 +78,10 @@ class ContactInboxesMigrator(BaseMigrator):
             contact_id_origin = int(row["contact_id"])
             inbox_id_origin = int(row["inbox_id"])
 
-            if contact_id_origin not in migrated_contacts or inbox_id_origin not in migrated_inboxes:
+            if (
+                contact_id_origin not in migrated_contacts
+                or inbox_id_origin not in migrated_inboxes
+            ):
                 continue  # will be skipped in remap_fn anyway
 
             dest_contact_id = self.id_remapper.remap(contact_id_origin, "contacts")

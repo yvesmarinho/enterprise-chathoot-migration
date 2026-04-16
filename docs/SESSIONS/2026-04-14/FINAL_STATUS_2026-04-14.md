@@ -2,7 +2,7 @@
 
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: 2026-04-14T08:57Z → 2026-04-14T15:30Z
-**Commit HEAD**: _atualizar após commit de encerramento_
+**Commit HEAD**: `7b52b39`
 
 ---
 

@@ -93,15 +93,17 @@ class ContactsMigrator(BaseMigrator):
                         # Keys use src_acct_id so the dedup loop below can match
                         # using the source row's account_id directly.
                         if r["phone_number"]:
-                            dst_phone_lkp[(src_acct_id, str(r["phone_number"]).strip().lower())] = int(
-                                r["id"]
-                            )
-                        if r["email"]:
-                            dst_email_lkp[(src_acct_id, str(r["email"]).strip().lower())] = int(r["id"])
-                        if r["identifier"]:
-                            dst_identifier_lkp[(src_acct_id, str(r["identifier"]).strip().lower())] = (
+                            dst_phone_lkp[(src_acct_id, str(r["phone_number"]).strip().lower())] = (
                                 int(r["id"])
                             )
+                        if r["email"]:
+                            dst_email_lkp[(src_acct_id, str(r["email"]).strip().lower())] = int(
+                                r["id"]
+                            )
+                        if r["identifier"]:
+                            dst_identifier_lkp[
+                                (src_acct_id, str(r["identifier"]).strip().lower())
+                            ] = int(r["id"])
 
             dedup_records: list[tuple[int, int]] = []  # (src_id, dest_id)
             for row in rows:
