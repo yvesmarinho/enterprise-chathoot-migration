@@ -1366,9 +1366,9 @@ def main() -> None:
         dc.close()
 
     if salvar:
-        out_dir = Path(__file__).parent.parent / "tmp"
+        out_dir = Path(__file__).parent.parent / ".tmp"
         out_dir.mkdir(exist_ok=True)
-        print(f"\n  Use: python 05_diagnostico_completo.py 2>&1 | tee ../tmp/diagnostico_{ts}.txt")
+        print(f"\n  Use: python 05_diagnostico_completo.py 2>&1 | tee ../.tmp/diagnostico_{ts}.txt")
 
 
 if __name__ == "__main__":

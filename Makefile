@@ -39,9 +39,10 @@ lint:
 format:
 	@echo "Formatando..."
 
-## Remove arquivos gerados
+## Remove arquivos gerados e limpa .tmp/
 clean:
 	@rm -rf dist/ build/ __pycache__/ .pytest_cache/ *.egg-info/ .coverage htmlcov/
+	@bash scripts/cleanup-tmp.sh --verbose
 ## Carrega variáveis MCP do .secrets/.env e orienta a abrir o VS Code
 mcp:
 	@bash scripts/load-mcp.sh
@@ -56,7 +57,7 @@ PHONE                ?=
 EMAIL                ?=
 CHECK_URLS           ?=
 
-.PHONY: validate-api-counts validate-api-deep validate-api
+.PHONY: validate-api-counts validate-api-deep validate-api validate-hash
 
 ## Fase 1 — contagens macro SOURCE vs DEST vs API (seguro para CI)
 validate-api-counts:
@@ -80,3 +81,13 @@ validate-api-deep:
 
 ## Executa Fase 1 + Fase 2 (PHONE=... ou EMAIL=... obrigatorio para Fase 2)
 validate-api: validate-api-counts validate-api-deep
+
+## Validação de integridade por hash MD5 (contacts, conversations, messages, attachments)
+validate-hash:
+	@test -f .secrets/generate_erd.json || \
+	    { echo "ERRO: .secrets/generate_erd.json nao encontrado"; exit 1; }
+	@timeout $(VALIDATE_TIMEOUT) \
+	    python app/11_validar_hash.py $(if $(TABLES),--tables $(TABLES)) \
+	    $(if $(ACCOUNTS),--accounts $(ACCOUNTS)) \
+	    $(if $(SAVE_PARQUET),--save-parquet)
+	@echo "Outputs em .tmp/"

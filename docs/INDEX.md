@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chathoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-04-20
-**Last Session**: 2026-04-20 (encerrada — D5-A1→A5 implementados, B1 executado EXIT 2, orphan_messages C1 pendente)
+**Last Updated**: 2026-04-21
+**Last Session**: 2026-04-21 (iniciada — continuação D5: B2/B3/C1 pendentes, orphan_messages investigation)
 
 ---
 
@@ -38,6 +38,11 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-04-20.md
     ├── SESSION_REPORT_2026-04-20.md
     └── FINAL_STATUS_2026-04-20.md
+└── 2026-04-21/           ← Sessão 7: D5-B2/B3/C1 — continuação validação API + investigação orphan_messages
+    ├── SESSION_RECOVERY_2026-04-21.md
+    ├── DAILY_ACTIVITIES_2026-04-21.md
+    ├── SESSION_REPORT_2026-04-21.md
+    └── FINAL_STATUS_2026-04-21.md
 ```
 
 ## Debates e Decisões

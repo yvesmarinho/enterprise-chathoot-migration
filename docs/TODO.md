@@ -1,13 +1,13 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-20 — D5-A1→A5 ✅ implementados, B1 ✅ executado (EXIT 2 — orphan_messages C1 pendente)
+**Last Updated**: 2026-04-21 — D6 validação hash concluída (conversations/messages/attachments ✅, 246 contacts missing ⚠️ pendente)
 **Status**: 🟢 Em andamento
 
 ---
 
 ## 🟠 Em Progresso
 
-### P0 — Validação API (D5) — Em andamento (Sessão 2026-04-20)
+### P0 — Validação API (D5) — Em andamento
 - [x] D5-A1: Sample contacts + CLI (CTE richness_score, `--sample-size`, Makefile targets) ✅ 2026-04-20
 - [x] D5-A2: API conversations scan (`ConversationApiCheck`, Rails limit warning, cross-ref src_id) ✅ 2026-04-20
 - [x] D5-A3: Exit codes semânticos (0/2/3/4) ✅ 2026-04-20
@@ -18,6 +18,14 @@
 - [ ] D5-B3: `make validate-api-deep SAMPLE=5 CHECK_URLS=1` — confirmar redação de URLs
 - [ ] D5-C1: Investigar `orphan_messages=6321` no dest_account_id=1 — pré-existente ou resíduo?
 - [ ] D5-C2: Documentar attachments_not_found se > 0 (pós B2/B3)
+
+### P0 — Validação Hash MD5 (D6) ✅ Concluído (Sessão 2026-04-21)
+- [x] D6-1: Corrigir BK de `conversations` — `display_id` → `created_at + status` ✅ 2026-04-21
+- [x] D6-2: Corrigir BK de `attachments` — `external_url` (100% NULL) → `file_type + created_at` ✅ 2026-04-21
+- [x] D6-3: Executar validação final — conversations ✅ | messages ✅ | attachments ✅ | contacts ⚠️ ✅ 2026-04-21
+- [x] D6-4: Consolidar `tmp/` → `.tmp/` (único diretório temp) ✅ 2026-04-21
+- [x] D6-5: Criar `scripts/cleanup-tmp.sh` + integrar ao `make clean` ✅ 2026-04-21
+- [ ] D6-C1: Investigar 246 contacts missing (3,41%) — BK `phone+email` pode ser imprecisa para contatos sem phone? (próxima sessão)
 
 ### P0 — Pipeline Pós-BUG-06 ✅ Concluído (2026-04-16)
 - [x] BUG-03: `conversations_migrator` — contact_id orphan → null-out em vez de skip
@@ -65,6 +73,8 @@
 
 ## ✅ Concluído
 
+- [x] D6 validação hash: `app/11_validar_hash.py` — BKs corrigidas + execução final: conversations ✅, messages ✅, attachments ✅, contacts ⚠️ 246 missing (2026-04-21)
+- [x] D6 consolidação tmp: `tmp/` → `.tmp/` + `scripts/cleanup-tmp.sh` + `make clean` integrado (2026-04-21)
 - [x] D5-A1→A5 + B1: `app/10_validar_api.py` — spec validação API implementado + 1ª execução real (EXIT 2 expected) (2026-04-20)
 - [x] RUN-20260416 completo: Exit:0 — BUG-01→BUG-06 corrigidos, 311.539 registros migrados (0 falhas) (2026-04-16)
 - [x] `src/migrators/contact_inboxes_migrator.py` criado — `contact_inboxes` adicionado ao pipeline (2026-04-16)
