@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chathoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-04-21
-**Last Session**: 2026-04-21 (iniciada — continuação D5: B2/B3/C1 pendentes, orphan_messages investigation)
+**Last Updated**: 2026-04-21 (encerramento — D6 validação hash completa: conversations/messages/attachments ✅, contacts ⚠️ 246 missing, commit d837915)
+**Last Session**: 2026-04-21 (encerrada — D6 BKs corrigidas + execução final + consolidação tmp/)
 
 ---
 
@@ -38,7 +38,7 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-04-20.md
     ├── SESSION_REPORT_2026-04-20.md
     └── FINAL_STATUS_2026-04-20.md
-└── 2026-04-21/           ← Sessão 7: D5-B2/B3/C1 — continuação validação API + investigação orphan_messages
+└── 2026-04-21/           ← Sessão 7: D6 — BKs hash corrigidas + validação final (conversations/messages/attachments ✅, contacts ⚠️ 246 missing)
     ├── SESSION_RECOVERY_2026-04-21.md
     ├── DAILY_ACTIVITIES_2026-04-21.md
     ├── SESSION_REPORT_2026-04-21.md
@@ -53,6 +53,8 @@ SESSIONS/
 | [debates/D4-DEBATE-CONTACTS-ORPHANS-2026-04-14.md](debates/D4-DEBATE-CONTACTS-ORPHANS-2026-04-14.md) | 31.568 contacts orphans no SOURCE — decisão: ACEITAR como data decay |
 | [debates/D5-DEBATE-SPEC-VALIDACAO-API-2026-04-20.md](debates/D5-DEBATE-SPEC-VALIDACAO-API-2026-04-20.md) | Spec validação API pós-migração — gaps A1–A5 + plano B1–C2 |
 | [debates/D5-SQL-VALIDACAO-PROFUNDA-2026-04-20.sql](debates/D5-SQL-VALIDACAO-PROFUNDA-2026-04-20.sql) | SQL queries para validação profunda (sanity checks) |
+| [debates/D5-REVISAO-METODO-VALIDACAO-2026-04-21.md](debates/D5-REVISAO-METODO-VALIDACAO-2026-04-21.md) | Revisão do método de validação API — D5 (2026-04-21) |
+| [debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md](debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md) | D6 — Arquitetura de validação por hash MD5 + BKs + resultados finais |
 
 ## Scripts de Relatório (reutilizáveis)
 
@@ -76,8 +78,14 @@ SESSIONS/
 | Arquivo | Descrição |
 |---------|----------|
 | [`app/05_diagnostico_completo.py`](../app/05_diagnostico_completo.py) | 14 blocos SOURCE vs DEST |
-| [`app/10_validar_api.py`](../app/10_validar_api.py) | **NOVO** — Validação API pós-migração: counts, deep scan, sanity, exit codes (D5) |
-| [`tmp/diagnostico_20260410_165333.txt`](../tmp/diagnostico_20260410_165333.txt) | Baseline 18KB (2026-04-10) |
+| [`app/10_validar_api.py`](../app/10_validar_api.py) | Validação API pós-migração: counts, deep scan, sanity, exit codes (D5) |
+| [`app/11_validar_hash.py`](../app/11_validar_hash.py) | **NOVO** — Validação por hash MD5: Pandas set-difference, BKs por tabela, missing/extra (D6) |
+
+## Scripts de Manutenção
+
+| Script | Descrição | Uso |
+|--------|-----------|-----|
+| [`scripts/cleanup-tmp.sh`](../scripts/cleanup-tmp.sh) | **NOVO** — Limpeza de `.tmp/` com `--dry-run` e `--verbose` | `./scripts/cleanup-tmp.sh --verbose` |
 
 ---
 

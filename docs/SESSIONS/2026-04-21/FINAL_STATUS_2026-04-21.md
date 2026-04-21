@@ -3,7 +3,7 @@
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: SESSION-2026-04-21 (Sessão 7)
 **Commit HEAD (início)**: `e58b08d`
-**Commit HEAD (fim)**: a registrar após commit de encerramento
+**Commit HEAD (fim)**: `d837915`
 
 ---
 
