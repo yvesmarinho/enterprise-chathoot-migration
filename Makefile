@@ -91,3 +91,41 @@ validate-hash:
 	    $(if $(ACCOUNTS),--accounts $(ACCOUNTS)) \
 	    $(if $(SAVE_PARQUET),--save-parquet)
 	@echo "Outputs em .tmp/"
+
+# ---------------------------------------------------------------------------
+# Diagnóstico D7 — visibilidade pós-migração por agente
+# ---------------------------------------------------------------------------
+DIAGNOSE_EMAIL ?= marcos.andrade@vya.digital
+DIAGNOSE_TIMEOUT ?= 120
+
+.PHONY: diagnose-agent
+
+## D7 — Diagnóstico de visibilidade de agente pós-migração (DIAGNOSE_EMAIL=user@domain)
+diagnose-agent:
+	@test -f .secrets/generate_erd.json || \
+	    { echo "ERRO: .secrets/generate_erd.json nao encontrado"; exit 1; }
+	@timeout $(DIAGNOSE_TIMEOUT) \
+	    python app/12_diagnostico_marcos.py --email "$(DIAGNOSE_EMAIL)"
+	@echo "Outputs em .tmp/"
+
+# ---------------------------------------------------------------------------
+# Verificação da conversa de 14/11/2025 — SOURCE vs DEST (D7 v2)
+# ---------------------------------------------------------------------------
+CONV_DATE     ?= 2025-11-14
+CONV_USER_ID  ?= 88
+CONV_WINDOW   ?= 3
+CONV_TIMEOUT  ?= 15
+
+.PHONY: verify-marcus-conv
+
+## D7v2 — Verifica conversa de Marcos (CONV_DATE=YYYY-MM-DD) via SOURCE+DEST DB+API
+verify-marcus-conv:
+	@test -f .secrets/generate_erd.json || \
+	    { echo "ERRO: .secrets/generate_erd.json nao encontrado"; exit 1; }
+	@timeout 120 \
+	    python app/14_verificar_conv_marcos.py \
+	        --user-id  "$(CONV_USER_ID)" \
+	        --date     "$(CONV_DATE)" \
+	        --window-days "$(CONV_WINDOW)" \
+	        --api-timeout "$(CONV_TIMEOUT)"
+	@echo "Outputs em .tmp/"
