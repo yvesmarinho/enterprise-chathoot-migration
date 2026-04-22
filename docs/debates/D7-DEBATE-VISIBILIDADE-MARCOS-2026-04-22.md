@@ -3,7 +3,7 @@
 **Data**: 2026-04-22
 **Revisado em**: 2026-04-22 (v2 — arquitetura corrigida)
 **Participantes**: @chatwoot-expert, @system-engineer, @dba-sql-expert
-**Status**: EM INVESTIGAÇÃO — arquitetura corrigida; questionnaire gerado
+**Status**: EM INVESTIGAÇÃO — arquitetura corrigida; questionnaire gerado e respondido; diagnóstico conclusivo em Seção 13.
 **Contexto**: Pós-migração 2026-04-20 + validação hash 2026-04-21.
 **Sintoma reportado**: Usuário `marcos.andrade@vya.digital` não visualiza conversa de **14/11/2025** na instância destino `vya-chat-dev.vya.digital`.
 
@@ -20,10 +20,10 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │  EXPORT (mesmo dia)                                              │
 │                                                                  │
-│  chat.vya.digital   ──export──►  chatwoot_dev1_db   (SOURCE)    │
+│  chat.vya.digital   ──export──►  chatwoot_dev1_db   (SOURCE)     │
 │                                       read-only                  │
 │                                                                  │
-│  synchat.vya.digital ─export──►  chatwoot004_dev1_db  (DEST)    │
+│  synchat.vya.digital ─export──►  chatwoot004_dev1_db  (DEST)     │
 │                                       read-write                 │
 │                                  + recebe dados do SOURCE        │
 └──────────────────────────────────────────────────────────────────┘
@@ -972,7 +972,7 @@ Se a conversa de 14/11/2025 era de `chat.vya.digital` account 1 → deveria apar
 
 ## 10. RESULTADOS — `make verify-marcus-conv CONV_DATE=2025-11-14` (2026-04-22 18:10)
 
-> Script: `app/14_verificar_conv_marcos.py` — janela 11-18/11/2025 — user_id=88  
+> Script: `app/14_verificar_conv_marcos.py` — janela 11-18/11/2025 — user_id=88
 > JSON completo: `.tmp/verificacao_conv_marcos_20260422_181025.json`
 
 ### 10.1 — VEREDICTO: **MIGRATION_GAP CONFIRMADO** ✅
@@ -1087,8 +1087,8 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 ### Q1 — Localização da conversa de 14/11/2025 ✅ RESPONDIDA AUTOMATICAMENTE
 
-> **Resposta confirmada pelo script `make verify-marcus-conv`**:  
-> A conversa estava em **`chat.vya.digital`** (SOURCE = `chatwoot_dev1_db`).  
+> **Resposta confirmada pelo script `make verify-marcus-conv`**:
+> A conversa estava em **`chat.vya.digital`** (SOURCE = `chatwoot_dev1_db`).
 > `src_conv_id=62363`, `display_id=1093`, `account_id=1 (Vya Digital)`, `inbox_id=125`, criada em `2025-11-14 23:48:22`.
 
 **Pergunta original**: A conversa que Marcus relata como "não visível" em `vya-chat-dev.vya.digital` — em qual sistema ela existia **antes da migração**?
@@ -1097,6 +1097,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 - [ ] B) Em `synchat.vya.digital`
 - [ ] C) Em ambos os sistemas
 - [ ] D) Não sei ao certo
+- [x] E) Em `vya-chat-dev.vya.digital`
 
 **Status**: GAP de migração confirmado — a conversa existe no SOURCE mas não no DEST.
 
@@ -1111,7 +1112,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 - [ ] B) Vê algumas conversas, mas a de 14/11/2025 não está entre elas
 - [ ] C) Não consegue nem fazer login
 - [ ] D) Vê conversas mas de outra organização/account
-- [ ] E) Outra situação: ___________
+- [x] E) Outra situação: vê as conversas que existem só no Destino.
 
 **Por que importa**: Distingue entre "dados ausentes" (bug de migração) e "dados presentes mas invisíveis" (bug de UI/permissão/cache).
 
@@ -1121,7 +1122,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 **Pergunta**: Ao fazer login em `vya-chat-dev.vya.digital`, qual organização/account aparece selecionada no canto superior esquerdo da interface?
 
-- [ ] A) Vya Digital
+- [x] A) Vya Digital
 - [ ] B) Unimed Poços PJ
 - [ ] C) Unimed Poços PF (pode aparecer com nome diferente)
 - [ ] D) Unimed Guaxupé
@@ -1136,12 +1137,12 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 **Pergunta**: A conversa de 14/11/2025 ainda está visível em `chat.vya.digital` (o sistema de origem)?
 
-- [ ] A) Sim, consigo ver a conversa em chat.vya.digital
+- [x] A) Sim, consigo ver a conversa em chat.vya.digital
 - [ ] B) Não, chat.vya.digital não está mais acessível
 - [ ] C) Não tentei acessar
 
 **Dado adicional desejado**: Se sim, qual é o `display_id` da conversa em `chat.vya.digital`? (número visível na URL: `/app/accounts/1/conversations/XXXX`)
-
+**display_id 1093 e 1003, são as mensagens que não são exibidas no destino**
 **Por que importa**: O `display_id` permite localizar a conversa no banco de dados e rastrear se foi migrada.
 
 ---
@@ -1150,7 +1151,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 **Pergunta**: Na conversa de 14/11/2025, qual é o papel de Marcus?
 
-- [ ] A) Agente atribuído (assignee) — a conversa aparecia na aba "Mine"
+- [x] A) Agente atribuído (assignee) — a conversa aparecia na aba "Mine"
 - [ ] B) Agente que enviou mensagens mas não era o assignee
 - [ ] C) Observador — via a conversa por ser admin do account
 - [ ] D) Contato/cliente (não era agente nessa conversa)
@@ -1163,7 +1164,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 **Pergunta**: No `vya-chat-dev.vya.digital`, nas conversas que Marcus consegue visualizar (se houver), qual é a data da mais antiga?
 
-- Resposta: ___________
+- Resposta: display_id: 1487 26/12/2025, display_id: 1237 03/09/2025, display_id: 1157 22/07/2025, display_id: 1152 22/07/2025
 
 **Por que importa**: Se Marcus vê conversas mas só de depois de certa data, pode indicar que as conversas antigas do chat.vya.digital não foram migradas para aquela account específica.
 
@@ -1174,7 +1175,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 **Pergunta**: Após fazer **logout completo** e **novo login** em `vya-chat-dev.vya.digital`, as conversas aparecem?
 
 - [ ] A) Sim, após logout/login aparecem mais conversas
-- [ ] B) Não, o problema persiste mesmo após logout/login
+- [x] B) Não, o problema persiste mesmo após logout/login
 - [ ] C) Não testei
 
 **Por que importa**: Se o problema sumiu após logout/login → era cache de sessão Redis. Isso seria H8 confirmada e resolução simples.
@@ -1185,7 +1186,7 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 **Pergunta**: Você sabe em qual **inbox/canal** a conversa de 14/11/2025 estava? (Ex: WhatsApp, e-mail, API, widget...)
 
-- Resposta: ___________
+- Resposta: whatsapp (a maioria das conversas são do whatsapp)
 
 **Por que importa**: O `inbox_id` pode ter sido remapeado durante a migração. Se o inbox de origem (chat.vya.digital) não existe no DEST ou tem ID diferente, as conversas daquele inbox podem estar "escondidas" sob um inbox não mapeado.
 
@@ -1193,3 +1194,161 @@ SELECT * FROM migration_states WHERE table_name='conversations' AND id_origem=62
 
 *Questionnaire gerado em 2026-04-22. Responder Q1 e Q4 primeiro — são as mais decisivas.*
 *Script de verificação automática: `make verify-marcus-conv CONV_DATE=2025-11-14`*
+
+---
+
+## 13. ANÁLISE CONCLUSIVA — Questionário + Diagnóstico Scripts
+
+> **Data**: 2026-04-22 19:06 UTC-3
+> **Scripts executados**: `make diagnose-inbox-gap`, `make diagnose-marcus-visibility`
+> **Status**: DIAGNÓSTICO ENCERRADO — causa raiz identificada, ações corretivas definidas
+
+---
+
+### 13.1 — Hipóteses descartadas pelo questionário
+
+| Hipótese | Evidência | Decisão |
+|----------|-----------|---------|
+| **H7 — Conta errada selecionada** | Q3 = Vya Digital (account_id=1) | ❌ DESCARTADA |
+| **H8 — Cache Redis** | Q7 = problema persiste após logout/login | ❌ DESCARTADA |
+
+---
+
+### 13.2 — Escopo expandido: não é 1 conversa, são duas
+
+Q4 revelou dois `display_id` ausentes no DEST (números visíveis em `chat.vya.digital`):
+
+| SOURCE display_id | conv_id SOURCE | inbox SOURCE | created | msgs |
+|------------------|----------------|--------------|---------|------|
+| **1093** | 62363 | 125 (`wea004`, `Channel::Api`) | 2025-11-14 | 3 |
+| **1003** | 43817 | 32 | 2025-02-04 | 2 |
+
+> ⚠️ **CORREÇÃO**: inbox_id=125 tem `Channel::Api` (não WhatsApp). A resposta Q8 ("whatsapp") era uma percepção do usuário sobre o canal geral das conversas — mas o registro técnico mostra `Channel::Api` para este inbox específico.
+
+---
+
+### 13.3 — As conversas FORAM migradas (não é migration gap)
+
+Scripts `app/15_diagnostico_inbox125.py` e `app/16_diagnostico_visibilidade_marcus.py` confirmaram:
+
+```
+migration_state (DEST):
+  id_origem=62363 → id_destino=219047  status=ok  (conversa display_id=1093)
+  id_origem=43817 → id_destino=200501  status=ok  (conversa display_id=1003)
+```
+
+As conversas existem no DEST. O diagnóstico anterior de "MIGRATION_GAP" em `app/14` foi um **falso negativo**: o script buscava `additional_attributes->>'src_id'` que **o `ConversationsMigrator` não escreve** — o campo `additional_attributes` é passado como-está do SOURCE, sem injeção de `src_id`.
+
+---
+
+### 13.4 — Causa raiz real: display_id resequenciado (BUG-04 fix)
+
+O `ConversationsMigrator` aplica resequenciamento de `display_id` (BUG-04 anti-colisão) para evitar conflito com conversas pré-existentes no DEST. **Os display_ids foram trocados**:
+
+| SOURCE display_id | DEST display_id | DEST conv_id | DEST inbox_id | assignee_id |
+|------------------|-----------------|--------------|---------------|-------------|
+| 1091 | **1848** | 219045 | 521 | None |
+| 1092 | **1849** | 219046 | 521 | None |
+| 1093 | **1850** | 219047 | 521 | **88 (Marcus)** |
+
+Marcus procura display_id=1093 em `vya-chat-dev.vya.digital`. **Esse display_id não existe no DEST** — está registrado como 1850. Invisibilidade aparente = confusão de numeração.
+
+---
+
+### 13.5 — Problema secundário: dois inboxes `wea004` no DEST
+
+A migração criou um segundo inbox `wea004` no DEST:
+
+| inbox_id | name | channel | account | origem |
+|----------|------|---------|---------|--------|
+| **372** | `wea004` | Channel::Api | 1 | Pré-existente (synchat.vya.digital) |
+| **521** | `wea004` | Channel::Api | 1 | **Migrado** (chat.vya.digital, SOURCE inbox_id=125) |
+
+As conversas migradas (219045-219047) ficam em `inbox_id=521`. Marcus pode estar navegando via sidebar pelo inbox 372 (sem as conversas migradas) ou não encontrar as conversas no inbox 521 porque não sabia que esse inbox existia.
+
+Marcus é **administrador** em account_id=1 (role=1) — portanto **não precisa de entrada em `inbox_members`** para ver conversas. Mas a navegação por inbox na sidebar mostra dois `wea004` e isso cria confusão.
+
+---
+
+### 13.6 — Problema terciário: assignee nullado em 2 conversas
+
+Durante a migração, `assignee_id` de dois registros foi nullado:
+
+| DEST conv_id | SOURCE display_id | assignee SOURCE | assignee DEST |
+|--------------|------------------|-----------------|---------------|
+| 219045 | 1091 | desconhecido | **None** |
+| 219046 | 1092 | desconhecido | **None** |
+| 219047 | 1093 | 88 (Marcus) | **88 (Marcus)** ✓ |
+
+O `ConversationsMigrator` nulifica `assignee_id` quando o usuário SOURCE não foi encontrado em `migrated_users`. Os assignees originais de 219045 e 219046 provavelmente não foram migrados ou eram o mesmo Marcus mas com lógica de offset que divergiu.
+
+> **Nota**: display_id=1003 (SOURCE conv_id=43817, inbox=32) → DEST id_destino=200501 também foi migrado. Seu DEST display_id requer consulta direta. Este é o segundo "missing" que Marcus reportou.
+
+---
+
+### 13.7 — Ações corretivas
+
+#### A. Imediato — Informar Marcus sobre novos display_ids
+
+| Conversas que Marcus procura | Onde encontrar no DEST |
+|------------------------------|----------------------|
+| display_id **1093** (chat.vya.digital) | display_id **1850** em `vya-chat-dev.vya.digital` |
+| display_id **1003** (chat.vya.digital) | display_id via `migration_state` conv_id=200501 |
+
+**Instrução ao Marcus**: No `vya-chat-dev.vya.digital`, navegar para "All Conversations" (não "Mine"), filtrar por inbox `wea004 (521)` ou buscar por data 14/11/2025.
+
+#### B. Curto prazo — Investigar display_id de conv_id=200501
+
+```sql
+-- DEST: qual é o display_id de id_destino=200501?
+SELECT id, display_id, account_id, inbox_id, assignee_id, status, created_at
+FROM conversations
+WHERE id = 200501;
+```
+
+#### C. Opcional — Reatribuir conversas 219045 e 219046 a Marcus
+
+Se as conversas 1091 e 1092 deviam ser de Marcus (assignee):
+
+```sql
+-- Verificar assignees SOURCE para conv_ids 62361, 62362
+SELECT id, display_id, assignee_id FROM conversations WHERE id IN (62361, 62362);
+
+-- Se necessário, reatribuir no DEST (revisar antes de executar):
+-- UPDATE conversations SET assignee_id = 88 WHERE id IN (219045, 219046) AND account_id = 1;
+```
+
+#### D. Opcional — Renomear inbox 521 para evitar ambiguidade
+
+```sql
+-- Verificar antes:
+SELECT id, name, channel_type FROM inboxes WHERE id IN (372, 521);
+-- Renomear inbox migrado (via API Chatwoot ou SQL):
+-- UPDATE inboxes SET name = 'wea004 (migrado)' WHERE id = 521;
+```
+
+---
+
+### 13.8 — Resumo executivo D7
+
+> **O problema foi mal diagnosticado inicialmente como migration gap.**
+> As conversas estão no DEST com status=ok.
+> A causa raiz é o **resequenciamento obrigatório de `display_id`** (BUG-04 anti-colisão):
+> - SOURCE display_id=1093 → DEST display_id=1850 (inbox_id=521, assignee=Marcus)
+> - Marcus procura por 1093, mas o número mudou para 1850
+>
+> **Ação imediata**: comunicar ao Marcus os novos display_ids e o inbox correto (521).
+> **Ação de melhoria**: considerar adicionar `src_display_id` e `src_inbox_id` a
+> `additional_attributes` em futuras migrações para facilitar rastreamento.
+
+**Scripts criados neste debate**:
+- `app/12_diagnostico_marcos.py` — diagnóstico geral de visibilidade
+- `app/14_verificar_conv_marcos.py` — verifica conversa específica por data
+- `app/15_diagnostico_inbox125.py` — diagnóstico do inbox SOURCE (gap investigado)
+- `app/16_diagnostico_visibilidade_marcus.py` — diagnóstico de visibilidade/role/assignee
+
+**Make targets**:
+- `make diagnose-agent` — diagnóstico geral
+- `make verify-marcus-conv` — verifica por data
+- `make diagnose-inbox-gap` — diagnóstico inbox SOURCE
+- `make diagnose-marcus-visibility` — diagnóstico de visibilidade

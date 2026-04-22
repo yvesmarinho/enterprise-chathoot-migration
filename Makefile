@@ -129,3 +129,38 @@ verify-marcus-conv:
 	        --window-days "$(CONV_WINDOW)" \
 	        --api-timeout "$(CONV_TIMEOUT)"
 	@echo "Outputs em .tmp/"
+
+# ---------------------------------------------------------------------------
+# Diagnóstico D7 — inbox gap (inbox_id=125 não migrado)
+# ---------------------------------------------------------------------------
+DIAG_INBOX_ID ?= 125
+
+.PHONY: diagnose-inbox-gap
+
+## D7-G — Diagnóstico do gap: por que inbox SOURCE não foi migrado (DIAG_INBOX_ID=125)
+diagnose-inbox-gap:
+	@test -f .secrets/generate_erd.json || \
+	    { echo "ERRO: .secrets/generate_erd.json nao encontrado"; exit 1; }
+	@timeout 120 \
+	    python app/15_diagnostico_inbox125.py --inbox-id "$(DIAG_INBOX_ID)"
+	@echo "Outputs em .tmp/"
+
+# ---------------------------------------------------------------------------
+# Diagnóstico D7 — visibilidade Marcus nas conversas migradas
+# ---------------------------------------------------------------------------
+MARCUS_SRC_CONV_IDS ?= 62361,62362,62363
+MARCUS_DEST_INBOX_ID ?= 521
+MARCUS_DEST_USER_ID  ?= 88
+
+.PHONY: diagnose-marcus-visibility
+
+## D7-V — Diagnóstico de visibilidade: por que Marcus não vê as conversas migradas
+diagnose-marcus-visibility:
+	@test -f .secrets/generate_erd.json || \
+	    { echo "ERRO: .secrets/generate_erd.json nao encontrado"; exit 1; }
+	@timeout 120 \
+	    python app/16_diagnostico_visibilidade_marcus.py \
+	        --source-conv-ids "$(MARCUS_SRC_CONV_IDS)" \
+	        --dest-inbox-id   "$(MARCUS_DEST_INBOX_ID)" \
+	        --dest-user-id    "$(MARCUS_DEST_USER_ID)"
+	@echo "Outputs em .tmp/"
