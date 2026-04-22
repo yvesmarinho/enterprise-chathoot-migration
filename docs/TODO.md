@@ -1,20 +1,21 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-22 — D7 MIGRATION_GAP confirmado: conversa 62363/display_id=1093 não migrada (inbox_id=125, account=1)
-**Status**: 🔴 Investigação ativa — causa raiz: inbox 125 não mapeado/migrado
+**Last Updated**: 2026-04-22 — D7 ENCERRADO: causa raiz = display_id resequenciado (BUG-04). Conversas migradas. Ação: informar Marcus novos display_ids.
+**Status**: 🟠 D7 resolvido; D5 (orphan_messages) e D6-C1 (contacts missing) pendentes
 
 ---
 
-## 🔴 URGENTE — D7: MIGRATION_GAP conversa 14/11/2025
+## 🟡 D7 — Visibilidade Marcus: ações remanescentes (baixa urgência)
 
-- [ ] **D7-G1**: Verificar se `inbox_id=125` (SOURCE/chat.vya.digital) tem equivalente no DEST `chatwoot004_dev1_db`
-  - SQL: `SELECT id, name, channel_type FROM inboxes WHERE id=125;` (no SOURCE)
-  - SQL: `SELECT * FROM inboxes WHERE additional_attributes->>'src_id'='125';` (no DEST)
-- [ ] **D7-G2**: Verificar quantas conversas de `account_id=1` foram migradas no total
-  - SQL: `SELECT COUNT(*) FROM conversations WHERE account_id=1 AND additional_attributes->>'src_id' IS NOT NULL;` (no DEST)
-- [ ] **D7-G3**: Checar `migration_state` para `conversations` em torno do `src_id=62363`
-- [ ] **D7-G4**: Identificar inbox equivalente no DEST e executar migração pontual da conversa 62363
-- [ ] **D7-Q**: Responder questionnaire Q2–Q8 do D7 (o que Marcus vê na UI, qual account, etc.)
+- [x] **D7-G1**: Verificar inbox_id=125 SOURCE → `wea004`, `Channel::Api`, `account_id=1` ✅ 2026-04-22
+- [x] **D7-G3**: Checar migration_state para conv_ids 62361–62363 → todos `status=ok` ✅ 2026-04-22
+- [ ] **D7-A1**: Verificar DEST display_id da conv_id=200501 (display_id=1003 SOURCE, inbox=32)
+  - SQL: `SELECT id, display_id, inbox_id, assignee_id FROM conversations WHERE id = 200501;` (no DEST)
+- [ ] **D7-A2**: Informar Marcus: SOURCE display_id=1093 → DEST display_id=1850 (inbox `wea004`, id=521)
+- [ ] **D7-A3**: Opcional — reatribuir conv_ids 219045, 219046 a Marcus (assignee=None → assignee=88)
+  - Verificar antes: `SELECT id, display_id, assignee_id FROM conversations WHERE id IN (62361, 62362);` (SOURCE)
+- [ ] **D7-A4**: Opcional — renomear inbox_id=521 para `wea004 (chat)` para diferenciar de inbox_id=372 (pré-existente)
+- [ ] **D7-Q**: Verificar também DEST display_id da conversa display_id=1003 SOURCE (conv_id=43817 SOURCE → id_destino=200501)
 
 ---
 

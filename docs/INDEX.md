@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chathoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-04-21 (encerramento — D6 validação hash completa: conversations/messages/attachments ✅, contacts ⚠️ 246 missing, commit d837915)
-**Last Session**: 2026-04-21 (encerrada — D6 BKs corrigidas + execução final + consolidação tmp/)
+**Last Updated**: 2026-04-22 (encerramento — D7 encerrado: display_id resequenciado, conversas migradas. Scripts 12/14/15/16 criados. Commit bb70a70)
+**Last Session**: 2026-04-22 (Sessão 8 — D7 diagnóstico conclusivo, 4 scripts diagnóstico, make targets adicionados)
 
 ---
 
@@ -38,11 +38,11 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-04-20.md
     ├── SESSION_REPORT_2026-04-20.md
     └── FINAL_STATUS_2026-04-20.md
-└── 2026-04-21/           ← Sessão 7: D6 — BKs hash corrigidas + validação final (conversations/messages/attachments ✅, contacts ⚠️ 246 missing)
-    ├── SESSION_RECOVERY_2026-04-21.md
-    ├── DAILY_ACTIVITIES_2026-04-21.md
-    ├── SESSION_REPORT_2026-04-21.md
-    └── FINAL_STATUS_2026-04-21.md
+└── 2026-04-22/           ← Sessão 8: D7 — diagnóstico visibilidade Marcus (display_id resequenciado, conv migradas ✅)
+    ├── DAILY_ACTIVITIES_2026-04-22.md
+    ├── SESSION_REPORT_2026-04-22.md
+    ├── SESSION_RECOVERY_2026-04-22.md
+    └── FINAL_STATUS_2026-04-22.md
 ```
 
 ## Debates e Decisões
@@ -55,6 +55,7 @@ SESSIONS/
 | [debates/D5-SQL-VALIDACAO-PROFUNDA-2026-04-20.sql](debates/D5-SQL-VALIDACAO-PROFUNDA-2026-04-20.sql) | SQL queries para validação profunda (sanity checks) |
 | [debates/D5-REVISAO-METODO-VALIDACAO-2026-04-21.md](debates/D5-REVISAO-METODO-VALIDACAO-2026-04-21.md) | Revisão do método de validação API — D5 (2026-04-21) |
 | [debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md](debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md) | D6 — Arquitetura de validação por hash MD5 + BKs + resultados finais |
+| [debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md](debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md) | D7 — Visibilidade Marcus pós-migração — causa: display_id resequenciado (BUG-04) |
 
 ## Scripts de Relatório (reutilizáveis)
 

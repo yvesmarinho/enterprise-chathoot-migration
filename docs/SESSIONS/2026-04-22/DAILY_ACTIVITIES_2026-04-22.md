@@ -46,8 +46,83 @@
 - 📝 Resultado salvo: `.tmp/verificacao_conv_marcos_20260422_181025.json`
 - ✅ D7 atualizado: Seções 10 (resultados), 11 (investigação), 12 (questionnaire com Q1 respondida)
 
-### Status Final da Sessão
-- **Causa raiz identificada**: MIGRATION_GAP — conversa `62363`/`display_id=1093` não foi migrada
-- **Próxima ação**: Investigar por que `inbox_id=125` (SOURCE) não gerou migração da conversa
-- **Questionnaire gerado**: Q2–Q8 aguardam resposta do usuário/Marcus
+### 18:30 — Questionário Q1–Q8 respondido pelo usuário
+
+- ✅ **Q3 = Vya Digital** → H7 DESCARTADA (conta correta selecionada)
+- ✅ **Q7 = persiste após logout** → H8 DESCARTADA (não é Redis)
+- 🔴 **Q4 = display_id 1093 E 1003** → escopo expandido (2 conversas, não 1)
+- 📝 **Q8 = WhatsApp** (percepção do usuário; técnico: `Channel::Api`, inbox `wea004`)
+
+---
+
+### 18:50 — Criação e execução de `app/15_diagnostico_inbox125.py`
+
+**Artefatos criados/modificados**:
+| Arquivo | O que mudou |
+|---------|-------------|
+| `app/15_diagnostico_inbox125.py` | Novo — diagnóstico completo inbox_id=125 SOURCE |
+| `Makefile` | Novo target `make diagnose-inbox-gap` |
+
+**Resultados** (`make diagnose-inbox-gap`):
+- SOURCE inbox_id=125: `name='wea004'`, `Channel::Api`, `account_id=1 (Vya Digital)`
+- **migration_state**: inbox 125 → `id_destino=521, status=ok` (migrado em 2026-04-20 17:51)
+- DEST tem **dois** inboxes `wea004`: id=372 (pré-existente synchat) e id=521 (migrado)
+- SOURCE inbox_id=125 tem **3 conversas** (display_ids 1091, 1092, 1093)
+- display_id=1003 → `conv_id=43817`, inbox=32, account=1, criada 2025-02-04
+
+**Insight crítico**: `app/14` deu **falso negativo** — buscava `additional_attributes->>'src_id'` que o `ConversationsMigrator` **não escreve**. Inbox e conversas foram migrados.
+
+---
+
+### 19:00 — Criação e execução de `app/16_diagnostico_visibilidade_marcus.py`
+
+**Artefatos criados/modificados**:
+| Arquivo | O que mudou |
+|---------|-------------|
+| `app/16_diagnostico_visibilidade_marcus.py` | Novo — diagnóstico visibilidade/role/assignee |
+| `Makefile` | Novo target `make diagnose-marcus-visibility` |
+
+**Resultados** (`make diagnose-marcus-visibility`):
+- `migration_state` confirma: todas as 3 conversas migradas com `status=ok`:
+  - conv_id=62361 → `id_destino=219045`
+  - conv_id=62362 → `id_destino=219046`
+  - conv_id=62363 → `id_destino=219047`
+- DEST inbox_id=521: 3 conversas com `display_id=1848, 1849, 1850` (resequenciado)
+- Marcus: **role=administrator** em account_id=1 ✓
+- Marcus é **assignee** em `dest_conv_id=219047` (display_id=1850)
+- **ROOT CAUSE**: `ADMIN_AND_ASSIGNEE` — Marcus deveria ver as conversas normalmente
+
+---
+
+### 19:10 — Análise conclusiva D7 + Commit `bb70a70`
+
+**Causa raiz definitiva: display_id resequenciado (BUG-04)**
+
+| SOURCE display_id | DEST display_id | DEST conv_id | assignee |
+|------------------|-----------------|--------------|---------|
+| 1091 | **1848** | 219045 | None |
+| 1092 | **1849** | 219046 | None |
+| **1093** | **1850** | 219047 | 88 (Marcus) ✓ |
+
+Marcus procura `display_id=1093` no DEST — esse número não existe lá porque foi resequenciado para **1850**.
+
+**Artefatos finais desta sessão**:
+| Arquivo | O que mudou |
+|---------|-------------|
+| `docs/debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md` | Seção 13 adicionada — análise conclusiva completa |
+| `app/15_diagnostico_inbox125.py` | Criado e executado |
+| `app/16_diagnostico_visibilidade_marcus.py` | Criado e executado |
+| `Makefile` | Targets `diagnose-inbox-gap` e `diagnose-marcus-visibility` |
+
+**Commit**: `bb70a70` — `diag: inbox_id=125 e visibilidade Marcus — causa raiz display_id resequenciado`
+
+---
+
+## Status Final da Sessão — 2026-04-22
+
+- **DIAGNÓSTICO ENCERRADO**: D7 concluído, causa raiz identificada
+- **Não é migration gap**: conversas foram migradas com `status=ok`
+- **Causa**: `display_id` resequenciado pelo BUG-04 (anti-colisão) → SOURCE 1093 = DEST 1850
+- **Ação imediata**: informar Marcus que display_id=1093 → DEST display_id=1850, inbox `wea004 (521)`
+- **Pendente**: verificar DEST display_id de `conv_id=200501` (a segunda conversa — display_id=1003 SOURCE)
 
