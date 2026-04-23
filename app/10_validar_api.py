@@ -91,7 +91,7 @@ log = logging.getLogger("validacao_api")
 class ApiConfig:
     base_url: str
     api_key: str
-    timeout_s: int = 10
+    timeout_s: int = 30
 
 
 def _redact_url(url: str) -> str:
@@ -106,18 +106,20 @@ class ApiError(Exception):
 
 
 def _load_api_config(timeout_s: int = 10) -> ApiConfig:
-    """Carrega configuração da API de .secrets/generate_erd.json["synchat"]."""
+    """Carrega configuração da API de .secrets/generate_erd.json["vya-chat-dev"]."""
     if not _SECRETS_PATH.exists():
         log.error("Secrets file not found: %s", _SECRETS_PATH)
         sys.exit(1)
     data: dict = json.loads(_SECRETS_PATH.read_text())
-    synchat = data.get("synchat", {})
-    api_key = synchat.get("api_key", "")
-    host = synchat.get("host", "")
+    api_section = data.get("vya-chat-dev", {})
+    api_key = api_section.get("api_key", "")
+    host = api_section.get("host", "")
     if not api_key or not host:
-        log.error("synchat.api_key ou synchat.host ausente em %s", _SECRETS_PATH)
+        log.error("vya-chat-dev.api_key ou vya-chat-dev.host ausente em %s", _SECRETS_PATH)
         sys.exit(1)
-    return ApiConfig(base_url=f"https://{host}", api_key=api_key, timeout_s=timeout_s)
+    if not host.startswith("http"):
+        host = f"https://{host}"
+    return ApiConfig(base_url=host.rstrip("/"), api_key=api_key, timeout_s=timeout_s)
 
 
 def _probe_api(cfg: ApiConfig) -> None:
@@ -145,6 +147,12 @@ def _api_get(url: str, cfg: ApiConfig) -> dict[str, Any]:
     except urllib.error.HTTPError as exc:
         raise ApiError(exc.code) from exc
     except urllib.error.URLError as exc:
+        raise ApiError(0) from exc
+    except TimeoutError as exc:
+        log.warning("API timeout url=%s", _redact_url(url))
+        raise ApiError(0) from exc
+    except OSError as exc:
+        log.warning("API connection error url=%s reason=%s", _redact_url(url), exc)
         raise ApiError(0) from exc
 
 
@@ -354,6 +362,26 @@ WHERE tabela = :tabela AND id_origem = :src_id
 LIMIT 1
 """
 
+_SQL_DEST_IDS_BATCH = """
+SELECT id_origem, id_destino
+FROM migration_state
+WHERE tabela = :tabela AND id_origem = ANY(:src_ids)
+"""
+
+_SQL_MESSAGES_BY_IDS = """
+SELECT id, account_id, conversation_id, content, message_type, content_type,
+       created_at, updated_at
+FROM messages
+WHERE id = ANY(:ids)
+"""
+
+_SQL_ATTACHMENTS_BY_MESSAGE_IDS = """
+SELECT id, message_id, account_id, file_type, external_url
+FROM attachments
+WHERE message_id = ANY(:message_ids)
+ORDER BY message_id, id
+"""
+
 _SQL_ACCOUNT_MAP = """
 SELECT ms.id_origem AS src_id, ms.id_destino AS dest_id, a.name
 FROM migration_state ms
@@ -492,6 +520,20 @@ def _lookup_dest_id(dest: Connection, tabela: str, src_id: int) -> int | None:
     """Retorna id_destino para a entidade SOURCE em migration_state."""
     row = dest.execute(text(_SQL_DEST_ID), {"tabela": tabela, "src_id": src_id}).fetchone()
     return int(row[0]) if row and row[0] is not None else None
+
+
+def _lookup_dest_ids_batch(dest: Connection, tabela: str, src_ids: list[int]) -> dict[int, int]:
+    """Retorna mapeamento {src_id: dest_id} para todos os IDs de uma vez (batch).
+
+    Muito mais eficiente que chamadas individuais a :func:`_lookup_dest_id` quando
+    há muitos registros — reduz N round-trips a 1.
+    """
+    if not src_ids:
+        return {}
+    rows = dest.execute(
+        text(_SQL_DEST_IDS_BATCH), {"tabela": tabela, "src_ids": src_ids}
+    ).fetchall()
+    return {int(r[0]): int(r[1]) for r in rows if r[1] is not None}
 
 
 def _load_account_map(dest: Connection) -> dict[int, int]:
@@ -650,6 +692,8 @@ def _deep_scan_message(
     has_mig_state: bool,
     *,
     check_urls: bool = False,
+    dest_id_override: int | None = None,
+    dest_msg_override: dict[str, Any] | None = None,
 ) -> MessageResult:
     src_id = int(src_msg["id"])
     log.debug(
@@ -660,19 +704,24 @@ def _deep_scan_message(
     )
     log.debug("    MSG src_full=%s", json.dumps(_serializable(src_msg), ensure_ascii=False))
 
-    dest_id: int | None = None
-    dest_msg: dict[str, Any] = {}
-
-    if has_mig_state:
+    # Usa pre-fetched dest_id/dest_msg quando disponível (evita N+1)
+    if dest_id_override is not None:
+        dest_id: int | None = dest_id_override
+    elif has_mig_state:
         dest_id = _lookup_dest_id(dest, "messages", src_id)
-        if dest_id is not None:
-            dest_msg = _row_to_dict(
-                dest.execute(text(_SQL_MESSAGE_BY_ID), {"id": dest_id}).fetchone()
+    else:
+        dest_id = None
+
+    if dest_msg_override is not None:
+        dest_msg: dict[str, Any] = dest_msg_override
+    elif dest_id is not None:
+        dest_msg = _row_to_dict(dest.execute(text(_SQL_MESSAGE_BY_ID), {"id": dest_id}).fetchone())
+        if dest_msg:
+            log.debug(
+                "    MSG dest_full=%s", json.dumps(_serializable(dest_msg), ensure_ascii=False)
             )
-            if dest_msg:
-                log.debug(
-                    "    MSG dest_full=%s", json.dumps(_serializable(dest_msg), ensure_ascii=False)
-                )
+    else:
+        dest_msg = {}
 
     found = bool(dest_msg)
     if not found:
@@ -716,6 +765,7 @@ def _deep_scan_conversation(
     has_mig_state: bool,
     *,
     check_urls: bool = False,
+    max_msgs: int | None = None,
 ) -> ConversationResult:
     src_id = int(src_conv["id"])
     display_id_src = src_conv.get("display_id")
@@ -766,8 +816,48 @@ def _deep_scan_conversation(
             text(_SQL_MESSAGES_BY_CONVERSATION), {"conversation_id": src_id}
         ).fetchall()
     ]
+    if max_msgs is not None and len(src_msgs) > max_msgs:
+        log.info(
+            "    CONV src_id=%d truncating msgs %d \u2192 %d (--max-msgs-per-conv)",
+            src_id,
+            len(src_msgs),
+            max_msgs,
+        )
+        src_msgs = src_msgs[:max_msgs]
+
+    # Batch pre-fetch: migration_state + DEST messages (evita N+1 queries)
+    msg_dest_map: dict[int, int] = {}
+    dest_msgs_by_id: dict[int, dict[str, Any]] = {}
+    if has_mig_state and src_msgs:
+        src_msg_ids = [int(m["id"]) for m in src_msgs]
+        msg_dest_map = _lookup_dest_ids_batch(dest, "messages", src_msg_ids)
+        if msg_dest_map:
+            dest_msg_ids = list(msg_dest_map.values())
+            rows = dest.execute(text(_SQL_MESSAGES_BY_IDS), {"ids": dest_msg_ids}).fetchall()
+            dest_msgs_by_id = {int(r[0]): _row_to_dict(r) for r in rows}
+            log.debug(
+                "    CONV src_id=%d batch msgs: src=%d mapped=%d fetched=%d",
+                src_id,
+                len(src_msg_ids),
+                len(msg_dest_map),
+                len(dest_msgs_by_id),
+            )
+
     msg_results = [
-        _deep_scan_message(src, dest, sm, has_mig_state, check_urls=check_urls) for sm in src_msgs
+        _deep_scan_message(
+            src,
+            dest,
+            sm,
+            has_mig_state,
+            check_urls=check_urls,
+            dest_id_override=msg_dest_map.get(int(sm["id"])),
+            dest_msg_override=(
+                dest_msgs_by_id.get(msg_dest_map[int(sm["id"])])
+                if int(sm["id"]) in msg_dest_map
+                else None
+            ),
+        )
+        for sm in src_msgs
     ]
 
     return ConversationResult(
@@ -1057,6 +1147,7 @@ def _deep_scan_contact(
     contact_id: int | None = None,
     sample_size: int | None = None,
     check_urls: bool = False,
+    max_msgs_per_conv: int | None = None,
 ) -> ContactDeepResult:
     query: dict[str, Any] = {}
     if phone:
@@ -1151,7 +1242,9 @@ def _deep_scan_contact(
 
     # 3a. Scan DB-vs-DB por conversa
     conv_results = [
-        _deep_scan_conversation(src, dest, sc, has_mig_state, check_urls=check_urls)
+        _deep_scan_conversation(
+            src, dest, sc, has_mig_state, check_urls=check_urls, max_msgs=max_msgs_per_conv
+        )
         for sc in src_convs
     ]
 
@@ -1228,6 +1321,7 @@ def _run_deep(
     email: str | None,
     sample_size: int | None,
     check_urls: bool,
+    max_msgs_per_conv: int | None = None,
 ) -> DeepValidationReport:
     log.info("=== Modo deep — %s ===", _TS)
 
@@ -1256,6 +1350,7 @@ def _run_deep(
                     email=email,
                     sample_size=sample_size,
                     check_urls=check_urls,
+                    max_msgs_per_conv=max_msgs_per_conv,
                 )
             ]
             contact_query: dict[str, Any] = {
@@ -1281,6 +1376,7 @@ def _run_deep(
                     contact_id=sc.src_contact_id,
                     sample_size=None,  # sem limite de convs em auto-sample
                     check_urls=check_urls,
+                    max_msgs_per_conv=max_msgs_per_conv,
                 )
                 for sc in samples
             ]
@@ -1323,8 +1419,10 @@ def _fetch_sanity(dest: Connection, dest_account_id: int) -> dict[str, int]:
         try:
             row = dest.execute(text(q), params).fetchone()
             return int(row[0]) if row else 0
-        except Exception as exc:
-            log.warning("SANITY dest_account_id=%d %s=SKIP (%s)", dest_account_id, key, exc)
+        except Exception as exc:  # noqa: BLE001
+            # Column/table absent in this Chatwoot schema version — not an error.
+            exc_summary = str(exc).split("\n")[0][:120]
+            log.debug("SANITY dest_account_id=%d %s=SKIP — %s", dest_account_id, key, exc_summary)
             dest.rollback()
             return -1  # sentinel: coluna/tabela ausente no schema
 
@@ -1390,7 +1488,7 @@ def _run_summary(factory: ConnectionFactory, api_cfg: ApiConfig) -> dict[str, An
         sum(dest_atts.values()),
     )
 
-    # Contagens via API
+    # Contagens via API — response: {"meta": {"all_count": N, ...}}
     api_counts: dict[int, tuple[int, int, str]] = {}
     for dest_acc_id in account_map.values():
         time.sleep(0.15)
@@ -1399,7 +1497,7 @@ def _run_summary(factory: ConnectionFactory, api_cfg: ApiConfig) -> dict[str, An
                 f"{api_cfg.base_url}/api/v1/accounts/{dest_acc_id}/conversations/meta?status=all",
                 api_cfg,
             )
-            api_conv = int(conv_data.get("data", {}).get("all_count", -1))
+            api_conv = int(conv_data.get("meta", {}).get("all_count", -1))
         except ApiError as exc:
             api_counts[dest_acc_id] = (-1, -1, f"conv_http:{exc.status}")
             continue
@@ -1591,6 +1689,17 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="check_urls",
         help="Verificar acessibilidade dos URLs de anexo (HEAD request)",
     )
+    dp.add_argument(
+        "--max-msgs-per-conv",
+        type=int,
+        default=None,
+        metavar="N",
+        dest="max_msgs_per_conv",
+        help=(
+            "Limita a N mensagens analisadas por conversa (padrão: sem limite). "
+            "Use para reduzir tempo em conversas com muitas mensagens."
+        ),
+    )
     return parser
 
 
@@ -1693,6 +1802,7 @@ def main() -> None:
             email=args.contact_email,
             sample_size=args.sample_size,
             check_urls=args.check_urls,
+            max_msgs_per_conv=args.max_msgs_per_conv,
         )
         _save_deep_outputs(report_deep)
         exit_code = _exit_code_deep(report_deep)

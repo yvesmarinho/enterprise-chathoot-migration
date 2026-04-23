@@ -54,6 +54,17 @@ class ConversationsMigrator(BaseMigrator):
             migrated_contacts = self.state_repo.get_migrated_ids(conn, "contacts")
             migrated_users = self.state_repo.get_migrated_ids(conn, "users")
             migrated_teams = self.state_repo.get_migrated_ids(conn, "teams")
+            # BUG-06 FIX: load migrated contact_inboxes IDs for contact_inbox_id remapping.
+            migrated_contact_inboxes = self.state_repo.get_migrated_ids(conn, "contact_inboxes")
+            # BUG-06 FIX: build (contact_id, inbox_id) → contact_inboxes.id fallback map
+            # covering ALL contact_inboxes currently in DEST (includes both pre-existing
+            # records and those just inserted by ContactInboxesMigrator in this run).
+            _dest_ci_pairs: dict[tuple[int, int], int] = {
+                (int(r[0]), int(r[1])): int(r[2])
+                for r in conn.execute(
+                    text("SELECT contact_id, inbox_id, id FROM public.contact_inboxes")
+                ).fetchall()
+            }
             # BUG-04 fix: pre-load MAX(display_id) per account in DEST so we can
             # resequence display_id for each migrated conversation without collisions.
             _display_id_counters: dict[int, int] = {}
@@ -138,6 +149,45 @@ class ConversationsMigrator(BaseMigrator):
                     new_row["team_id"] = self.id_remapper.remap(team_id_origin, "teams")
                 else:
                     new_row["team_id"] = None
+
+            # BUG-06 FIX: remap contact_inbox_id.
+            # The source value is a SOURCE contact_inboxes.id; without remapping
+            # it becomes an invalid FK in DEST, causing HTTP 404 for all migrated
+            # conversations in the Chatwoot API.
+            #
+            # Resolution order:
+            #   1. If src CI was successfully migrated → use id_remapper
+            #   2. Else → look up (dest_contact_id, dest_inbox_id) pair in DEST
+            #   3. Else → NULL out and log warning (conversation visible but
+            #      the contact-inbox link is lost; can be repaired manually)
+            ci_val = row.get("contact_inbox_id")
+            if ci_val is not None:
+                ci_origin = int(ci_val)
+                if ci_origin in migrated_contact_inboxes:
+                    new_row["contact_inbox_id"] = self.id_remapper.remap(
+                        ci_origin, "contact_inboxes"
+                    )
+                else:
+                    # Fallback: resolve by (contact_id, inbox_id) pair in DEST
+                    dest_contact_id = new_row.get("contact_id")
+                    dest_inbox_id = new_row.get("inbox_id")
+                    if dest_contact_id and dest_inbox_id:
+                        fallback_ci = _dest_ci_pairs.get((int(dest_contact_id), int(dest_inbox_id)))
+                        if fallback_ci is not None:
+                            new_row["contact_inbox_id"] = fallback_ci
+                        else:
+                            self.logger.warning(
+                                "ConversationsMigrator: id=%d — contact_inbox_id=%d not "
+                                "migrated and no (contact_id=%s, inbox_id=%s) pair in "
+                                "DEST — nulling out",
+                                id_origin,
+                                ci_origin,
+                                dest_contact_id,
+                                dest_inbox_id,
+                            )
+                            new_row["contact_inbox_id"] = None
+                    else:
+                        new_row["contact_inbox_id"] = None
 
             # Regenerate uuid to avoid UniqueViolation on index_conversations_on_uuid
             new_row["uuid"] = str(uuid.uuid4())

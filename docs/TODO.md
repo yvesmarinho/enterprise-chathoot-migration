@@ -1,21 +1,28 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-22 — D7 ENCERRADO: causa raiz = display_id resequenciado (BUG-04). Conversas migradas. Ação: informar Marcus novos display_ids.
-**Status**: 🟠 D7 resolvido; D5 (orphan_messages) e D6-C1 (contacts missing) pendentes
+**Last Updated**: 2026-04-23 — ROOT CAUSE CONFIRMADO: token agent + inbox_members=0. 309 convs migradas íntegras no DB. Bloqueador: token admin para revalidar. BUG-A/B e endpoint API corrigidos.
+**Status**: 🟡 BLOQUEADO — aguardando token API de administrator para account_id=1
 
 ---
 
-## 🟡 D7 — Visibilidade Marcus: ações remanescentes (baixa urgência)
+## 🔴 BLOQUEADOR ATIVO
+
+- [ ] **TOKEN-ADMIN**: Obter token API de `administrator` em `account_id=1` (sugerido: `admin@vya.digital`, `user_id=1`)
+  - Adicionar em `.secrets/generate_erd.json` sob chave `"vya-chat-dev-admin"`
+  - Reexecutar `make validate-api` → esperado `api_conv=687` para account_id=1
+  - Confirmar: 309 conversas migradas visíveis via API de admin
+
+---
+
+## ✅ D7 — Visibilidade Marcus: RESOLVIDO (2026-04-23)
 
 - [x] **D7-G1**: Verificar inbox_id=125 SOURCE → `wea004`, `Channel::Api`, `account_id=1` ✅ 2026-04-22
 - [x] **D7-G3**: Checar migration_state para conv_ids 62361–62363 → todos `status=ok` ✅ 2026-04-22
-- [ ] **D7-A1**: Verificar DEST display_id da conv_id=200501 (display_id=1003 SOURCE, inbox=32)
-  - SQL: `SELECT id, display_id, inbox_id, assignee_id FROM conversations WHERE id = 200501;` (no DEST)
-- [ ] **D7-A2**: Informar Marcus: SOURCE display_id=1093 → DEST display_id=1850 (inbox `wea004`, id=521)
-- [ ] **D7-A3**: Opcional — reatribuir conv_ids 219045, 219046 a Marcus (assignee=None → assignee=88)
-  - Verificar antes: `SELECT id, display_id, assignee_id FROM conversations WHERE id IN (62361, 62362);` (SOURCE)
-- [ ] **D7-A4**: Opcional — renomear inbox_id=521 para `wea004 (chat)` para diferenciar de inbox_id=372 (pré-existente)
-- [ ] **D7-Q**: Verificar também DEST display_id da conversa display_id=1003 SOURCE (conv_id=43817 SOURCE → id_destino=200501)
+- [x] **D7-A1**: conv_id=200501 → DEST `display_id=1843`, `inbox_id=428`, `assignee_id=88` ✅ 2026-04-23
+- [x] **D7-A2**: Mensagem formal enviada a Marcus: SOURCE `display_id=1093` → DEST `display_id=1850`; SOURCE `display_id=1003` → DEST `display_id=1843` ✅ 2026-04-23
+- [x] **D7-A3**: conv_ids 62361/62362 tinham `assignee_id=None` na SOURCE — migração correta, sem ação ✅ 2026-04-23
+- [x] **D7-Q**: display_id=1003 SOURCE → DEST display_id=1843 confirmado ✅ 2026-04-23
+- [ ] **D7-A4**: Opcional — renomear inbox_id=521 para `wea004 (migrado)` — requer aprovação gestor
 
 ---
 
@@ -28,9 +35,14 @@
 - [x] D5-A4: Sanity queries com tolerância a schema mismatch (sentinel -1) ✅ 2026-04-20
 - [x] D5-A5: url_preview redaction (`AttachmentResult` refatorado) ✅ 2026-04-20
 - [x] D5-B1: Primeira execução real — EXIT 2 esperado (orphan_messages=6321, todos deltas positivos) ✅ 2026-04-20
-- [ ] D5-B2: `make validate-api-deep SAMPLE=5` — confirmar deep scan funcional
+- [x] D5-B2 batch: Batch optimization aplicado (2 queries/conv, 3x mais rápido) ✅ 2026-04-23
+- [x] BUG-A: `_fetch_sanity()` pubsub_token — downgrade warning→debug ✅ 2026-04-23
+- [x] BUG-B: `_run_summary()` `meta.all_count` vs `data.all_count` ✅ 2026-04-23
+- [x] Fix endpoint: `synchat` → `vya-chat-dev` em `_load_api_config()` ✅ 2026-04-23
+- [ ] **TOKEN-ADMIN**: Reexecutar `make validate-api` com token admin → esperado `api_conv=687` account_id=1
+- [ ] D5-B2: Confirmar deep scan funcional com token admin
 - [ ] D5-B3: `make validate-api-deep SAMPLE=5 CHECK_URLS=1` — confirmar redação de URLs
-- [ ] D5-C1: Investigar `orphan_messages=6321` no dest_account_id=1 — pré-existente ou resíduo?
+- [ ] D5-C1: Investigar `orphan_messages=6321` no dest_account_id=1 — pré-existente (baixa prioridade)
 - [ ] D5-C2: Documentar attachments_not_found se > 0 (pós B2/B3)
 
 ### P0 — Validação Hash MD5 (D6) ✅ Concluído (Sessão 2026-04-21)

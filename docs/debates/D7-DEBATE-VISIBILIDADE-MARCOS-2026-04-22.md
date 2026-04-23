@@ -1,9 +1,9 @@
 # D7 — DEBATE: Mensagens de marcos.andrade@vya.digital não visíveis no Destino
 
 **Data**: 2026-04-22
-**Revisado em**: 2026-04-22 (v2 — arquitetura corrigida)
+**Revisado em**: 2026-04-23 (v3 — resolução final)
 **Participantes**: @chatwoot-expert, @system-engineer, @dba-sql-expert
-**Status**: EM INVESTIGAÇÃO — arquitetura corrigida; questionnaire gerado e respondido; diagnóstico conclusivo em Seção 13.
+**Status**: ✅ RESOLVIDO — 2026-04-23. Ver Seção 14.
 **Contexto**: Pós-migração 2026-04-20 + validação hash 2026-04-21.
 **Sintoma reportado**: Usuário `marcos.andrade@vya.digital` não visualiza conversa de **14/11/2025** na instância destino `vya-chat-dev.vya.digital`.
 
@@ -1352,3 +1352,69 @@ SELECT id, name, channel_type FROM inboxes WHERE id IN (372, 521);
 - `make verify-marcus-conv` — verifica por data
 - `make diagnose-inbox-gap` — diagnóstico inbox SOURCE
 - `make diagnose-marcus-visibility` — diagnóstico de visibilidade
+
+---
+
+## 14. RESOLUÇÃO FINAL — 2026-04-23
+
+### 14.1 — D7-A1: display_id de conv_id=200501
+
+Consulta direta ao DEST confirmou:
+
+| DEST conv_id | display_id DEST | inbox_id | assignee | status | created_at |
+|---|---|---|---|---|---|
+| 200501 | **1843** | 428 | 88 (Marcus) | 0 (open) | 2025-02-04 |
+
+SOURCE display_id=1003 → DEST display_id=**1843**. Conversa atribuída a Marcus. ✅
+
+### 14.2 — D7-A2: comunicação enviada ao Marcus
+
+Mensagem formal preparada e entregue em 2026-04-23 com os novos display_ids:
+
+| display_id SOURCE | display_id DEST | inbox DEST | assignee |
+|---|---|---|---|
+| 1093 (14/11/2025) | **1850** | wea004 (id=521) | Marcus ✓ |
+| 1003 (04/02/2025) | **1843** | inbox 428 | Marcus ✓ |
+
+Instrução ao Marcus: navegar por "All Conversations" em `vya-chat-dev.vya.digital`, filtrar pelo inbox correto ou buscar por data.
+
+### 14.3 — D7-A3: reatribuição de 219045/219046 descartada
+
+Verificação do SOURCE confirmou que conv_ids 62361 e 62362 (SOURCE display_ids 1091/1092) já tinham `assignee_id=None` originalmente:
+
+| SOURCE conv_id | display_id | assignee SOURCE | assignee DEST |
+|---|---|---|---|
+| 62361 | 1091 | None | None ✓ |
+| 62362 | 1092 | None | None ✓ |
+| 62363 | 1093 | 88 (Marcus) | 88 (Marcus) ✓ |
+
+**Migração correta**. Nenhum UPDATE necessário. D7-A3 encerrado sem ação.
+
+### 14.4 — Dois inboxes wea004: diagnóstico e recomendação
+
+| inbox_id | criado em | origem | conv_count | inbox_members |
+|---|---|---|---|---|
+| 372 | 2025-12-18 | synchat.vya.digital (pré-existente) | 3 | nenhum |
+| 521 | 2025-11-14 | chat.vya.digital (migrado) | 3 | nenhum |
+
+- Marcus é `role=admin` (account_user role=1) — acessa todos os inboxes sem inbox_members.
+- A ambiguidade de nome na sidebar pode causar confusão ao navegar.
+- **Recomendação**: renomear inbox_id=521 para `wea004 (migrado)` via API ou SQL para eliminar ambiguidade.
+
+```sql
+-- Verificar antes de executar:
+SELECT id, name, channel_type FROM inboxes WHERE id IN (372, 521);
+-- Renomear (requer aprovação):
+-- UPDATE inboxes SET name = 'wea004 (migrado)' WHERE id = 521 AND account_id = 1;
+```
+
+### 14.5 — Status final de todos os itens D7
+
+| ID | Ação | Status |
+|---|---|---|
+| D7-A1 | Verificar display_id de conv_id=200501 | ✅ RESOLVIDO — display_id=1843 |
+| D7-A2 | Comunicar Marcus sobre novos display_ids | ✅ RESOLVIDO — mensagem entregue 2026-04-23 |
+| D7-A3 | Reatribuir 219045/219046 a Marcus | ✅ DESCARTADO — SOURCE já tinha assignee=None |
+| D7-A4 | Renomear inbox 521 | 🟡 OPCIONAL — requer aprovação do gestor |
+
+**D7 encerrado.** ✅

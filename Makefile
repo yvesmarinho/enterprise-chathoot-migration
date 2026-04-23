@@ -50,12 +50,13 @@ mcp:
 # ---------------------------------------------------------------------------
 # Validação pós-migração via API REST do Chatwoot
 # ---------------------------------------------------------------------------
-VALIDATE_TIMEOUT     ?= 300
+VALIDATE_TIMEOUT     ?= 600
 VALIDATE_URL_TIMEOUT ?= 1800
 SAMPLE               ?= 5
 PHONE                ?=
 EMAIL                ?=
 CHECK_URLS           ?=
+MAX_MSGS             ?= 50
 
 .PHONY: validate-api-counts validate-api-deep validate-api validate-hash
 
@@ -76,6 +77,7 @@ validate-api-deep:
 	    $(if $(PHONE),--contact-phone "$(PHONE)") \
 	    $(if $(EMAIL),--contact-email "$(EMAIL)") \
 	    $(if $(SAMPLE),--sample-size "$(SAMPLE)") \
+	    $(if $(MAX_MSGS),--max-msgs-per-conv "$(MAX_MSGS)") \
 	    $(if $(CHECK_URLS),--check-urls)
 	@echo "Outputs em .tmp/"
 

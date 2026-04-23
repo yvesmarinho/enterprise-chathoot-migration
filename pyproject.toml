@@ -9,6 +9,7 @@ dependencies = [
     "psycopg2-binary==2.9.11",
     "alembic==1.18.4",
     "pandas>=2.2.0",
+    "requests>=2.33.1",
 ]
 
 [project.optional-dependencies]
