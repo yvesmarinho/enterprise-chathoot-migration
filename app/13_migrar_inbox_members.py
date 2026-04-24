@@ -36,7 +36,7 @@ import json
 import logging
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -116,9 +116,7 @@ def _load_id_map(conn: Connection, tabela: str) -> dict[int, int]:
 
 def _load_existing_dest_pairs(conn: Connection) -> set[tuple[int, int]]:
     """Retorna o conjunto de (inbox_id, user_id) já presentes no DEST."""
-    rows = conn.execute(
-        text("SELECT inbox_id, user_id FROM inbox_members")
-    ).fetchall()
+    rows = conn.execute(text("SELECT inbox_id, user_id FROM inbox_members")).fetchall()
     return {(int(r[0]), int(r[1])) for r in rows}
 
 
@@ -204,6 +202,7 @@ def run_migration(dry_run: bool = False) -> InboxMembersMigrationResult:
 
     # ── Remapear e classificar ────────────────────────────────────────────────
     to_insert: list[dict[str, Any]] = []
+    _now = datetime.now(tz=timezone.utc)
 
     for src_inbox_id, src_user_id in src_rows:
         src_inbox_id = int(src_inbox_id)
@@ -239,13 +238,19 @@ def run_migration(dry_run: bool = False) -> InboxMembersMigrationResult:
             result.skipped += 1
             continue
 
-        to_insert.append({"inbox_id": dest_inbox_id, "user_id": dest_user_id})
+        to_insert.append(
+            {
+                "inbox_id": dest_inbox_id,
+                "user_id": dest_user_id,
+                "created_at": _now,
+                "updated_at": _now,
+            }
+        )
         # Adicionar ao set local para evitar duplicatas dentro deste run
         existing_pairs.add((dest_inbox_id, dest_user_id))
 
     log.info(
-        "Classificação: a_inserir=%d skipped=%d "
-        "(orphan_user=%d orphan_inbox=%d ja_existe=%d)",
+        "Classificação: a_inserir=%d skipped=%d " "(orphan_user=%d orphan_inbox=%d ja_existe=%d)",
         len(to_insert),
         result.skipped,
         result.skip_reasons.orphan_user_id,
@@ -307,31 +312,39 @@ def check_rerun_safety(dest_engine: Engine) -> dict[str, Any]:
     """
     with dest_engine.connect() as conn:
         # Verificar se há unique constraint em inbox_members
-        constraints = conn.execute(
-            text(
-                "SELECT conname, contype "
-                "FROM pg_constraint "
-                "WHERE conrelid = 'inbox_members'::regclass AND contype IN ('u', 'p')"
+        constraints = (
+            conn.execute(
+                text(
+                    "SELECT conname, contype "
+                    "FROM pg_constraint "
+                    "WHERE conrelid = 'inbox_members'::regclass AND contype IN ('u', 'p')"
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
-        current_count = conn.execute(
-            text("SELECT COUNT(*) FROM inbox_members")
-        ).scalar() or 0
+        current_count = conn.execute(text("SELECT COUNT(*) FROM inbox_members")).scalar() or 0
 
-        user_map_size = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM migration_state "
-                "WHERE tabela = 'users' AND status = 'ok'"
-            )
-        ).scalar() or 0
+        user_map_size = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM migration_state "
+                    "WHERE tabela = 'users' AND status = 'ok'"
+                )
+            ).scalar()
+            or 0
+        )
 
-        inbox_map_size = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM migration_state "
-                "WHERE tabela = 'inboxes' AND status = 'ok'"
-            )
-        ).scalar() or 0
+        inbox_map_size = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM migration_state "
+                    "WHERE tabela = 'inboxes' AND status = 'ok'"
+                )
+            ).scalar()
+            or 0
+        )
 
     has_unique = any(str(c["contype"]) in ("u", "p") for c in constraints)
 
@@ -394,9 +407,7 @@ def main() -> None:
     result = run_migration(dry_run=args.dry_run)
 
     out_path = _TMP / f"migrar_inbox_members_{_TS}.json"
-    out_path.write_text(
-        json.dumps(asdict(result), indent=2, ensure_ascii=False)
-    )
+    out_path.write_text(json.dumps(asdict(result), indent=2, ensure_ascii=False))
     log.info("Relatório salvo em: %s", out_path)
 
     if result.failed > 0:

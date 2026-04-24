@@ -53,18 +53,19 @@ class TeamsMigrator(BaseMigrator):
         merged_account_ids: set[int] = {
             acct_id
             for acct_id in migrated_accounts
-            if self.id_remapper.remap(acct_id, "accounts") == acct_id
+            if self.id_remapper.has_alias("accounts", acct_id)
         }
         if merged_account_ids:
             dst_name_acct: dict[tuple[str, int], int] = {}
             with self.dest_engine.connect() as conn:
                 for acct_id in merged_account_ids:
+                    dest_acct_id = self.id_remapper.remap(acct_id, "accounts")
                     for dest_id, name, account_id in conn.execute(
                         text(
                             "SELECT id, name, account_id FROM public.teams "
                             "WHERE account_id = :acct_id"
                         ),
-                        {"acct_id": acct_id},
+                        {"acct_id": dest_acct_id},
                     ).fetchall():
                         dst_name_acct[(str(name), int(account_id))] = int(dest_id)
 
@@ -73,7 +74,8 @@ class TeamsMigrator(BaseMigrator):
                 account_id_origin = int(row["account_id"])
                 if account_id_origin not in merged_account_ids:
                     continue
-                key = (str(row.get("name") or ""), account_id_origin)
+                dest_acct = self.id_remapper.remap(account_id_origin, "accounts")
+                key = (str(row.get("name") or ""), dest_acct)
                 if key in dst_name_acct:
                     src_id = int(row["id"])
                     dest_id = dst_name_acct[key]

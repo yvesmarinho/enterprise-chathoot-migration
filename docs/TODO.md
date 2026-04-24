@@ -1,7 +1,59 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-23 — ROOT CAUSE CONFIRMADO: token agent + inbox_members=0. 309 convs migradas íntegras no DB. Bloqueador: token admin para revalidar. BUG-A/B e endpoint API corrigidos.
-**Status**: 🟡 BLOQUEADO — aguardando token API de administrator para account_id=1
+**Last Updated**: 2026-04-24 — Sessão 10 encerrada: 309 convs + 13.164 msgs migradas para account_id=1 (fases 0-4 ✅). BUG-06 corrigido em `app/01_migrar_account.py`. Pendências: resequenciar sequences + inbox_members + outros 4 accounts.
+**Status**: 🟡 EM ANDAMENTO — migração Vya Digital fases 0-4 completas; resequência e outros accounts pendentes
+
+---
+
+## 🔴 D12 — AÇÕES OBRIGATÓRIAS ANTES DE LIGAR O CONTAINER
+
+> Origem: [D12-ANALISE-CRITICA-LOGICA-NEGOCIO-FLUXO-DADOS-2026-04-24.md](debates/D12-ANALISE-CRITICA-LOGICA-NEGOCIO-FLUXO-DADOS-2026-04-24.md)
+
+### P0 — Executar antes de reiniciar o serviço
+
+- [x] **D12-P0-1** `[A-05]` Verificar/regenerar tokens de autenticação SOURCE vs DEST — **CONCLUÍDO 2026-04-24: 95 colisões encontradas e corrigidas; 216 sessões Devise limpas no DEST.** Novo token admin (chatwoot004_dev1_db): `+bhADFGGkIHkUM06DnYgWfdYVdNn4Lte`. Token antigo inválido após container trocar para DB correto.
+  ```sql
+  UPDATE users SET authentication_token = encode(gen_random_bytes(20), 'hex'), updated_at = NOW()
+  WHERE id IN (SELECT DISTINCT owner_id FROM access_tokens WHERE owner_type = 'User');
+  ```
+  Verificar duplicatas antes: `SELECT authentication_token, COUNT(*) FROM users GROUP BY authentication_token HAVING COUNT(*) > 1;`
+
+- [x] **D12-P0-2** `[A-02 / F-04]` Quantificar conversas `snoozed` com prazo vencido — **CONCLUÍDO 2026-04-24: 0 snoozed no DEST** (nenhuma conversa com status=3; risco F-04 não se aplica)
+
+- [x] **D12-P0-3** `[A-02]` Quantificar conversas `open` com mais de 30 dias — **CONCLUÍDO 2026-04-24: 124 conversas open históricas. DECISÃO: manter status open** (cliente confirmou, nenhuma ação necessária)
+
+### P1 — Verificações pré-liberação para usuários
+
+- [ ] **D12-P1-1** `[A-01]` Verificar conversas sem `contact_inbox_id` (FK dangling)
+  ```sql
+  SELECT COUNT(*) FILTER (WHERE contact_inbox_id IS NULL) AS ci_null,
+         COUNT(*) FILTER (WHERE contact_id IS NULL) AS contact_null
+  FROM conversations WHERE id > 156684 AND account_id = 1;
+  ```
+
+- [ ] **D12-P1-2** `[A-03]` Verificar colisões de phone no SOURCE (dedup silencioso)
+  ```sql
+  -- chatwoot_dev1_db (SOURCE)
+  SELECT phone_number, COUNT(*) AS n FROM contacts
+  WHERE account_id = 1 AND phone_number IS NOT NULL
+  GROUP BY phone_number HAVING COUNT(*) > 1 ORDER BY n DESC LIMIT 20;
+  ```
+
+- [ ] **D12-P1-3** `[L-01]` Verificar contatos com `contact_id = NULL` herdados do legado
+  ```sql
+  -- chatwoot_dev1_db (SOURCE)
+  SELECT COUNT(*) FROM conversations WHERE contact_id IS NULL AND account_id = 1;
+  ```
+
+- [ ] **D12-P1-4** `[F-02]` Avaliar se `conversation_participants` é relevante — criar migrador se necessário
+
+- [ ] **D12-P1-5** `[A-05]` Confirmar webhooks/integrações do DEST não apontam para URLs do SOURCE
+
+### P2 — Robustez para re-runs futuros
+
+- [ ] **D12-P2-1** `[F-01]` Documentar procedimento de reset: truncar `migration_state` + tabelas de dados **juntos**
+- [ ] **D12-P2-2** `[A-03]` Normalizar telefones E.164 no ContactsMigrator antes de novo run
+- [ ] **D12-P2-3** `[F-03]` Definir prioridade de dedup explícita: `identifier > phone > email`
 
 ---
 
@@ -11,6 +63,29 @@
   - Adicionar em `.secrets/generate_erd.json` sob chave `"vya-chat-dev-admin"`
   - Reexecutar `make validate-api` → esperado `api_conv=687` para account_id=1
   - Confirmar: 309 conversas migradas visíveis via API de admin
+
+---
+
+## 🔴 PENDENTE — Pós-Sessão 10 (2026-04-24)
+
+> Itens abertos ao encerrar a sessão 10 — resolver na Sessão 11.
+
+### P0 — Resequência e Membros de Inbox
+
+- [ ] **S10-P0-1** Re-executar `app/01_migrar_account.py "Vya Digital"` com BUG-06 já corrigido para resequenciar sequences (`contacts_id_seq`, `conversations_id_seq`, `messages_id_seq` etc.)
+  - ⚠️ As 309 convs **já existem** no DEST — verificar idempotência antes de re-rodar
+  - Alternativa: executar apenas a fase 5 de resequência de forma isolada
+- [ ] **S10-P0-2** Migrar `inbox_members` para os novos inboxes (397-409):
+  - Script `app/13_migrar_inbox_members.py` depende de `migration_state`
+  - Adaptar para leitura por nome de inbox (não por ID) pois IDs mudam entre runs
+- [ ] **S10-P0-3** Validar inboxes visíveis no frontend para usuários não-admin após migração de `inbox_members`
+
+### P1 — Outros Accounts SOURCE
+
+- [ ] **S10-P1-1** Aplicar migração para account SOURCE "Sol Copernico" (`account_id=4`)
+- [ ] **S10-P1-2** Aplicar migração para account SOURCE "Unimed Poços PJ" (`account_id=17`)
+- [ ] **S10-P1-3** Aplicar migração para account SOURCE "Unimed Poços PF" (`account_id=18`)
+- [ ] **S10-P1-4** Aplicar migração para account SOURCE "Unimed Guaxupé" (`account_id=25`)
 
 ---
 

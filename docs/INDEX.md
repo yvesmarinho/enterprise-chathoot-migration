@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chathoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-04-22 (encerramento — D7 encerrado: display_id resequenciado, conversas migradas. Scripts 12/14/15/16 criados. Commit bb70a70)
-**Last Session**: 2026-04-22 (Sessão 8 — D7 diagnóstico conclusivo, 4 scripts diagnóstico, make targets adicionados)
+**Last Updated**: 2026-04-24 (encerramento Sessão 10 — D11 container DB corrigido, 309 convs migradas para account_id=1, BUG-06 corrigido em `app/01_migrar_account.py`. Sessão 11 pendente: resequenciar sequences + inbox_members + outros 4 accounts)
+**Last Session**: 2026-04-24 (Sessão 10 — container `chat-vya-digital` recriado, migração Vya Digital 309 convs + 13.164 msgs, BUG-06 diagnosticado e corrigido)
 
 ---
 
@@ -38,11 +38,16 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-04-20.md
     ├── SESSION_REPORT_2026-04-20.md
     └── FINAL_STATUS_2026-04-20.md
-└── 2026-04-22/           ← Sessão 8: D7 — diagnóstico visibilidade Marcus (display_id resequenciado, conv migradas ✅)
-    ├── DAILY_ACTIVITIES_2026-04-22.md
-    ├── SESSION_REPORT_2026-04-22.md
-    ├── SESSION_RECOVERY_2026-04-22.md
-    └── FINAL_STATUS_2026-04-22.md
+├── 2026-04-22/           ← Sessão 8: D7 — diagnóstico visibilidade Marcus (display_id resequenciado, conv migradas ✅)
+│   ├── DAILY_ACTIVITIES_2026-04-22.md
+│   ├── SESSION_REPORT_2026-04-22.md
+│   ├── SESSION_RECOVERY_2026-04-22.md
+│   └── FINAL_STATUS_2026-04-22.md
+└── 2026-04-24/           ← Sessão 10: D11 root cause (container DB errado) resolvido, 309 convs migradas, BUG-06 corrigido em app/01_migrar_account.py
+    ├── SESSION_RECOVERY_2026-04-24.md
+    ├── DAILY_ACTIVITIES_2026-04-24.md
+    ├── SESSION_REPORT_2026-04-24.md
+    └── FINAL_STATUS_2026-04-24.md
 ```
 
 ## Debates e Decisões

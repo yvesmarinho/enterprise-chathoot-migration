@@ -116,8 +116,66 @@ class InboxesMigrator(BaseMigrator):
 
         self.logger.info("InboxesMigrator: %d source rows fetched", len(rows))
 
+        # ── FIX-01: Dedup inboxes for merged accounts (BUG-B) ────────────
+        # For accounts whose account_id was merged (alias registered), the DEST
+        # already has inboxes. Detect them by (name.lower(), channel_type) key,
+        # register aliases and record_success so _run_batches skips the INSERT.
+        # Also exclude aliased inboxes from _migrate_channels to avoid creating
+        # orphan channel records in DEST.
+        aliased_inbox_src_ids: set[int] = set()
+        merged_account_ids_inb: set[int] = {
+            acct_id
+            for acct_id in migrated_accounts
+            if self.id_remapper.has_alias("accounts", acct_id)
+        }
+        if merged_account_ids_inb:
+            dst_name_type: dict[tuple[str, str], int] = {}
+            with self.dest_engine.connect() as conn:
+                for acct_id in merged_account_ids_inb:
+                    dest_acct_id = self.id_remapper.remap(acct_id, "accounts")
+                    for dest_id, name, channel_type in conn.execute(
+                        text(
+                            "SELECT id, name, channel_type "
+                            "FROM public.inboxes "
+                            "WHERE account_id = :acct_id"
+                        ),
+                        {"acct_id": dest_acct_id},
+                    ).fetchall():
+                        key = (str(name).lower(), str(channel_type))
+                        dst_name_type[key] = int(dest_id)
+
+            inbox_merged: list[tuple[int, int]] = []
+            for row in rows:
+                account_id_origin = int(row["account_id"])
+                if account_id_origin not in merged_account_ids_inb:
+                    continue
+                name_val = str(row.get("name") or "").lower()
+                ct_val = str(row.get("channel_type") or "")
+                key = (name_val, ct_val)
+                if key in dst_name_type:
+                    src_id = int(row["id"])
+                    dest_id = dst_name_type[key]
+                    self.id_remapper.register_alias("inboxes", src_id, dest_id)
+                    aliased_inbox_src_ids.add(src_id)
+                    inbox_merged.append((src_id, dest_id))
+
+            if inbox_merged:
+                with self.dest_engine.connect() as conn:
+                    with conn.begin():
+                        for src_id, dest_id in inbox_merged:
+                            self.state_repo.record_success(conn, "inboxes", src_id, dest_id)
+                self.logger.info(
+                    "InboxesMigrator: %d inboxes matched in merged accounts" " — skipping INSERT",
+                    len(inbox_merged),
+                )
+        # ──────────────────────────────────────────────────────────────────────
+
+        # Exclude aliased inboxes so _migrate_channels doesn't create orphan
+        # channel records that would never be referenced by any inbox row.
+        channel_source_rows = [r for r in rows if int(r["id"]) not in aliased_inbox_src_ids]
+
         # ── BUG-05 FIX: migrate channel records and build channel_id mapping ─
-        channel_id_map = self._migrate_channels(rows, migrated_accounts)
+        channel_id_map = self._migrate_channels(channel_source_rows, migrated_accounts)
         self.logger.info(
             "InboxesMigrator: %d channel records migrated to DEST", len(channel_id_map)
         )

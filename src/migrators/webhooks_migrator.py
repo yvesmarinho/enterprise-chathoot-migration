@@ -1,7 +1,13 @@
-"""Migrator for the ``labels`` entity.
+"""Migrator for the ``webhooks`` entity.
 
-:description: Remaps ``id`` (offset_labels) and ``account_id`` (offset_accounts).
+:description: Remaps ``id`` (offset_webhooks) and ``account_id``
+    (offset_accounts). Also remaps optional ``inbox_id`` when present.
+    Deduplicates by ``(dest_account_id, url)`` for merged accounts.
     Records with orphaned ``account_id`` are skipped with a WARNING.
+
+    NOTE: The SOURCE database had 0 webhook rows at diagnosis time
+    (2026-04-24). This migrator is a no-op when the source is empty but
+    is included for correctness and future-proofing.
 """
 
 from __future__ import annotations
@@ -11,8 +17,8 @@ from sqlalchemy import MetaData, Table, text
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
 
 
-class LabelsMigrator(BaseMigrator):
-    """Migrate all rows from ``labels`` source → destination.
+class WebhooksMigrator(BaseMigrator):
+    """Migrate all rows from ``webhooks`` source → destination.
 
     :param source_engine: Read-only source engine.
     :type source_engine: Engine
@@ -27,98 +33,120 @@ class LabelsMigrator(BaseMigrator):
     """
 
     def migrate(self) -> MigrationResult:
-        """Execute labels migration.
+        """Execute webhooks migration.
 
-        :returns: Migration result summary for ``labels``.
+        :returns: Migration result summary for ``webhooks``.
         :rtype: MigrationResult
         """
-        self.logger.info("LabelsMigrator: starting")
+        self.logger.info("WebhooksMigrator: starting")
         src_meta = MetaData()
-        src_table = Table("labels", src_meta, autoload_with=self.source_engine)
+        src_table = Table("webhooks", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_table = Table("labels", dest_meta, autoload_with=self.dest_engine)
+        dest_table = Table("webhooks", dest_meta, autoload_with=self.dest_engine)
 
         with self.dest_engine.connect() as conn:
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
+            migrated_inboxes = self.state_repo.get_migrated_ids(conn, "inboxes")
 
         with self.source_engine.connect() as conn:
             rows = [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
 
-        self.logger.info("LabelsMigrator: %d source rows fetched", len(rows))
+        self.logger.info("WebhooksMigrator: %d source rows fetched", len(rows))
 
-        # ── Dedup: labels for merged accounts (same id+name in both DBs) ─────
-        # For accounts whose account_id was reused as-is (alias registered),
-        # the destination already has labels with the same (title, account_id) key.
-        # We register aliases and record_success so _run_batches skips the INSERT.
+        if not rows:
+            self.logger.info("WebhooksMigrator: no rows — nothing to do")
+            return MigrationResult(
+                table="webhooks",
+                total_source=0,
+                migrated=0,
+                skipped=0,
+                failed_ids=[],
+            )
+
+        # ── Dedup: webhooks for merged accounts ─────────────────────────────
         merged_account_ids: set[int] = {
             acct_id
             for acct_id in migrated_accounts
             if self.id_remapper.has_alias("accounts", acct_id)
         }
         if merged_account_ids:
-            dst_title_acct: dict[tuple[str, int], int] = {}
+            dst_url_acct: dict[tuple[str, int], int] = {}
             with self.dest_engine.connect() as conn:
                 for acct_id in merged_account_ids:
                     dest_acct_id = self.id_remapper.remap(acct_id, "accounts")
-                    for dest_id, title, account_id in conn.execute(
+                    for dest_id, url, account_id in conn.execute(
                         text(
-                            "SELECT id, title, account_id FROM public.labels "
+                            "SELECT id, url, account_id FROM webhooks "
                             "WHERE account_id = :acct_id"
                         ),
                         {"acct_id": dest_acct_id},
                     ).fetchall():
-                        dst_title_acct[(str(title), int(account_id))] = int(dest_id)
+                        k = (str(url or ""), int(account_id))
+                        dst_url_acct[k] = int(dest_id)
 
-            label_merged: list[tuple[int, int]] = []
+            hook_merged: list[tuple[int, int]] = []
             for row in rows:
                 account_id_origin = int(row["account_id"])
                 if account_id_origin not in merged_account_ids:
                     continue
                 dest_acct = self.id_remapper.remap(account_id_origin, "accounts")
-                key = (str(row.get("title") or ""), dest_acct)
-                if key in dst_title_acct:
+                key = (str(row.get("url") or ""), dest_acct)
+                if key in dst_url_acct:
                     src_id = int(row["id"])
-                    dest_id = dst_title_acct[key]
-                    self.id_remapper.register_alias("labels", src_id, dest_id)
-                    label_merged.append((src_id, dest_id))
+                    dest_id = dst_url_acct[key]
+                    self.id_remapper.register_alias("webhooks", src_id, dest_id)
+                    hook_merged.append((src_id, dest_id))
 
-            if label_merged:
+            if hook_merged:
                 with self.dest_engine.connect() as conn:
                     with conn.begin():
-                        for src_id, dest_id in label_merged:
-                            self.state_repo.record_success(conn, "labels", src_id, dest_id)
+                        for src_id, dest_id in hook_merged:
+                            self.state_repo.record_success(conn, "webhooks", src_id, dest_id)
                 self.logger.info(
-                    "LabelsMigrator: %d labels matched in merged accounts — skipping INSERT",
-                    len(label_merged),
+                    "WebhooksMigrator: %d webhooks matched — skipping INSERT",
+                    len(hook_merged),
                 )
         # ──────────────────────────────────────────────────────────────────────
 
         def remap_fn(row: dict) -> dict | None:
-            """Remap PK and account_id for a labels row.
+            """Remap PK, account_id and inbox_id for a webhooks row.
 
             :param row: Source row as plain dict.
             :type row: dict
-            :returns: Destination row with remapped IDs, or ``None`` if FK orphan.
+            :returns: Destination row or ``None`` if FK orphan.
             :rtype: dict | None
             """
             account_id_origin = int(row["account_id"])
             if account_id_origin not in migrated_accounts:
                 self.logger.warning(
-                    "LabelsMigrator: id=%d skipped — orphan account_id=%d",
+                    "WebhooksMigrator: id=%d skipped — orphan account_id=%d",
                     row["id"],
                     account_id_origin,
                 )
                 return None
-            return {
+
+            new_row = {
                 **row,
-                "id": self.id_remapper.remap(int(row["id"]), "labels"),
+                "id": self.id_remapper.remap(int(row["id"]), "webhooks"),
                 "account_id": self.id_remapper.remap(account_id_origin, "accounts"),
             }
 
-        result = self._run_batches(rows, "labels", dest_table, remap_fn)
+            # inbox_id is nullable — remap only when present
+            inbox_id = row.get("inbox_id")
+            if inbox_id is not None:
+                src_inbox = int(inbox_id)
+                if src_inbox in migrated_inboxes:
+                    new_row["inbox_id"] = self.id_remapper.remap(src_inbox, "inboxes")
+                else:
+                    # inbox not migrated — set NULL rather than FK fail
+                    new_row["inbox_id"] = None
+
+            return new_row
+
+        result = self._run_batches(rows, "webhooks", dest_table, remap_fn)
 
         self.logger.info(
-            "LabelsMigrator: complete — migrated=%d skipped=%d failed=%d",
+            "WebhooksMigrator: complete — migrated=%d skipped=%d failed=%d",
             result.migrated,
             result.skipped,
             len(result.failed_ids),
@@ -130,44 +158,24 @@ class LabelsMigrator(BaseMigrator):
     # ------------------------------------------------------------------
 
     def _table_name(self) -> str:
-        """Return canonical table name.
-
-        :returns: ``"labels"``
-        :rtype: str
-        """
-        return "labels"
+        return "webhooks"
 
     def _fetch_all_source_rows(self) -> list[dict]:
-        """Fetch all rows from source ``labels``.
-
-        :returns: All source rows as plain dicts.
-        :rtype: list[dict]
-        """
         src_meta = MetaData()
-        src_table = Table("labels", src_meta, autoload_with=self.source_engine)
+        src_table = Table("webhooks", src_meta, autoload_with=self.source_engine)
         with self.source_engine.connect() as conn:
             return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
 
-    def _classify_row_poc(  # type: ignore[override]
+    def _classify_row_poc(
         self,
         row: dict,
         migrated_sets: dict[str, set[int]],
     ) -> tuple:
-        """Classify a labels row: orphan account_id → ORPHAN_FK_SKIP.
-
-        :param row: Source row as plain dict.
-        :type row: dict
-        :param migrated_sets: Dest ID sets keyed by table name.
-        :type migrated_sets: dict[str, set[int]]
-        :returns: ``(outcome, reason)`` tuple.
-        :rtype: tuple
-        """
         from src.reports.poc_reporter import Outcome
 
-        account_id = int(row["account_id"])
-        if account_id not in migrated_sets.get("accounts", set()):
+        if int(row["account_id"]) not in migrated_sets.get("accounts", set()):
             return (
                 Outcome.ORPHAN_FK_SKIP,
-                f"account_id={account_id} not in migrated accounts",
+                f"account_id={row['account_id']} not in migrated accounts",
             )
         return Outcome.WOULD_MIGRATE, "clean"

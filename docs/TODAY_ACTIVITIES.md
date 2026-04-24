@@ -1,8 +1,48 @@
 # 📅 Atividades — Enterprise Chathoot Migration
 
-**Data**: 2026-04-09 → 2026-04-13
+**Data**: 2026-04-24
 **Projeto**: `enterprise-chathoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
+**Status**: 🟡 ENCERRADA — Sessão 10 concluída (fases 0-4 ✅ | sequences pendentes)
+
+---
+
+## Sessão 10 — 2026-04-24
+
+### Início de sessão
+
+- Context recovery: lidos TODO, INDEX, FINAL_STATUS_2026-04-23, debates D8/D9/Q1
+- Estado atual: DB DEST restaurado para `account_id=1`; BUG-05 a verificar; token admin pendente
+- Sessão criada: `docs/SESSIONS/2026-04-24/`
+
+### Migração account=1 "Vya Digital" (16:xx)
+
+- Container `chat-vya-digital` recriado com `chatwoot004_dev1_db` (D11 causa raiz resolvida)
+- D12-P0: 95 colisões de token corrigidas, 216 sessões Devise limpas, 0 snoozed, 124 open históricos mantidos
+- Migração fases 0-4 executadas com 0 erros:
+  - 13 inboxes criadas (397-409) + 1 mapeada (wea004→372)
+  - 179 contacts inseridos | 942 dedup
+  - 309 conversas + 13.164 mensagens migradas
+- **BUG-06**: Phase 5 (resequência) falhou — `psycopg2.ProgrammingError: set_session cannot be used inside a transaction`
+  - Causa: `dc.autocommit = True` com transação implícita aberta após healthcheck `SELECT 1`
+  - Correção: `dc.commit()` inserido antes da mudança de autocommit em `app/01_migrar_account.py`
+
+### Encerramento de sessão (17:xx)
+
+- BUG-06 documentado e corrigido no código-fonte
+- Documentação de encerramento criada:
+  - `FINAL_STATUS_2026-04-24.md` ✅
+  - `TODO.md` atualizado (seção pós-Sessão 10) ✅
+  - `INDEX.md` atualizado (Sessão 10 no índice) ✅
+- **Status final**: 🟡 PARCIAL — migração fases 0-4 ✅ | sequences pendentes (re-run na Sessão 11)
+- Commit de encerramento pendente
+
+---
+
+---
+<!-- HISTÓRICO ANTERIOR -->
+
+**Data**: 2026-04-09 → 2026-04-13
 **Status**: ✅ Sessão encerrada
 
 ---

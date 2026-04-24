@@ -2,7 +2,7 @@
 
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: SESSION-2026-04-23 (Sessão 9)
-**Commit de encerramento**: _(a preencher após git push)_
+**Commit de encerramento**: `91f2fba` — `chore(session): encerramento sessão 9 — 2026-04-23`
 **Status global**: 🟡 BLOQUEADO — aguardando token API de administrator
 
 ---

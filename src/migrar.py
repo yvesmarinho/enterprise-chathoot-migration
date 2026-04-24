@@ -37,14 +37,23 @@ from pathlib import Path
 from src.factory.connection_factory import ConnectionFactory
 from src.migrators.accounts_migrator import AccountsMigrator
 from src.migrators.attachments_migrator import AttachmentsMigrator
+from src.migrators.canned_responses_migrator import CannedResponsesMigrator
 from src.migrators.contact_inboxes_migrator import ContactInboxesMigrator
 from src.migrators.contacts_migrator import ContactsMigrator
+from src.migrators.conversation_labels_migrator import (
+    ConversationLabelsMigrator,
+)
 from src.migrators.conversations_migrator import ConversationsMigrator
+from src.migrators.custom_attribute_definitions_migrator import (
+    CustomAttributeDefinitionsMigrator,
+)
 from src.migrators.inboxes_migrator import InboxesMigrator
 from src.migrators.labels_migrator import LabelsMigrator
 from src.migrators.messages_migrator import MessagesMigrator
+from src.migrators.team_members_migrator import TeamMembersMigrator
 from src.migrators.teams_migrator import TeamsMigrator
 from src.migrators.users_migrator import UsersMigrator
+from src.migrators.webhooks_migrator import WebhooksMigrator
 from src.reports.poc_reporter import POCReporter
 from src.reports.validation_reporter import ValidationReporter
 from src.repository.migration_state_repository import MigrationStateRepository
@@ -55,28 +64,38 @@ from src.utils.log_masker import MaskingHandler
 # Canonical FK migration order
 _MIGRATION_ORDER = [
     "accounts",
+    "custom_attribute_definitions",
+    "canned_responses",
     "inboxes",
+    "webhooks",
     "users",
     "teams",
+    "team_members",
     "labels",
     "contacts",
     "contact_inboxes",
     "conversations",
     "messages",
     "attachments",
+    "conversation_labels",
 ]
 
 _MIGRATOR_MAP = {
     "accounts": AccountsMigrator,
+    "custom_attribute_definitions": CustomAttributeDefinitionsMigrator,
+    "canned_responses": CannedResponsesMigrator,
     "inboxes": InboxesMigrator,
+    "webhooks": WebhooksMigrator,
     "users": UsersMigrator,
     "teams": TeamsMigrator,
+    "team_members": TeamMembersMigrator,
     "labels": LabelsMigrator,
     "contacts": ContactsMigrator,
     "contact_inboxes": ContactInboxesMigrator,
     "conversations": ConversationsMigrator,
     "messages": MessagesMigrator,
     "attachments": AttachmentsMigrator,
+    "conversation_labels": ConversationLabelsMigrator,
 }
 
 
@@ -193,9 +212,13 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("migration_state table verified")
 
     # (3) Compute offsets once for the session
+    # "conversation_labels" is a logical name — actual DB table is "taggings"
+    _offset_tables = [t if t != "conversation_labels" else "taggings" for t in _MIGRATION_ORDER]
     remapper = IDRemapper()
-    offsets = remapper.compute_offsets(dest_engine, _MIGRATION_ORDER)
-    logger.info("Offsets computed: %s", offsets)
+    offsets = remapper.compute_offsets(dest_engine, _offset_tables)
+    # Register "conversation_labels" offset so ConversationLabelsMigrator.remap works
+    remapper._offsets["conversation_labels"] = remapper._offsets.get("taggings", 0)
+    logger.info("Offsets computed: %s", remapper.offsets)
 
     # (3b) Pre-seed remapper aliases from migration_state so that id_remapper.remap()
     # returns the correct dest_id even after restarts where the computed offset may

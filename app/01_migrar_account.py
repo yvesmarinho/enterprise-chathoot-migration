@@ -915,10 +915,17 @@ def run(account_name: str):
     # Resequencia PKs
     if not DRY_RUN:
         print(f"\n[5] Resequenciando sequences...")
+        # Encerra qualquer transacao pendente antes de mudar autocommit
+        # (psycopg2 lança ProgrammingError se set_session usado dentro de tx)
+        try:
+            dc.commit()
+        except Exception:
+            pass
         # Reconecta DEST se necessario (pode ter caido durante a migracao)
         try:
             with cur(dc) as c:
                 c.execute("SELECT 1")
+            dc.commit()  # encerra o SELECT da verificacao
         except Exception:
             log("  Reconectando DEST para resequenciar...")
             try: dc.close()

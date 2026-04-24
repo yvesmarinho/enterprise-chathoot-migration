@@ -1,8 +1,18 @@
 # Comparativo: Código Legado SQL vs Migrador Python Atual
 
-**Data**: 2026-04-23
+**Data**: 2026-04-23 | **Revisão**: 2026-04-24
 **Legado**: `docs/sql_code_old/script*.sql` (PL/pgSQL)
 **Atual**: `src/migrators/*.py` (Python 3.12 + SQLAlchemy 2.0)
+
+> ⚠️ **ATENÇÃO**: Este documento foi revisado em 2026-04-24.
+> A análise original era imprecisa quanto às **transformações de campo concretas** do SQL legado.
+> O debate completo com análise campo-a-campo, bugs identificados e plano de ação está em:
+> **[D10-DEBATE-SQL-LEGADO-VS-PYTHON-ATUAL-2026-04-24.md](../debates/D10-DEBATE-SQL-LEGADO-VS-PYTHON-ATUAL-2026-04-24.md)**
+>
+> **Ações críticas identificadas no D10 (executar HOJE)**:
+> 1. Verificar `app/13_migrar_inbox_members.py` — deve usar IDRemapper para `inbox_id` e `user_id`
+> 2. Decidir `conversations.status` com o cliente (verbatim vs forçar `resolved`)
+> 3. Executar assertions SQL pré-migração (queries no §5.2 do D10)
 
 ---
 

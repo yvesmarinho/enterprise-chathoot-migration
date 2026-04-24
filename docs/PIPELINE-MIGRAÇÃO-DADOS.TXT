@@ -1,0 +1,89 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║            PIPELINE DE MIGRAÇÃO ENTERPRISE CHATWOOT                            ║
+║  SOURCE: chatwoot_dev1_db  (chat.vya.digital)      [read-only]                 ║
+║  DEST:   chatwoot004_dev1_db  (vya-chat-dev.vya.digital)  [read-write]         ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+  ┌──────────────────────┐                    ┌───────────────────────┐
+  │  chatwoot_dev1_db    │                    │  chatwoot004_dev1_db  │
+  │  chat.vya.digital    │                    │  vya-chat-dev         │
+  │  (SOURCE)            │                    │  (DEST)               │
+  └──────────┬───────────┘                    └───────────┬───────────┘
+             │                                            │
+             └──────────────────┬─────────────────────────┘
+                                ▼
+          ┌──────────────────────────────────────────────────────────────┐
+          │  FASE 0 — Inspeção (app/00_inspecionar.py)                   │
+          │  • Verificar account por nome (SOURCE vs DEST)               │
+          │  • Comparar volumes por tabela (contacts/convs/messages)     │
+          │  • Verificar users por email → [OK dest_id=X] / [FALTA]      │
+          │  • Verificar inboxes por nome → [JÁ EXISTE] / [FALTA CRIAR]  │
+          │    + quantas conversas dependem de cada inbox ausente        │
+          │  ⚠ Somente leitura — não altera nenhum banco                 │
+          └─────────────────────┬────────────────────────────────────────┘
+                                ▼
+          ┌─────────────────────────────────────────────┐
+          │  FASE 1 — Mapeamento de Accounts            │
+          │  app/01_migrar_account.py                   │
+          │  Estratégia: MERGE (dedup por nome/slug)    │
+          │                                             │
+          │  src_id=1  → dst_id=1   (Vya Digital, merge)│
+          │  src_id=17 → dst_id=17  (Unimed PJ, merge)  │
+          │  src_id=4  → dst_id=47  (novo)              │
+          │  src_id=18 → dst_id=61  (novo)              │
+          │  src_id=25 → dst_id=68  (novo)              │
+          └─────────────────────┬───────────────────────┘
+                                ▼
+          ┌─────────────────────────────────────────────┐
+          │  FASE 2 — Diagnóstico de Overlap             │
+          │  app/03_diagnostico_overlap.py               │
+          │  • Detecta registros sobrepostos             │
+          │  • Gera candidatos a deduplicação            │
+          └─────────────────────┬───────────────────────┘
+                                ▼
+          ┌─────────────────────────────────────────────────────────────────┐
+          │  FASE 3 — Pipeline Principal (src/migrar.py)                    │
+          │  Ordem por dependência FK:                                      │
+          │                                                                 │
+          │   1. accounts              ──► IDRemapper (account_id map)      │
+          │   2. custom_attr_defs      ──► metadados de campos              │
+          │   3. canned_responses      ──► respostas rápidas                │
+          │   4. inboxes               ──► offset +396                      │
+          │                                (src_id 3 → dst_id 399)         │
+          │   5. webhooks              ──► notificações de eventos           │
+          │   6. users                 ──► dedup por email                  │
+          │   7. teams                 ──► grupos de agentes                │
+          │   8. team_members          ──► user↔team                        │
+          │   9. labels                ──► etiquetas de conversa            │
+          │  10. contacts              ──► dedup por email/telefone/id      │
+          │  11. contact_inboxes       ──► contato↔inbox                   │
+          │  12. conversations         ──► offset +156684                   │
+          │                                (display_id remapeado)           │
+          │  13. messages              ──► mensagens por conversa           │
+          │  14. attachments           ──► arquivos anexos                  │
+          │  15. conversation_labels   ──► etiquetas por conversa           │
+          │                                                                 │
+          │  FASE 3.3 (complementar):                                       │
+          │  16. inbox_members         ──► app/13_migrar_inbox_members.py   │
+          │      agente↔inbox  (52 migrados · 0 falhos)                    │
+          └─────────────────────┬───────────────────────────────────────────┘
+                                ▼
+          ┌─────────────────────────────────────────────────────────────────┐
+          │  FASE 4 — Pós-Migração                                          │
+          │                                                                 │
+          │  POS-01  Validar contagens SOURCE vs DEST por tabela/account    │
+          │  POS-02  Validar integridade FK no DEST                         │
+          │  POS-03  Resetar sequences (nextval = MAX(id) + 1)              │
+          │  POS-04  Regenerar pubsub_tokens (6.438 contact_inboxes)        │
+          │  POS-05  Auditar orphans (contacts sem contact_inboxes)         │
+          │  POS-06  Validação via API (HTTP 200 por recurso migrado)       │
+          └─────────────────────┬───────────────────────────────────────────┘
+                                ▼
+          ┌─────────────────────────────────────────────────────────────────┐
+          │  RESULTADO (chatwoot004_dev1_db)                                 │
+          │                                                                 │
+          │  ✅ 313.450+ registros migrados                                 │
+          │  ✅ 13 inboxes (IDs 399–519)  ·  309 conversas migradas         │
+          │  ✅ Sequences em sincronia  ·  FK sem violações                 │
+          │  ⚠  Container vya-chat-dev: reiniciar para ler .env atualizado  │
+          └─────────────────────────────────────────────────────────────────┘
