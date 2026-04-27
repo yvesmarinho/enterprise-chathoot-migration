@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chathoot Migration
 
-**Last Updated**: 2026-04-24 — Sessão 10 encerrada: 309 convs + 13.164 msgs migradas para account_id=1 (fases 0-4 ✅). BUG-06 corrigido em `app/01_migrar_account.py`. Pendências: resequenciar sequences + inbox_members + outros 4 accounts.
-**Status**: 🟡 EM ANDAMENTO — migração Vya Digital fases 0-4 completas; resequência e outros accounts pendentes
+**Last Updated**: 2026-04-27 — Sessão 11: pipeline Vya Digital re-executado do zero (banco restaurado). Sequences resequenciadas. Infra Docker criada (docker/). Migração reportada como bem-sucedida pela equipe ops — aguardando validação formal.
+**Status**: 🟡 EM ANDAMENTO — Vya Digital migrado ✅ aguardando validação ops | inbox_members pendente | outros 4 accounts pendentes
 
 ---
 
@@ -72,20 +72,26 @@
 
 ### P0 — Resequência e Membros de Inbox
 
-- [ ] **S10-P0-1** Re-executar `app/01_migrar_account.py "Vya Digital"` com BUG-06 já corrigido para resequenciar sequences (`contacts_id_seq`, `conversations_id_seq`, `messages_id_seq` etc.)
-  - ⚠️ As 309 convs **já existem** no DEST — verificar idempotência antes de re-rodar
-  - Alternativa: executar apenas a fase 5 de resequência de forma isolada
-- [ ] **S10-P0-2** Migrar `inbox_members` para os novos inboxes (397-409):
-  - Script `app/13_migrar_inbox_members.py` depende de `migration_state`
-  - Adaptar para leitura por nome de inbox (não por ID) pois IDs mudam entre runs
-- [ ] **S10-P0-3** Validar inboxes visíveis no frontend para usuários não-admin após migração de `inbox_members`
+- [x] **S10-P0-1** Re-executar pipeline completo `app/01_migrar_account.py "Vya Digital"` — **CONCLUÍDO 2026-04-27** (banco restaurado; fases 0-5 executadas; sequences resequenciadas via `.tmp/fix_sequences.py`)
+- [ ] **S11-P0-1** Migrar `inbox_members` para os novos inboxes (397-409):
+  - ⚠️ `app/13_migrar_inbox_members.py` depende de `migration_state` — tabela **não existe** no DEST
+  - Adaptar script para resolver mapeamentos por nome (inbox) e email (user) diretamente
+  - Usar `docker/` para executar no wfdb01 (baixa latência)
+- [ ] **S11-P0-2** Aguardar confirmação validação ops e executar `make validate-api` com token admin → esperado `api_conv` para account_id=1
+- [ ] **S11-P0-3** Validar inboxes visíveis no frontend para usuários não-admin após migração de `inbox_members`
 
 ### P1 — Outros Accounts SOURCE
 
-- [ ] **S10-P1-1** Aplicar migração para account SOURCE "Sol Copernico" (`account_id=4`)
-- [ ] **S10-P1-2** Aplicar migração para account SOURCE "Unimed Poços PJ" (`account_id=17`)
-- [ ] **S10-P1-3** Aplicar migração para account SOURCE "Unimed Poços PF" (`account_id=18`)
-- [ ] **S10-P1-4** Aplicar migração para account SOURCE "Unimed Guaxupé" (`account_id=25`)
+- [ ] **S11-P1-1** Aplicar migração para account SOURCE "Sol Copernico" (`account_id=4`) — usar `docker/` no wfdb01
+- [ ] **S11-P1-2** Aplicar migração para account SOURCE "Unimed Poços PJ" (`account_id=17`)
+- [ ] **S11-P1-3** Aplicar migração para account SOURCE "Unimed Poços PF" (`account_id=18`)
+- [ ] **S11-P1-4** Aplicar migração para account SOURCE "Unimed Guaxupé" (`account_id=25`)
+
+### P2 — Infra Docker (criada Sessão 11)
+
+- [x] **S11-DOCKER** Criar `docker/` para executar migração no wfdb01 (mesmo datacenter wfdb02) — **CONCLUÍDO 2026-04-27** commit `2619dd9`
+- [x] **S11-DOCKER-FIX** Corrigir deploy-to-wfdb01.sh: fwknop SPA + porta 5010 + user archaris — **CONCLUÍDO 2026-04-27** commit `0ed9d4f`
+- [ ] **S11-DOCKER-TEST** Testar build e execução completa no wfdb01 (aguarda validação ops)
 
 ---
 
