@@ -1,0 +1,7 @@
+# Dependências de produção — espelho de pyproject.toml [project.dependencies]
+# Atualizar aqui quando pyproject.toml mudar.
+sqlalchemy==2.0.49
+psycopg2-binary==2.9.11
+alembic==1.18.4
+pandas>=2.2.0
+requests>=2.33.1

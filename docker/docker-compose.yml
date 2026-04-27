@@ -1,0 +1,50 @@
+# docker-compose.yml — enterprise-chathoot-migration
+#
+# Execução em wfdb01 (próximo ao wfdb02 onde ficam os bancos de dados).
+# Os segredos ficam no host e são montados read-only no container.
+#
+# Pré-requisito no host:
+#   - Clonar o repositório em wfdb01
+#   - Garantir que .secrets/generate_erd.json existe e tem permissão 600
+#
+# Uso:
+#   # Migração padrão (Vya Digital)
+#   docker compose run --rm migrator
+#
+#   # Outra account
+#   docker compose run --rm -e ACCOUNT_NAME="Sol Copernico" migrator
+#
+#   # Dry-run
+#   docker compose run --rm -e DRY_RUN=true migrator
+#
+#   # Script avulso (ex: inbox_members)
+#   docker compose run --rm -e SCRIPT=13_migrar_inbox_members.py migrator
+#
+#   # Fix sequences isolado
+#   docker compose run --rm -e SCRIPT=.tmp/fix_sequences.py migrator
+
+services:
+  migrator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: chatwoot-migration:latest
+    container_name: chatwoot-migrator
+
+    environment:
+      ACCOUNT_NAME: "${ACCOUNT_NAME:-Vya Digital}"
+      DRY_RUN: "${DRY_RUN:-false}"
+      SCRIPT: "${SCRIPT:-}"
+      PYTHONUNBUFFERED: "1"
+
+    volumes:
+      # Segredos: montados read-only, nunca na imagem
+      - ../.secrets:/app/.secrets:ro
+      # Logs e outputs .tmp ficam no host para inspeção pós-execução
+      - ../app/logs:/app/app/logs
+      - ../.tmp:/app/.tmp
+
+    # Sem portas expostas — só acesso de saída para wfdb02.vya.digital:5432
+    network_mode: bridge
+
+    restart: "no"
