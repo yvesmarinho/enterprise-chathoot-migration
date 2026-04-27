@@ -35,11 +35,13 @@ SSH_OPTS="-p ${WFDB01_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=15"
 
 BUILD=false
 RUN=false
+RUN_ALL=false
 
 for arg in "$@"; do
     case "$arg" in
         --build) BUILD=true ;;
         --run)   RUN=true ;;
+        --all)   RUN_ALL=true ;;
     esac
 done
 
@@ -101,7 +103,7 @@ if [[ "${BUILD}" == "true" ]]; then
     echo "✅ Build concluído"
 fi
 
-# --- run -----------------------------------------------------------------
+# --- run (uma account específica) ----------------------------------------
 if [[ "${RUN}" == "true" ]]; then
     knock
     echo "→ Executando migração em ${WFDB01_HOST} (account: ${ACCOUNT_NAME})..."
@@ -109,11 +111,26 @@ if [[ "${RUN}" == "true" ]]; then
     echo "✅ Migração executada"
 fi
 
+# --- run all (todos os accounts em sequência) ----------------------------
+if [[ "${RUN_ALL}" == "true" ]]; then
+    knock
+    echo "→ Executando migração COMPLETA em ${WFDB01_HOST} (TODOS os accounts)..."
+    ssh_run "cd ${REMOTE_DIR} && ALL_ACCOUNTS=true docker compose -f docker/docker-compose.yml run --rm migrator"
+    echo "✅ Migração completa executada"
+fi
+
 echo ""
 echo "Comandos úteis no wfdb01 (após fwknop):"
 echo "  fwknop --rc-file ~/.fwknoprc -n wfdb01 && sleep 3"
 echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST}"
 echo "  cd ${REMOTE_DIR}"
+echo "  # Build:"
 echo "  docker compose -f docker/docker-compose.yml build"
-echo "  docker compose -f docker/docker-compose.yml run --rm migrator"
+echo "  # Migrar TODOS os accounts (uso principal):"
+echo "  ALL_ACCOUNTS=true docker compose -f docker/docker-compose.yml run --rm migrator"
+echo "  # Migrar uma account específica:"
+echo "  ACCOUNT_NAME='Sol Copernico' docker compose -f docker/docker-compose.yml run --rm migrator"
+echo "  # Dry-run completo (sem gravar nada):"
+echo "  ALL_ACCOUNTS=true DRY_RUN=true docker compose -f docker/docker-compose.yml run --rm migrator"
+echo "  # Script avulso:"
 echo "  docker compose -f docker/docker-compose.yml run --rm -e SCRIPT=13_migrar_inbox_members.py migrator"

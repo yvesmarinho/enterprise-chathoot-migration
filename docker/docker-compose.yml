@@ -33,6 +33,7 @@ services:
 
     environment:
       ACCOUNT_NAME: "${ACCOUNT_NAME:-Vya Digital}"
+      ALL_ACCOUNTS: "${ALL_ACCOUNTS:-false}"
       DRY_RUN: "${DRY_RUN:-false}"
       SCRIPT: "${SCRIPT:-}"
       PYTHONUNBUFFERED: "1"
