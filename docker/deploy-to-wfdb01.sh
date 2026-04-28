@@ -8,7 +8,14 @@
 # Uso:
 #   ./docker/deploy-to-wfdb01.sh                      # só rsync
 #   ./docker/deploy-to-wfdb01.sh --build              # rsync + docker build
-#   ./docker/deploy-to-wfdb01.sh --build --run        # rsync + build + run
+#   ./docker/deploy-to-wfdb01.sh --build --all        # rsync + build + inicia migração em BACKGROUND no wfdb01
+#   ./docker/deploy-to-wfdb01.sh --build --run        # rsync + build + run interativo (bloqueia SSH)
+#
+# Com --all, o processo de migração é iniciado em background no wfdb01 e NÃO
+# depende desta máquina. O SSH é aberto apenas para lançar o nohup e retorna
+# imediatamente. Para acompanhar:
+#   fwknop --rc-file ~/.fwknoprc -n wfdb01 && sleep 3
+#   ssh -p 5010 archaris@wfdb01.vya.digital 'tail -f ~/chatwoot-migration/logs/migration_all_latest.log'
 #
 # Variáveis customizáveis:
 #   WFDB01_HOST      Host de destino    (padrão: wfdb01.vya.digital)
@@ -111,12 +118,19 @@ if [[ "${RUN}" == "true" ]]; then
     echo "✅ Migração executada"
 fi
 
-# --- run all (todos os accounts em sequência) ----------------------------
+# --- run all — background autônomo no wfdb01 (não depende desta máquina) ---
 if [[ "${RUN_ALL}" == "true" ]]; then
     knock
-    echo "→ Executando migração COMPLETA em ${WFDB01_HOST} (TODOS os accounts)..."
-    ssh_run "cd ${REMOTE_DIR} && ALL_ACCOUNTS=true docker compose -f docker/docker-compose.yml run --rm migrator"
-    echo "✅ Migração completa executada"
+    echo "→ Iniciando migração COMPLETA em background no ${WFDB01_HOST}..."
+    echo "  (processo autonomo — SSH retorna imediatamente)"
+    ssh_run "cd ${REMOTE_DIR} && bash scripts/start-migration-bg.sh"
+    echo ""
+    echo "✅ Migração iniciada — processo rodando autonomamente no ${WFDB01_HOST}"
+    echo ""
+    echo "Para acompanhar o progresso:"
+    echo "  fwknop --rc-file ${WFDB01_FWKNOP_RC} -n ${WFDB01_FWKNOP_N} && sleep ${FWKNOP_SLEEP}"
+    echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST} \\"
+    echo "      'tail -f ${REMOTE_DIR}/logs/migration_all_latest.log'"
 fi
 
 echo ""
@@ -124,13 +138,25 @@ echo "Comandos úteis no wfdb01 (após fwknop):"
 echo "  fwknop --rc-file ~/.fwknoprc -n wfdb01 && sleep 3"
 echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST}"
 echo "  cd ${REMOTE_DIR}"
-echo "  # Build:"
+echo ""
+echo "  # Iniciar migração completa em background (recomendado):"
+echo "  bash scripts/start-migration-bg.sh"
+echo ""
+echo "  # Acompanhar log em tempo real:"
+echo "  tail -f logs/migration_all_latest.log"
+echo ""
+echo "  # Build da imagem:"
 echo "  docker compose -f docker/docker-compose.yml build"
-echo "  # Migrar TODOS os accounts (uso principal):"
+echo ""
+echo "  # Migração interativa (bloqueia terminal SSH):"
 echo "  ALL_ACCOUNTS=true docker compose -f docker/docker-compose.yml run --rm migrator"
-echo "  # Migrar uma account específica:"
-echo "  ACCOUNT_NAME='Sol Copernico' docker compose -f docker/docker-compose.yml run --rm migrator"
-echo "  # Dry-run completo (sem gravar nada):"
+echo ""
+echo "  # Dry-run completo:"
 echo "  ALL_ACCOUNTS=true DRY_RUN=true docker compose -f docker/docker-compose.yml run --rm migrator"
+echo ""
 echo "  # Script avulso:"
 echo "  docker compose -f docker/docker-compose.yml run --rm -e SCRIPT=13_migrar_inbox_members.py migrator"
+echo ""
+echo "  # Verificar processo:"
+echo "  ps aux | grep migrat && docker ps"
+echo "  cat .tmp/migrator.pid"
