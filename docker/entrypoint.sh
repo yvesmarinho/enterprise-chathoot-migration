@@ -40,18 +40,20 @@ fi
 
 # Migração de TODOS os accounts
 if [[ "${ALL_ACCOUNTS}" == "true" ]]; then
+    LOG_FILE="/app/app/logs/migration_all_$(date +%Y%m%d_%H%M%S).log"
+    mkdir -p /app/app/logs
+    # Symlink "latest" para facilitar tail -f
+    ln -sf "${LOG_FILE}" /app/app/logs/migration_all_latest.log
     echo "→ Migrando TODOS os accounts (migrate_all_accounts.py)"
+    echo "→ Log salvo em: ${LOG_FILE}"
     ARGS=()
-    if [[ "${DRY_RUN}" == "true" ]]; then
-        ARGS+=("--dry-run")
-    fi
-    exec python app/migrate_all_accounts.py "${ARGS[@]}"
+    [[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
+    # tee: exibe no stdout (docker logs) e salva em arquivo no volume montado
+    python app/migrate_all_accounts.py "${ARGS[@]}" 2>&1 | tee "${LOG_FILE}"
+    exit ${PIPESTATUS[0]}
 fi
 
 # Pipeline de uma account específica
 ARGS=("${ACCOUNT_NAME}")
-if [[ "${DRY_RUN}" == "true" ]]; then
-    ARGS+=("--dry-run")
-fi
-
+[[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
 exec python app/01_migrar_account.py "${ARGS[@]}"

@@ -2,80 +2,62 @@
 # scripts/start-migration-bg.sh
 # Inicia a migração completa em background no wfdb01.
 #
-# Execute DIRETAMENTE no wfdb01 (sem depender do computador de origem):
+# Execute DIRETAMENTE no wfdb01 (não depende do computador de origem):
 #   cd ~/chatwoot-migration
 #   bash scripts/start-migration-bg.sh
 #
-# O processo Docker continua rodando mesmo após fechar o terminal SSH.
-# O log é escrito em: logs/migration_all_YYYYMMDD_HHMMSS.log
+# O container Docker roda de forma independente — fechar o terminal não para
+# a migração. Para acompanhar: docker logs -f chatwoot-migrator-all
 #
-# Para acompanhar após iniciar:
-#   tail -f ~/chatwoot-migration/logs/migration_all_*.log
-#
-# Para verificar se ainda está rodando:
-#   ps aux | grep migrat
-#   docker ps
+# Pré-requisito: docker build já executado (./docker/deploy-to-wfdb01.sh --build)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REMOTE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-LOGFILE="${REMOTE_DIR}/logs/migration_all_${TIMESTAMP}.log"
-PIDFILE="${REMOTE_DIR}/.tmp/migrator.pid"
-LATEST_LINK="${REMOTE_DIR}/logs/migration_all_latest.log"
+CONTAINER="chatwoot-migrator-all"
+COMPOSE_FILE="${REMOTE_DIR}/docker/docker-compose.yml"
 
-mkdir -p "${REMOTE_DIR}/logs" "${REMOTE_DIR}/.tmp"
+echo "======================================================================"
+echo "  Migração COMPLETA — container detached"
+echo "  Host      : $(hostname)"
+echo "  Dir       : ${REMOTE_DIR}"
+echo "  Container : ${CONTAINER}"
+echo "  Início    : $(date '+%Y-%m-%d %H:%M:%S')"
+echo "======================================================================"
 
-# ── Verificar se já existe migração rodando ──────────────────────────────────
-if [[ -f "${PIDFILE}" ]]; then
-    EXISTING_PID="$(cat "${PIDFILE}")"
-    if kill -0 "${EXISTING_PID}" 2>/dev/null; then
-        echo "⚠️  Migração já está rodando (PID: ${EXISTING_PID})"
-        echo "   Log atual: ${LATEST_LINK}"
-        echo "   Para acompanhar: tail -f ${LATEST_LINK}"
-        echo "   Para forçar novo início: rm ${PIDFILE} && bash $0"
-        exit 1
-    else
-        echo "→ PID ${EXISTING_PID} não está ativo — iniciando nova execução..."
-        rm -f "${PIDFILE}"
-    fi
+# ── Verificar se já está rodando ────────────────────────────────────────────
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
+    echo "⚠️  Container '${CONTAINER}' já está rodando."
+    echo "   Para acompanhar: docker logs -f ${CONTAINER}"
+    echo "   Para parar: docker stop ${CONTAINER}"
+    exit 1
 fi
 
-echo "======================================================================"
-echo "  Migração COMPLETA — background (wfdb01)"
-echo "  Host    : $(hostname)"
-echo "  Dir     : ${REMOTE_DIR}"
-echo "  Início  : $(date '+%Y-%m-%d %H:%M:%S')"
-echo "  Log     : ${LOGFILE}"
-echo "======================================================================"
+# ── Remover container anterior parado (se houver) ───────────────────────────
+docker rm -f "${CONTAINER}" 2>/dev/null || true
 
-# ── Lançar em background com nohup ──────────────────────────────────────────
-nohup bash -c "
-    cd '${REMOTE_DIR}'
-    ALL_ACCOUNTS=true docker compose -f docker/docker-compose.yml run --rm migrator
-    echo ''
-    echo '=== PROCESSO ENCERRADO: \$(date \"+%Y-%m-%d %H:%M:%S\") ==='
-" > "${LOGFILE}" 2>&1 &
-
-PID=$!
-echo "${PID}" > "${PIDFILE}"
-
-# Symlink para "latest"
-ln -sf "${LOGFILE}" "${LATEST_LINK}"
+# ── Iniciar container em background ─────────────────────────────────────────
+cd "${REMOTE_DIR}"
+docker compose -f "${COMPOSE_FILE}" run \
+    -d \
+    --name "${CONTAINER}" \
+    -e ALL_ACCOUNTS=true \
+    -e DRY_RUN=false \
+    migrator
 
 echo ""
-echo "✅ Migração iniciada em background"
-echo "   PID      : ${PID}"
-echo "   Log      : ${LOGFILE}"
-echo "   PID file : ${PIDFILE}"
+echo "✅ Container '${CONTAINER}' iniciado"
 echo ""
-echo "Para acompanhar em tempo real:"
-echo "  tail -f ${LATEST_LINK}"
+echo "Acompanhar log em tempo real:"
+echo "  docker logs -f ${CONTAINER}"
 echo ""
-echo "Para verificar processo:"
-echo "  ps aux | grep ${PID}"
-echo "  docker ps"
+echo "Log em arquivo (volume montado):"
+echo "  tail -f ${REMOTE_DIR}/app/logs/migration_all_latest.log"
 echo ""
-echo "Relatório JSON (após concluir):"
-echo "  ls -lt ${REMOTE_DIR}/.tmp/migrate_all_*.json | head -1"
+echo "Verificar status:"
+echo "  docker ps --filter name=${CONTAINER}"
+echo ""
+echo "Relatório final (após concluir):"
+echo "  ls -lh ${REMOTE_DIR}/.tmp/migrate_all_*.json"
+

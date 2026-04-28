@@ -110,7 +110,7 @@ if [[ "${BUILD}" == "true" ]]; then
     echo "✅ Build concluído"
 fi
 
-# --- run (uma account específica) ----------------------------------------
+# --- run (uma account específica) — foreground OK para tarefas curtas --------
 if [[ "${RUN}" == "true" ]]; then
     knock
     echo "→ Executando migração em ${WFDB01_HOST} (account: ${ACCOUNT_NAME})..."
@@ -118,45 +118,59 @@ if [[ "${RUN}" == "true" ]]; then
     echo "✅ Migração executada"
 fi
 
-# --- run all — background autônomo no wfdb01 (não depende desta máquina) ---
+# --- run all — container DETACHED (independente do SSH) -----------------------
+# Usa docker compose run -d para que o processo continue após fechar o SSH.
+# Logs: docker logs -f <container> | arquivo em app/logs/ (volume montado)
 if [[ "${RUN_ALL}" == "true" ]]; then
+    CONTAINER="chatwoot-migrator-all"
     knock
-    echo "→ Iniciando migração COMPLETA em background no ${WFDB01_HOST}..."
-    echo "  (processo autonomo — SSH retorna imediatamente)"
-    ssh_run "cd ${REMOTE_DIR} && bash scripts/start-migration-bg.sh"
+    echo "→ Iniciando migração COMPLETA em ${WFDB01_HOST}..."
+    echo "  Container: ${CONTAINER}"
+    echo "  Modo: detached (independente do SSH)"
+
+    # Remove container anterior (se existir parado) e inicia novo em background
+    ssh_run "
+        cd ${REMOTE_DIR}
+        docker rm -f '${CONTAINER}' 2>/dev/null || true
+        docker compose -f docker/docker-compose.yml run \
+            -d \
+            --name '${CONTAINER}' \
+            -e ALL_ACCOUNTS=true \
+            -e DRY_RUN=false \
+            migrator
+    "
     echo ""
-    echo "✅ Migração iniciada — processo rodando autonomamente no ${WFDB01_HOST}"
+    echo "✅ Container iniciado: ${CONTAINER}"
     echo ""
-    echo "Para acompanhar o progresso:"
+    echo "Para acompanhar (abra nova conexão SSH):"
     echo "  fwknop --rc-file ${WFDB01_FWKNOP_RC} -n ${WFDB01_FWKNOP_N} && sleep ${FWKNOP_SLEEP}"
-    echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST} \\"
-    echo "      'tail -f ${REMOTE_DIR}/logs/migration_all_latest.log'"
+    echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST}"
+    echo "  docker logs -f ${CONTAINER}"
+    echo ""
+    echo "Log em arquivo (volume montado):"
+    echo "  tail -f ${REMOTE_DIR}/app/logs/migration_all_latest.log"
 fi
 
+# --- hints de uso -------------------------------------------------------
 echo ""
-echo "Comandos úteis no wfdb01 (após fwknop):"
+echo "Comandos úteis no wfdb01:"
 echo "  fwknop --rc-file ~/.fwknoprc -n wfdb01 && sleep 3"
 echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST}"
 echo "  cd ${REMOTE_DIR}"
 echo ""
-echo "  # Iniciar migração completa em background (recomendado):"
-echo "  bash scripts/start-migration-bg.sh"
+echo "  docker ps                                           # ver containers rodando"
+echo "  docker logs -f chatwoot-migrator-all               # seguir log migração"
+echo "  tail -f app/logs/migration_all_latest.log          # log em arquivo"
+echo "  ls -lh .tmp/migrate_all_*.json                     # relatório final"
 echo ""
-echo "  # Acompanhar log em tempo real:"
-echo "  tail -f logs/migration_all_latest.log"
-echo ""
-echo "  # Build da imagem:"
+echo "  # Build manual:"
 echo "  docker compose -f docker/docker-compose.yml build"
 echo ""
-echo "  # Migração interativa (bloqueia terminal SSH):"
-echo "  ALL_ACCOUNTS=true docker compose -f docker/docker-compose.yml run --rm migrator"
+echo "  # Migrar um account específico (interativo):"
+echo "  ACCOUNT_NAME='Sol Copernico' docker compose -f docker/docker-compose.yml run --rm migrator"
 echo ""
 echo "  # Dry-run completo:"
-echo "  ALL_ACCOUNTS=true DRY_RUN=true docker compose -f docker/docker-compose.yml run --rm migrator"
+echo "  docker compose -f docker/docker-compose.yml run --rm -e ALL_ACCOUNTS=true -e DRY_RUN=true migrator"
 echo ""
 echo "  # Script avulso:"
 echo "  docker compose -f docker/docker-compose.yml run --rm -e SCRIPT=13_migrar_inbox_members.py migrator"
-echo ""
-echo "  # Verificar processo:"
-echo "  ps aux | grep migrat && docker ps"
-echo "  cat .tmp/migrator.pid"
