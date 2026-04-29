@@ -1,7 +1,7 @@
 # 📋 Resumo de Criação do Projeto
 
-**Projeto**: `enterprise-chathoot-migration`
-**Título**: Enterprise Chathoot Migration
+**Projeto**: `enterprise-chatwoot-migration`
+**Título**: Enterprise Chatwoot Migration
 **Criado em**: 2026-04-09T11:37:54Z
 **Template**: Enterprise Default Project Template v1.0.0
 
@@ -11,18 +11,18 @@
 
 | Propriedade | Valor |
 |-------------|-------|
-| **Nome** | enterprise-chathoot-migration |
+| **Nome** | enterprise-chatwoot-migration |
 | **Descrição** | Projeto para migração de dados entre versões diferentes do Chatwoot |
 | **Domínio** | programming |
 | **Linguagem** | python |
-| **Repositório** | git@github.com:yvesmarinho/enterprise-chathoot-migration.git |
+| **Repositório** | git@github.com:yvesmarinho/enterprise-chatwoot-migration.git |
 
 ---
 
 ## 📁 Estrutura Criada
 
 ```
-enterprise-chathoot-migration/
+enterprise-chatwoot-migration/
 ├── .github/                    # GitHub config (workflows, agents, prompts)
 │   ├── agents/                 # SpecKit agents (11 agents)
 │   ├── prompts/                # Prompt templates (9 prompts)
@@ -84,10 +84,10 @@ enterprise-chathoot-migration/
 ## 🔧 Git Inicializado
 
 ✅ **Repositório Git criado**
-- Commit inicial: `chore: scaffold inicial do projeto enterprise-chathoot-migration`
+- Commit inicial: `chore: scaffold inicial do projeto enterprise-chatwoot-migration`
 - Tag: `scaffold-v1.0.0` (marca versão do template)
 - Branch: `master`
-- Remote: `origin` → git@github.com:yvesmarinho/enterprise-chathoot-migration.git
+- Remote: `origin` → git@github.com:yvesmarinho/enterprise-chatwoot-migration.git
 
 ---
 

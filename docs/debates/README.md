@@ -61,3 +61,15 @@ Exemplos:
 
 - [decisions/](../decisions/) — Registro formal de decisões (ADRs)
 - [retrospectives/](../retrospectives/) — Aprendizados pós-sprint
+
+## 📋 Debates deste projeto
+
+| ID | Arquivo | Assunto | Status |
+|----|---------|---------|--------|
+| D3 | [D3-DEBATE-REGRAS-MIGRACAO-2026-04-10.md](D3-DEBATE-REGRAS-MIGRACAO-2026-04-10.md) | Estratégia MERGE vs incremental | Resolvido |
+| D4 | [D4-DEBATE-CONTACTS-ORPHANS-2026-04-14.md](D4-DEBATE-CONTACTS-ORPHANS-2026-04-14.md) | Contatos órfãos | Resolvido |
+| D5 | [D5-DEBATE-SPEC-VALIDACAO-API-2026-04-20.md](D5-DEBATE-SPEC-VALIDACAO-API-2026-04-20.md) | Spec validação via API | Resolvido |
+| D6 | [D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md](D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md) | Validação hash/integridade | Resolvido |
+| D7 | [D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md](D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md) | Visibilidade conversas Marcos | Resolvido |
+| D8 | [D8-ANALISE-404-CHATWOOT-API-2026-04-23.md](D8-ANALISE-404-CHATWOOT-API-2026-04-23.md) | HTTP 404 API + 14 inboxes invisíveis | Resolvido (código corrigido) |
+| Q1 | [Q1-QUESTIONARIO-INFORMACOES-FALTANTES-2026-04-23.md](Q1-QUESTIONARIO-INFORMACOES-FALTANTES-2026-04-23.md) | Questionário decisões pendentes | **Pendente resposta** |

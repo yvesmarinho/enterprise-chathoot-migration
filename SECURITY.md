@@ -12,7 +12,7 @@
 
 Instead, please report them privately:
 
-1. Go to the [Security tab](git@github.com:yvesmarinho/enterprise-chathoot-migration.git/security) of this repository
+1. Go to the [Security tab](git@github.com:yvesmarinho/enterprise-chatwoot-migration.git/security) of this repository
 2. Click "Report a vulnerability"
 3. Provide detailed information about the vulnerability
 

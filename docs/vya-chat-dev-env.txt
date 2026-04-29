@@ -1,0 +1,6 @@
+# Postgres Database config variables
+# You can leave POSTGRES_DATABASE blank. The default name of
+# the database in the production environment is chatwoot_production
+POSTGRES_DATABASE=chatwoot004_dev1_db
+POSTGRES_HOST=82.197.64.145
+POSTGRES_USERNAME=chatwoot_user

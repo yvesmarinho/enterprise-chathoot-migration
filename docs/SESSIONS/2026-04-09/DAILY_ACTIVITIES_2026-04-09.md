@@ -31,7 +31,7 @@
 
 <!-- Add new activities below this line with separator --- -->
 
-<!-- 
+<!--
 ===========================================================================
 TEMPLATE DE BLOCO ESTRUTURADO
 ===========================================================================
@@ -74,7 +74,7 @@ Copie o template abaixo e preencha os campos:
 ---
 -->
 
-<!-- 
+<!--
 ===========================================================================
 EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 ===========================================================================
@@ -129,7 +129,7 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 
 **Resultado**: Aprovação unânime da Alternativa 1 (hybrid approach) com cronograma de 3 sessões. ROI calculado: 3.5x return (280h saved/year vs 80h maintenance).
 
-**Decisões técnicas**: 
+**Decisões técnicas**:
 - Implementação em 4 IMPs sequenciais (48-51)
 - IMP-51 (Busca MCP) priorizado por atender objetivo B do usuário
 - Controles de segurança (gitleaks) obrigatórios antes de persistir docs
@@ -146,3 +146,174 @@ EXEMPLO PRÁTICO DE BLOCO ESTRUTURADO
 ---
 
 <!-- Continue adding activity blocks below -->
+
+---
+
+### Phase 1 — Pre-Spec Analysis e Documentação
+
+**10:00 — ✅ Completo**
+
+**Objetivo**: Analisar objetivo.yaml e objetivo-template.yaml; identificar dúvidas bloqueantes antes de especificação formal
+
+**Contexto**: Projeto recém-scaffolded, sem especificação formal. Necessário análise prévia para alimentar speckit com dados reais do ambiente.
+
+**Passos executados**:
+1. Leitura de `objetivo.yaml` e `objetivo-template.yaml` — identificação de placeholders e lacunas
+2. Criação de `docs/SESSIONS/2026-04-09/PRE_SPEC_ANALYSIS_REPORT.md` v1 → evoluiu até v4
+3. Catalogação de 6 dúvidas (D1–D6) com severidade e impacto
+
+**Resultado**: Relatório PRE_SPEC_ANALYSIS_REPORT.md v4 com contexto técnico completo e 6 dúvidas mapeadas. D2 identificada como não-bloqueante (decisão de owner).
+
+**Arquivos modificados/criados**:
+- `docs/SESSIONS/2026-04-09/PRE_SPEC_ANALYSIS_REPORT.md` (+creado)
+
+**Status**: ✅ Completo
+
+---
+
+### Phase 2 — D1: Verificação de Versões Chatwoot
+
+**11:00 — ✅ Completo**
+
+**Objetivo**: Resolver dúvida D1 — verificar versões reais dos bancos `chatwoot_dev1_db` e `chatwoot004_dev1_db`
+
+**Contexto**: Sem dados reais de versão e schema, impossível garantir compatibilidade na migração. D1 era bloqueante para especificação.
+
+**Passos executados**:
+1. Criar `scripts/check_chatwoot_versions.py` — script de inspeção via SQLAlchemy
+2. Corrigir problemas de conexão: hostname (`wfdb02.vya.digital`), SSL desabilitado, options corretos
+3. Instalar dependências: `uv sync` — 19 pacotes instalados (`psycopg2-binary`, `sqlalchemy`, etc.)
+4. Executar script — coletar dados reais de ambos os bancos
+5. Atualizar `objetivo.yaml`, `objetivo-init.yaml`, `constitution.md` e `PRE_SPEC_ANALYSIS_REPORT.md` com dados coletados
+
+**Resultado**: Dados reais coletados:
+- `chatwoot_dev1_db`: migration=`20241217041352`, total=252 migrações, schema_sha1=`da6b4a366d...`
+- `chatwoot004_dev1_db`: migration=`20240820191716`, total=255 migrações, schema_sha1=`da6b4a366d...` (**IDÊNTICO**)
+- Contagens: contacts=38868/225536, conversations=41743/153582, messages=310155/1302949
+
+**Decisões técnicas**: schemas idênticos confirmam que migração é de dados apenas, sem transformação estrutural.
+
+**Arquivos modificados/criados**:
+- `scripts/check_chatwoot_versions.py` (+criado)
+- `objetivo.yaml` (atualizado com dados reais)
+- `objetivo-init.yaml` (atualizado com dados reais)
+
+**Status**: ✅ Completo
+
+---
+
+### Phase 3 — speckit.constitution
+
+**13:00 — ✅ Completo**
+
+**Objetivo**: Gerar `.specify/memory/constitution.md` com os 5 princípios de design do projeto
+
+**Contexto**: Pré-requisito do speckit para garantir alinhamento arquitetural em todos os artefatos gerados.
+
+**Passos executados**:
+1. Analisar `objetivo.yaml` atualizado e constraints do projeto
+2. Definir 5 princípios: Fabric Pattern (obrigatório), Idempotência, Observabilidade, Segurança e Simplicidade
+3. Gerar `.specify/memory/constitution.md` v1.0.0
+
+**Resultado**: Constitution v1.0.0 gerada com 5 princípios, incluindo Fabric Pattern como mandatório.
+
+**Arquivos modificados/criados**:
+- `.specify/memory/constitution.md` (+criado)
+
+**Status**: ✅ Completo
+
+---
+
+### Phase 4 — speckit.git.feature + speckit.specify
+
+**13:30 — ✅ Completo**
+
+**Objetivo**: Criar branch de feature e gerar spec.md com histórias de usuário e requisitos funcionais
+
+**Contexto**: Branch necessária para isolar trabalho. `spec.md` é o artefato central do speckit.
+
+**Passos executados**:
+1. Criar branch `001-enterprise-chatwoot-migration` a partir de `master`
+2. Gerar `.specify/features/001-enterprise-chatwoot-migration/spec.md`
+3. Definir 3 user stories, 12 FR e 8 SC
+
+**Resultado**: Branch criada, spec.md gerado com escopo completo.
+
+**Arquivos modificados/criados**:
+- `.specify/features/001-enterprise-chatwoot-migration/spec.md` (+criado)
+
+**Status**: ✅ Completo
+
+---
+
+### Phase 5 — speckit.clarify (5/5 questões respondidas)
+
+**14:30 — ✅ Completo**
+
+**Objetivo**: Responder 5 questões de clarificação para eliminar ambiguidades da spec
+
+**Contexto**: speckit.clarify bloqueia speckit.plan enquanto houver questões abertas.
+
+**Passos executados**:
+1. Q1: `migration_state` → tabela no banco `chatwoot004_dev1_db`
+2. Q2: batch size → 500 registros por transação
+3. Q3: log → `.tmp/migration_YYYYMMDD_HHMMSS.log` + stdout
+4. Q4: cobertura de testes → 90% (`fail_under`)
+5. Q5: rollback → manual com instrução ao operador
+6. Atualizar spec.md e constitution.md com respostas
+
+**Resultado**: Todas as 5 questões respondidas. speckit.plan desbloqueado.
+
+**Status**: ✅ Completo
+
+---
+
+### Phase 6 — speckit.plan
+
+**15:30 — ✅ Completo**
+
+**Objetivo**: Gerar todos os artefatos de design técnico do speckit.plan
+
+**Contexto**: Pré-requisito para especificação de tasks e início de implementação.
+
+**Passos executados**:
+1. Gerar `plan.md`: Technical Context + Constitution Check (5/5 pass) + Project Structure
+2. Gerar `research.md`: 7 decisões técnicas (R-001 a R-007)
+3. Gerar `data-model.md`: 9 entidades Chatwoot + `migration_state`, grafo FK, offsets
+4. Gerar `contracts/cli-contract.md`: schema CLI, exit codes, formato de output, invariantes
+5. Gerar `quickstart.md`: setup, execução, testes, recovery
+
+**Resultado**: 5 artefatos de design prontos. Projeto tecnicamente especificado e pronto para speckit.tasks.
+
+**Arquivos modificados/criados**:
+- `.specify/features/001-enterprise-chatwoot-migration/plan.md`
+- `.specify/features/001-enterprise-chatwoot-migration/research.md`
+- `.specify/features/001-enterprise-chatwoot-migration/data-model.md`
+- `.specify/features/001-enterprise-chatwoot-migration/contracts/cli-contract.md`
+- `.specify/features/001-enterprise-chatwoot-migration/quickstart.md`
+
+**Commits**:
+- `f8a39f1` — feat(spec): pre-spec analysis, constitution, clarify e spec.md concluidos (28 files)
+- `6a7d8c8` — feat(plan): speckit.plan concluido — artefatos de design gerados (6 files)
+
+**Status**: ✅ Completo
+
+---
+
+### Session End — Encerramento 2026-04-09
+
+**17:00 — ✅ Completo**
+
+**Objetivo**: Encerrar sessão com documentação finalizada
+
+**Resumo dos commits**:
+- `f8a39f1` — feat(spec): 28 arquivos — pre-spec, constitution, clarify, spec.md
+- `6a7d8c8` — feat(plan): 6 arquivos — plan, research, data-model, cli-contract, quickstart
+
+**Pendências para próxima sessão**:
+- D2: destino final de `chatwoot_dev1_db` pós-migração (decisão do owner — não bloqueante)
+- `speckit.tasks`: geração de tasks de implementação (próximo passo imediato)
+
+**Status**: ✅ Sessão encerrada
+
+---

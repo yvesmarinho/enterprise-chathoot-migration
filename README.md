@@ -1,10 +1,10 @@
-# Enterprise Chathoot Migration
+# Enterprise Chatwoot Migration
 
-> Projeto para migração de dados entre versões diferentes do Chatwoot
+> Migração por merge de dados entre instâncias do Chatwoot com deduplicação por chave de negócio
 
 **Domínio**: programming | **Linguagem**: python
 **Criado em**: 2026-04-09T11:37:54Z
-**Repositório**: [git@github.com:yvesmarinho/enterprise-chathoot-migration.git](git@github.com:yvesmarinho/enterprise-chathoot-migration.git)
+**Repositório**: [git@github.com:yvesmarinho/enterprise-chatwoot-migration.git](git@github.com:yvesmarinho/enterprise-chatwoot-migration.git)
 
 ---
 
@@ -211,3 +211,118 @@ Formato de cada linha:
 ```json
 {"phase": "conversations", "id": "38733", "reason": "server closed the connection..."}
 ```
+
+---
+
+## ⚠️ Mudança de Estratégia — 2026-04-10
+
+**Descoberta**: existem registros sobrepostos entre `chatwoot_dev1_db` e `chatwoot004_dev1_db`.
+
+A estratégia de migração do projeto enterprise (`src/`) passa de **incremental pura** (offset de IDs)
+para **merge** (deduplicação por chave de negócio + remapeamento apenas para registros realmente novos).
+
+| Abordagem anterior | Nova abordagem |
+|--------------------|----------------|
+| Assume dados completamente distintos entre bancos | Assume possível sobreposição |
+| Insere todos os registros com `id = id_origem + offset` | Verifica chave de negócio antes de inserir |
+| Sem resolução de conflito | Política de conflito por entidade (skip / merge / origem-vence) |
+
+**Impacto**: spec.md, plan.md e tasks.md do feature `001-enterprise-chatwoot-migration`
+precisam ser revisados após debate D3 (ver `.specify/memory/constitution.md`).
+
+Os scripts `app/` (caminho `01_migrar_account.py`) já implementam merge por `src_id` e
+servem como referência de lógica de deduplicação por entidade.
+
+---
+
+## ✅ Validação de Migração (Pós-Migração)
+
+### Fluxo de Validação Implementado — 2026-04-29
+
+Após a migração bem-sucedida de 5 accounts, foi implementado um processo de validação completo que combina verificação no banco de dados e via API REST.
+
+#### Scripts de Validação
+
+| Script | Função |
+|--------|--------|
+| `.tmp/testar_autenticacao_api.py` | Testa autenticação da API sem expor credenciais |
+| `.tmp/gerar_novo_token.py` | Gera token de API válido no banco DEST |
+| `.tmp/identificar_accounts_migrados.py` | Identifica accounts com conversations migradas |
+| `.tmp/18_validacao_multi_account.py` | **Script principal** — valida 100 registros por account |
+| `.tmp/analise_inboxes_vya.py` | Analisa inboxes e identifica remapeamentos de IDs |
+
+#### Processo de Validação
+
+```bash
+# 1. Validar autenticação da API (lê token de .secrets/generate_erd.json)
+python3 .tmp/testar_autenticacao_api.py
+
+# 2. Se token inválido, gerar novo token
+python3 .tmp/gerar_novo_token.py
+# Atualizar .secrets/generate_erd.json com o token gerado
+
+# 3. Identificar accounts migrados
+python3 .tmp/identificar_accounts_migrados.py
+
+# 4. Executar validação completa (500 registros totais)
+python3 .tmp/18_validacao_multi_account.py
+```
+
+#### Metodologia de Validação
+
+Para cada account migrado:
+1. **Amostragem aleatória**: 100 conversations do SOURCE
+2. **Validação no banco DEST**: Busca por `display_id` + `account_id`
+3. **Validação via API**: `GET /api/v1/accounts/{id}/conversations/{display_id}`
+4. **Processamento em lotes**: 20 registros por vez com rate limiting (100ms)
+5. **Registro completo**: JSON com todos os resultados e falhas
+
+#### Resultados (2026-04-29)
+
+**Validação de 500 registros (100 por account)**:
+
+| Account | SOURCE→DEST | Amostra | DEST | API | Status |
+|---------|-------------|---------|------|-----|--------|
+| Vya Digital | 1→1 | 100 | 4% | 4% | ⚠️ MERGE (DEST tinha dados pré-existentes) |
+| Sol Copernico | 4→44 | 100 | 97% | 97% | ✅ Sucesso |
+| Unimed Poços PJ | 17→17 | 100 | 100% | 100% | ✅ Perfeito |
+| Unimed Poços PF | 18→45 | 100 | 99% | 99% | ✅ Sucesso |
+| Unimed Guaxupé | 25→46 | 100 | 100% | 100% | ✅ Perfeito |
+| **TOTAL** | - | **500** | **80%** | **80%** | ✅ **Validado** |
+
+**Observações**:
+- **Vya Digital (4%)**: Resultado esperado para estratégia MERGE. O DEST já possuía 378 conversations de outras fontes (687 total vs. 309 do SOURCE). Validação manual via frontend confirmou 7 caixas de entrada corretas.
+- **4 accounts ≥97%**: Migração validada com alta taxa de sucesso.
+- **API funcionando**: Token gerado dinamicamente e validado com sucesso.
+
+#### Documentação Completa
+
+Consulte a documentação detalhada da validação:
+- **Relatório executivo**: [`docs/SESSIONS/2026-04-29/RELATORIO_VALIDACAO_MIGRACAO.md`](docs/SESSIONS/2026-04-29/RELATORIO_VALIDACAO_MIGRACAO.md)
+- **Guia técnico de alterações**: [`docs/SESSIONS/2026-04-29/GUIA_ALTERACOES_TECNICAS.md`](docs/SESSIONS/2026-04-29/GUIA_ALTERACOES_TECNICAS.md)
+
+#### Boas Práticas Identificadas
+
+1. **Segurança**: NUNCA expor credenciais em linha de comando
+   - ✅ Usar scripts Python que leem de `.secrets/generate_erd.json`
+   - ❌ Evitar `curl -H "api_access_token: [EXPOSTO]"`
+
+2. **Validação dupla**: Banco + API
+   - Banco: confirma migração física
+   - API: confirma visibilidade de negócio
+
+3. **Amostragem**: 100 registros aleatórios por account é suficiente
+   - Detecta padrões sistêmicos
+   - Falhas concentradas indicam problema específico
+
+4. **Estratégias de migração**:
+   - **FULL**: Migração completa (threshold ≥95%)
+   - **MERGE**: Mesclar com dados existentes (threshold ≥80%)
+   - Documentar estratégia usada por account
+
+#### Próximos Passos Recomendados
+
+- [ ] Investigar Vya Digital: determinar critérios de filtro (4% encontrados)
+- [ ] Automatizar validação: integrar ao pipeline de migração
+- [ ] Implementar testes: pytest com thresholds configuráveis por estratégia
+- [ ] Criar dashboard: visualização de métricas de validação

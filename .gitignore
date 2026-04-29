@@ -1,3 +1,6 @@
+# Logs de execução da migração (não versionar)
+.tmp/
+
 # Segredos e credenciais
 .secrets/
 *.key
@@ -52,3 +55,4 @@ Thumbs.db
 *.log
 logs/
 !scripts/logs/.gitkeep
+tmp/

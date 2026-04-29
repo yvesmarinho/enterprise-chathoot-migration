@@ -288,13 +288,13 @@ Remover arquivos temporários gerados durante a sessão:
 # Verificar o que será removido (dry run)
 ./scripts/cleanup-tmp.sh --dry-run
 
-# Limpar tmp/ (preserva tmp/README.md)
+# Limpar .tmp/ (preserva .gitkeep)
 ./scripts/cleanup-tmp.sh --verbose
 ```
 
 **O script remove**:
-- Todos os arquivos em `tmp/` exceto `README.md`
-- Todos os subdiretórios em `tmp/`
+- Todos os arquivos em `.tmp/` exceto `.gitkeep`
+- Todos os subdiretórios em `.tmp/`
 
 **Quando NÃO limpar**:
 - Se há arquivos temporários que serão usados na próxima sessão imediata
@@ -311,7 +311,7 @@ Remover arquivos temporários gerados durante a sessão:
 - [ ] `docs/INDEX.md` atualizado (se novos arquivos criados)
 
 ### Limpeza
-- [ ] `./scripts/cleanup-tmp.sh` executado (ou motivo documentado para não executar)
+- [ ] `./scripts/cleanup-tmp.sh --verbose` executado sobre `.tmp/` (ou motivo documentado para não executar)
 
 ### Qualidade
 - [ ] Testes passando (se código foi modificado)
