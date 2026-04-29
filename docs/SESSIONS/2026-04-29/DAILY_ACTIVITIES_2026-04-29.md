@@ -211,4 +211,52 @@
 
 ---
 
+### Correção de Nome do Projeto
+
+**11:45-11:50 — ✅ Completo**
+
+**Objetivo**: Corrigir typo no nome do projeto de "chathoot" para "chatwoot" em todos os arquivos
+
+**Contexto**: Usuário renomeou repositório e pasta do projeto para refletir o nome correto da plataforma Chatwoot
+
+**Passos executados**:
+1. **Busca de ocorrências**: grep_search encontrou 60 ocorrências de "chathoot"
+2. **Substituição em código e configuração**:
+   - main.py, pyproject.toml, Makefile
+   - .copilot-rules-*, .github/copilot-instructions.md
+   - SECURITY.md, .scaffold-state.yaml
+   - test/conftest.py, docker/* (3 arquivos)
+   - uv.lock
+
+3. **Substituição em documentação**:
+   - README.md, docs/INDEX.md, docs/TODO.md, docs/TODAY_ACTIVITIES.md
+   - docs/PROJECT_CREATION_SUMMARY.md
+   - docs/SESSIONS/* (múltiplas sessões)
+   - docs/debates/* (D5, D11, D13)
+   - .specify/features/*/quickstart.md
+
+4. **Substituição em massa**: sed -i para arquivos restantes (.md, .sql)
+
+5. **Renomeação de arquivo**:
+   - `.copilot-rules-enterprise-chathoot-migration.md` → `.copilot-rules-enterprise-chatwoot-migration.md`
+
+6. **Commits**:
+   - Commit 1 (157c864): 37 arquivos alterados (210 inserções, 141 deleções)
+   - Commit 2 (aa1549a): renomeação do arquivo de regras
+   - Push para origin/001-enterprise-chatwoot-migration
+
+**Resultado**:
+- ✅ 0 ocorrências de "chathoot" restantes
+- ✅ Nome correto em todos os arquivos: "enterprise-chatwoot-migration"
+- ✅ Arquivo .copilot-rules renomeado
+- ✅ Commits criados e pushed
+
+**Arquivos modificados**: 37 (+ 1 renomeado)
+**Commits**: 2
+**Branch atualizado**: 001-enterprise-chatwoot-migration
+
+**Status**: ✅ Completo
+
+---
+
 *Sessão ativa. Documentação incremental em andamento.*
