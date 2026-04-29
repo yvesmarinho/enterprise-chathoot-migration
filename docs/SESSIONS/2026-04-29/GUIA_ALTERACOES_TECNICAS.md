@@ -1,6 +1,6 @@
 # Guia de Alterações Técnicas — Migração Chatwoot
-**Data**: 2026-04-29  
-**Objetivo**: Documentar alterações necessárias para otimizar processo de migração  
+**Data**: 2026-04-29
+**Objetivo**: Documentar alterações necessárias para otimizar processo de migração
 
 ---
 
@@ -13,48 +13,48 @@
 **Adicionar método**:
 ```python
 def validate_migration(
-    self, 
-    account_id_source: int, 
+    self,
+    account_id_source: int,
     account_id_dest: int,
     sample_size: int = 100
 ) -> dict:
     """Valida migração com amostragem aleatória.
-    
+
     Args:
         account_id_source: ID do account no SOURCE
         account_id_dest: ID do account no DEST (pode ser diferente)
         sample_size: Número de registros para amostrar
-        
+
     Returns:
         Dict com estatísticas de validação
     """
     from sqlalchemy import text
     import random
-    
+
     # Coletar IDs do SOURCE
     query_src = text("""
-        SELECT id, display_id 
-        FROM conversations 
+        SELECT id, display_id
+        FROM conversations
         WHERE account_id = :account_id
         ORDER BY RANDOM()
         LIMIT :limit
     """)
-    
+
     with self.source_conn.execute(
-        query_src, 
+        query_src,
         {"account_id": account_id_source, "limit": sample_size}
     ) as result:
         source_samples = [(row[0], row[1]) for row in result.fetchall()]
-    
+
     # Validar no DEST
     found = 0
     not_found = []
-    
+
     query_dest = text("""
         SELECT id FROM conversations
         WHERE display_id = :display_id AND account_id = :account_id
     """)
-    
+
     for src_id, display_id in source_samples:
         with self.dest_conn.execute(
             query_dest,
@@ -64,7 +64,7 @@ def validate_migration(
                 found += 1
             else:
                 not_found.append(display_id)
-    
+
     return {
         "total_sampled": len(source_samples),
         "found": found,
@@ -117,29 +117,29 @@ def migrate(
     **kwargs
 ) -> dict:
     """Executa migração com estratégia especificada.
-    
+
     Args:
         account_id_source: ID no SOURCE
         account_id_dest: ID no DEST
         strategy: FULL, MERGE ou INCREMENTAL
         **kwargs: Parâmetros adicionais (ex: date_from para INCREMENTAL)
-        
+
     Returns:
         Dict com estatísticas de migração
     """
     logger.info(f"Iniciando migração {strategy.value} para account {account_id_source}")
-    
+
     if strategy == MigrationStrategy.MERGE:
         # Verificar registros existentes no DEST
         existing_ids = self._get_existing_display_ids(account_id_dest)
         logger.info(f"DEST já possui {len(existing_ids)} conversations")
-        
+
     elif strategy == MigrationStrategy.INCREMENTAL:
         last_migration_date = kwargs.get("date_from")
         if not last_migration_date:
             raise ValueError("INCREMENTAL requires 'date_from' parameter")
         logger.info(f"Migrando apenas após {last_migration_date}")
-    
+
     # ... resto da lógica de migração
 ```
 
@@ -148,13 +148,13 @@ def migrate(
 def _get_existing_display_ids(self, account_id: int) -> set[int]:
     """Retorna set de display_ids já presentes no DEST."""
     from sqlalchemy import text
-    
+
     query = text("""
-        SELECT DISTINCT display_id 
-        FROM conversations 
+        SELECT DISTINCT display_id
+        FROM conversations
         WHERE account_id = :account_id
     """)
-    
+
     with self.dest_conn.execute(query, {"account_id": account_id}) as result:
         return {row[0] for row in result.fetchall()}
 ```
@@ -189,13 +189,13 @@ class MigrationFailure:
 
 class MigrationLogger:
     """Logger com suporte a registro estruturado de falhas."""
-    
+
     def __init__(self, log_dir: Path):
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.failures: list[MigrationFailure] = []
         self.logger = logging.getLogger(__name__)
-    
+
     def log_failure(
         self,
         account_id_source: int,
@@ -220,37 +220,37 @@ class MigrationLogger:
             context=context
         )
         self.failures.append(failure)
-        
+
         self.logger.warning(
             f"Migration failure: {entity_type} id={entity_id_source} "
             f"(display_id={display_id}) - {error_type}: {error_message}"
         )
-    
+
     def save_failures(self, filename: str = None):
         """Salva falhas em JSON."""
         if not self.failures:
             self.logger.info("Nenhuma falha registrada")
             return
-        
+
         if filename is None:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"migration_failures_{ts}.json"
-        
+
         filepath = self.log_dir / filename
-        
+
         data = {
             "total_failures": len(self.failures),
             "by_type": self._group_by_type(),
             "failures": [asdict(f) for f in self.failures]
         }
-        
+
         filepath.write_text(
             json.dumps(data, indent=2, ensure_ascii=False),
             encoding="utf-8"
         )
-        
+
         self.logger.info(f"Falhas salvas em: {filepath}")
-    
+
     def _group_by_type(self) -> dict[str, int]:
         """Agrupa falhas por tipo de erro."""
         result = {}
@@ -267,7 +267,7 @@ class ConversationMigrator:
     def __init__(self, ...):
         # ...
         self.mig_logger = MigrationLogger(Path("logs/migration"))
-    
+
     def migrate_conversation(self, conv_id: int):
         try:
             # ... lógica de migração
@@ -284,7 +284,7 @@ class ConversationMigrator:
                 context={"inbox_id": conv_data.get("inbox_id")}
             )
             raise
-    
+
     def finalize(self):
         """Ao final da migração."""
         self.mig_logger.save_failures()
@@ -314,7 +314,7 @@ accounts:
       inboxes: [3, 7, 32, 34, 39, 53, 84, 85, 89, 103, 122, 123, 125]
       date_from: null  # "2024-01-01" para incremental
       status: null     # [0, 1, 2] para filtrar por status
-    
+
   sol_copernico:
     source_id: 4
     dest_id: 44
@@ -323,7 +323,7 @@ accounts:
       enabled: true
       sample_size: 100
       threshold: 95
-    
+
   unimed_pocos_pj:
     source_id: 17
     dest_id: 17
@@ -332,7 +332,7 @@ accounts:
       enabled: true
       sample_size: 100
       threshold: 95
-  
+
   unimed_pocos_pf:
     source_id: 18
     dest_id: 45
@@ -341,7 +341,7 @@ accounts:
       enabled: true
       sample_size: 100
       threshold: 95
-  
+
   unimed_guaxupe:
     source_id: 25
     dest_id: 46
@@ -357,11 +357,11 @@ general:
   rate_limit_ms: 0  # 0 = sem rate limit
   parallel_workers: 4
   dry_run: false
-  
+
   # Retry logic
   max_retries: 3
   retry_delay_s: 5
-  
+
   # Logs
   log_level: INFO
   log_dir: logs/migration
@@ -388,7 +388,7 @@ class MigrationConfig:
     def __init__(self, config_file: Path):
         with open(config_file) as f:
             self.data = yaml.safe_load(f)
-    
+
     def get_account_config(self, account_key: str) -> AccountConfig:
         """Retorna configuração de um account."""
         acc = self.data["accounts"][account_key]
@@ -435,7 +435,7 @@ LIMIT 100;
 
 ```sql
 -- Verificar se migração filtrou por data
-SELECT 
+SELECT
     DATE_TRUNC('month', created_at) as mes,
     COUNT(*) as total
 FROM conversations
@@ -444,7 +444,7 @@ GROUP BY mes
 ORDER BY mes DESC;
 
 -- Comparar com DEST
-SELECT 
+SELECT
     DATE_TRUNC('month', created_at) as mes,
     COUNT(*) as total
 FROM chatwoot004_dev1_db.conversations
@@ -457,7 +457,7 @@ ORDER BY mes DESC;
 
 ```sql
 -- Display_ids duplicados no DEST (indicam merge com dados existentes)
-SELECT 
+SELECT
     display_id,
     COUNT(*) as duplicatas,
     ARRAY_AGG(id) as conversation_ids,
@@ -473,7 +473,7 @@ ORDER BY duplicatas DESC;
 
 ```sql
 -- Conversations com inbox_id inválido
-SELECT 
+SELECT
     c.id,
     c.display_id,
     c.inbox_id,
@@ -483,7 +483,7 @@ LEFT JOIN inboxes i ON i.id = c.inbox_id AND i.account_id = c.account_id
 WHERE c.account_id = 1 AND i.id IS NULL;
 
 -- Conversations com contact_id inválido
-SELECT 
+SELECT
     c.id,
     c.display_id,
     c.contact_id,
@@ -525,52 +525,52 @@ def get_missing_display_ids(
     account_id_dest: int
 ) -> list[int]:
     """Retorna display_ids do SOURCE ausentes no DEST."""
-    
+
     # SOURCE
     query_src = text("""
-        SELECT DISTINCT display_id 
-        FROM conversations 
+        SELECT DISTINCT display_id
+        FROM conversations
         WHERE account_id = :account_id
     """)
     source_ids = {
-        row[0] for row in 
+        row[0] for row in
         source_conn.execute(query_src, {"account_id": account_id_source})
     }
-    
+
     # DEST
     query_dest = text("""
-        SELECT DISTINCT display_id 
-        FROM conversations 
+        SELECT DISTINCT display_id
+        FROM conversations
         WHERE account_id = :account_id
     """)
     dest_ids = {
-        row[0] for row in 
+        row[0] for row in
         dest_conn.execute(query_dest, {"account_id": account_id_dest})
     }
-    
+
     missing = source_ids - dest_ids
     return sorted(missing)
 
 def main():
     account_id_source = 1
     account_id_dest = 1
-    
+
     factory = ConnectionFactory()
     source_engine = factory.create_source_engine()
     dest_engine = factory.create_dest_engine()
-    
+
     with source_engine.connect() as src, dest_engine.connect() as dst:
         missing = get_missing_display_ids(src, dst, account_id_source, account_id_dest)
-        
+
         log.info(f"Encontrados {len(missing)} display_ids ausentes")
-        
+
         if not missing:
             log.info("Nenhuma conversation faltando. Migração completa!")
             return 0
-        
+
         # Re-migrar
         migrator = ConversationMigrator(src, dst)
-        
+
         for display_id in missing:
             try:
                 # Buscar conversation original
@@ -583,7 +583,7 @@ def main():
                     "display_id": display_id
                 })
                 row = result.fetchone()
-                
+
                 if row:
                     conv_id = row[0]
                     migrator.migrate_single_conversation(
@@ -593,13 +593,13 @@ def main():
                     log.info(f"✓ Re-migrado: display_id={display_id}")
                 else:
                     log.warning(f"✗ Não encontrado no SOURCE: display_id={display_id}")
-                    
+
             except Exception as e:
                 log.error(f"✗ Erro ao migrar display_id={display_id}: {e}")
-        
+
         dst.commit()
         log.info(f"Re-migração concluída. Tentou migrar {len(missing)} conversations")
-    
+
     return 0
 
 if __name__ == "__main__":
@@ -622,30 +622,30 @@ from src.validation.migration_validator import MigrationValidator
 def test_validation_vya_digital(source_conn, dest_conn, api_config):
     """Testa validação do account Vya Digital."""
     validator = MigrationValidator(source_conn, dest_conn, api_config)
-    
+
     result = validator.validate_account(
         account_id_source=1,
         account_id_dest=1,
         sample_size=100
     )
-    
+
     # Para MERGE, aceitar threshold menor
     assert result["success_rate"] >= 80, \
         f"Taxa de sucesso abaixo do esperado: {result['success_rate']}%"
-    
+
     assert result["api_success_rate"] >= 80, \
         f"API success rate abaixo do esperado: {result['api_success_rate']}%"
 
 def test_validation_full_migration(source_conn, dest_conn, api_config):
     """Testa validação de migração completa (Sol Copernico)."""
     validator = MigrationValidator(source_conn, dest_conn, api_config)
-    
+
     result = validator.validate_account(
         account_id_source=4,
         account_id_dest=44,
         sample_size=100
     )
-    
+
     # Para FULL migration, exigir threshold alto
     assert result["success_rate"] >= 95, \
         f"Taxa de sucesso abaixo do esperado: {result['success_rate']}%"
@@ -718,6 +718,6 @@ README.md                       # Documentar novos scripts
 
 ---
 
-**Documento gerado**: 2026-04-29  
-**Próxima revisão**: Após implementação das alterações  
+**Documento gerado**: 2026-04-29
+**Próxima revisão**: Após implementação das alterações
 **Responsável**: Equipe de engenharia + DevOps

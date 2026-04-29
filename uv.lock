@@ -244,7 +244,7 @@ wheels = [
 ]
 
 [[package]]
-name = "enterprise-chathoot-migration"
+name = "enterprise-chatwoot-migration"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

@@ -1,14 +1,14 @@
 # Relatório de Validação de Migração — Enterprise Chatwoot
-**Data**: 2026-04-29  
-**Projeto**: enterprise-chathoot-migration  
-**Execução**: Validação automatizada multi-account  
+**Data**: 2026-04-29
+**Projeto**: enterprise-chatwoot-migration
+**Execução**: Validação automatizada multi-account
 
 ---
 
 ## Sumário Executivo
 
-**Validação realizada**: 500 registros (100 por account) em 5 accounts migrados  
-**Taxa de sucesso geral**: 80% (400/500 encontrados no DEST e visíveis via API)  
+**Validação realizada**: 500 registros (100 por account) em 5 accounts migrados
+**Taxa de sucesso geral**: 80% (400/500 encontrados no DEST e visíveis via API)
 **Tempo de execução**: ~14 minutos (com rate limiting de 100ms por request)
 
 ### Status por Account
@@ -258,7 +258,7 @@ curl -H "api_access_token: [EXPOSTO]" https://...
 #### A. Verificar Critérios de Filtro de Migração
 ```sql
 -- Identificar se houve filtro por data, status ou inbox
-SELECT 
+SELECT
     DATE(created_at) as data,
     COUNT(*) as total
 FROM conversations
@@ -289,7 +289,7 @@ FROM conversations WHERE account_id = 1;
 #### C. Análise de Conversations Pré-existentes
 ```sql
 -- DEST: Identificar origem dos 378 registros extras
-SELECT 
+SELECT
     i.name as inbox_name,
     COUNT(*) as conv_count,
     MIN(c.created_at) as primeira,
@@ -387,7 +387,7 @@ account_migration:
     dest_account_id: 1
     expected_dest_total: ">= SOURCE" # DEST pode ter mais
     validation_threshold: 80%  # Menor para MERGE
-    
+
   sol_copernico:
     strategy: FULL_MIGRATION
     source_account_id: 4
@@ -499,6 +499,6 @@ Tempo execução:     ~14 minutos
 
 ---
 
-**Relatório gerado**: 2026-04-29  
-**Autor**: Sistema automatizado de validação  
+**Relatório gerado**: 2026-04-29
+**Autor**: Sistema automatizado de validação
 **Revisão necessária**: Equipe de operações + DBA

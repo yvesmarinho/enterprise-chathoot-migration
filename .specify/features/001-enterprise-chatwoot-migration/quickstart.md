@@ -19,7 +19,7 @@
 
 ```bash
 # 1. Clonar e entrar no diretório
-cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chathoot-migration
+cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chatwoot-migration
 
 # 2. Instalar dependências
 uv sync

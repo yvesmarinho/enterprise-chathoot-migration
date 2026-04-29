@@ -196,7 +196,7 @@
 **Resultado**:
 - ✅ README.md atualizado com fluxo de trabalho validado
 - ✅ Commit criado e pushed: 0491822
-- ✅ PR #3 criado: https://github.com/yvesmarinho/enterprise-chathoot-migration/pull/3
+- ✅ PR #3 criado: https://github.com/yvesmarinho/enterprise-chatwoot-migration/pull/3
 - ✅ Branch pronta para revisão e merge
 
 **Arquivos atualizados**:

@@ -1,6 +1,6 @@
 # 📋 Daily Activities — 2026-04-27
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: SESSION-11
 
@@ -71,3 +71,17 @@
 - `13_migrar_inbox_members.py` precisa ser adaptado (sem migration_state)
 - Outros 4 accounts: Sol Copernico (4), Unimed Poços PJ (17), Unimed Poços PF (18), Unimed Guaxupé (25)
 - D12-P1-1 a P1-5 — verificações pré-liberação
+
+---
+
+## Bloco 6 — 14:00 — Início Sessão 12
+
+**Atividade**: Inicialização de sessão recorrente (/session-start).
+
+**Contexto recuperado**:
+- Sessão 11 encerrada com pipeline Vya Digital completo (fases 0-5), infra Docker criada
+- HEAD: `b3804b5` — working tree limpo
+- `inbox_members` permanece bloqueado (sem `migration_state`)
+- 4 outros accounts aguardam validação de Vya Digital
+
+**Status**: ✅ Sessão 12 iniciada. Aguardando direcionamento de trabalho.

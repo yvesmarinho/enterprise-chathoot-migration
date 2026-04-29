@@ -1,6 +1,6 @@
 # 📅 Atividades Diárias — 2026-04-24
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: SESSION-2026-04-24 (Sessão 10)
 

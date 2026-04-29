@@ -1,6 +1,6 @@
-# 📚 Índice — Enterprise Chathoot Migration
+# 📚 Índice — Enterprise Chatwoot Migration
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
 **Last Updated**: 2026-04-24 (encerramento Sessão 10 — D11 container DB corrigido, 309 convs migradas para account_id=1, BUG-06 corrigido em `app/01_migrar_account.py`. Sessão 11 pendente: resequenciar sequences + inbox_members + outros 4 accounts)
 **Last Session**: 2026-04-24 (Sessão 10 — container `chat-vya-digital` recriado, migração Vya Digital 309 convs + 13.164 msgs, BUG-06 diagnosticado e corrigido)

@@ -1,7 +1,7 @@
-# 📅 Atividades — Enterprise Chathoot Migration
+# 📅 Atividades — Enterprise Chatwoot Migration
 
 **Data**: 2026-04-24
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Status**: 🟡 ENCERRADA — Sessão 10 concluída (fases 0-4 ✅ | sequences pendentes)
 
@@ -127,7 +127,7 @@
 # 📅 Atividades — 2026-04-10
 
 **Data**: 2026-04-10
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Status**: ✅ Sessão encerrada
 
@@ -213,7 +213,7 @@
 # 📅 Atividades — 2026-04-13
 
 **Data**: 2026-04-13
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Status**: ✅ Sessão encerrada
 

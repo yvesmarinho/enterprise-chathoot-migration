@@ -1,4 +1,4 @@
-# 📝 TODO — Enterprise Chathoot Migration
+# 📝 TODO — Enterprise Chatwoot Migration
 
 **Last Updated**: 2026-04-27 — Sessão 11: pipeline Vya Digital re-executado do zero (banco restaurado). Sequences resequenciadas. Infra Docker criada (docker/). Migração reportada como bem-sucedida pela equipe ops — aguardando validação formal.
 **Status**: 🟡 EM ANDAMENTO — Vya Digital migrado ✅ aguardando validação ops | inbox_members pendente | outros 4 accounts pendentes

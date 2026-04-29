@@ -25,7 +25,7 @@ SCRIPT="${SCRIPT:-}"
 cd /app
 
 echo "========================================================"
-echo "  enterprise-chathoot-migration — Docker Runner"
+echo "  enterprise-chatwoot-migration — Docker Runner"
 echo "  ACCOUNT      : ${ACCOUNT_NAME}"
 echo "  ALL_ACCOUNTS : ${ALL_ACCOUNTS}"
 echo "  DRY_RUN      : ${DRY_RUN}"

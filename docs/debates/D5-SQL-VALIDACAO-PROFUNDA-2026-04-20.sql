@@ -1,6 +1,6 @@
 -- =============================================================================
 -- D5 — SQL de Validação Profunda de Dados Migrados
--- Projeto: enterprise-chathoot-migration
+-- Projeto: enterprise-chatwoot-migration
 -- Data:    2026-04-20
 -- Autor:   @dba-sql-expert
 --

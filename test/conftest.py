@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for enterprise-chathoot-migration tests.
+"""Shared pytest fixtures for enterprise-chatwoot-migration tests.
 
 :description: Provides mock DB engines, connections, and secrets loader stubs
     used across unit and integration test suites.

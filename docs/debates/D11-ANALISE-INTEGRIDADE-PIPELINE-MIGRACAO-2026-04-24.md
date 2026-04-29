@@ -851,5 +851,5 @@ ORDER BY account_id, name;
 
 ---
 
-*Este documento é de uso interno do projeto `enterprise-chathoot-migration`.  
+*Este documento é de uso interno do projeto `enterprise-chatwoot-migration`.  
 Não contém código SQL executável — apenas documentação de análise e recomendações.*

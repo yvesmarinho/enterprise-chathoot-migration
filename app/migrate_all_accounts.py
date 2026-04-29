@@ -41,6 +41,8 @@ def _fmt_elapsed(seconds: float) -> str:
     if m:
         return f"{m}m {sec}s"
     return f"{sec}s"
+
+
 _TS = datetime.now().strftime("%Y%m%d_%H%M%S")
 _OUT = _ROOT / ".tmp" / f"migrate_all_{_TS}.json"
 

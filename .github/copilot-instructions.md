@@ -4,9 +4,9 @@ applyTo: "**"
 
 # GitHub Copilot — Instruções do Projeto
 
-**Projeto**: `enterprise-chathoot-migration` — Enterprise Chathoot Migration
+**Projeto**: `enterprise-chatwoot-migration` — Enterprise Chatwoot Migration
 **Domínio**: programming | **Linguagem**: python
-**Regras completas**: `.copilot-rules-enterprise-chathoot-migration.md`
+**Regras completas**: `.copilot-rules-enterprise-chatwoot-migration.md`
 **Rituais de sessão**: `.github/prompts/session-start.prompt.md` | `session-end.prompt.md`
 **Domain Profile ativo**: `.github/prompts/domain/devops-programming.prompt.md`
 
@@ -123,7 +123,7 @@ Motivo: [explicação]
 Correto: [alternativa válida]
 ```
 
-*Gerado por scaffold.py em 2026-04-09T11:37:54Z — Projeto: enterprise-chathoot-migration*
+*Gerado por scaffold.py em 2026-04-09T11:37:54Z — Projeto: enterprise-chatwoot-migration*
 
 ## Active Technologies
 - Python 3.12+ + SQLAlchemy 2.0.49 (Core + ORM), psycopg2-binary 2.9.11, alembic 1.18.4 (referência), ruff 0.15.10, black 26.3.1, pytest 9.0.3, pytest-cov (001-enterprise-chatwoot-migration)

@@ -522,4 +522,4 @@ O código de migração está bem estruturado, com boas práticas de idempotênc
 
 ---
 
-*Documento gerado em 2026-04-24 a partir das análises individuais de DBA & SQL Expert (D11), Python Expert e Chatwoot Expert (D12) no projeto enterprise-chathoot-migration.*
+*Documento gerado em 2026-04-24 a partir das análises individuais de DBA & SQL Expert (D11), Python Expert e Chatwoot Expert (D12) no projeto enterprise-chatwoot-migration.*

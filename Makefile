@@ -1,4 +1,4 @@
-# Makefile — Enterprise Chathoot Migration
+# Makefile — Enterprise Chatwoot Migration
 # Gerado por scaffold.py em 2026-04-09T11:37:54Z
 
 .PHONY: help init dev build test lint format clean

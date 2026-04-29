@@ -2,7 +2,7 @@
 
 **Data**: 2026-04-24
 **Status**: ✅ RESOLVIDO — Causa raiz identificada
-**Autor**: enterprise-chathoot-migration / session-10
+**Autor**: enterprise-chatwoot-migration / session-10
 
 ---
 

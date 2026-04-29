@@ -1,6 +1,6 @@
 # 📋 Session Report — 2026-04-09
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Data**: 2026-04-09
 **Tipo**: Primeira sessão (pós-scaffold)
 **Agente**: Session Manager v1.2.0
@@ -10,7 +10,7 @@
 
 ## Resumo da Sessão
 
-Primeira sessão de trabalho do projeto `enterprise-chathoot-migration`. O projeto foi
+Primeira sessão de trabalho do projeto `enterprise-chatwoot-migration`. O projeto foi
 scaffolded em 2026-04-09T11:37:54Z via `uv run scripts/scaffold.py`. Esta sessão tem foco
 em inicialização: recuperação de contexto, validação de estrutura e definição das próximas
 atividades técnicas.
@@ -23,7 +23,7 @@ atividades técnicas.
 |------|--------|
 | **Commit base** | `ac7983d` — scaffold inicial (`scaffold-v1.0.0`) |
 | **Branch** | `master` |
-| **Remote** | `git@github.com:yvesmarinho/enterprise-chathoot-migration.git` |
+| **Remote** | `git@github.com:yvesmarinho/enterprise-chatwoot-migration.git` |
 | **Arquivos não rastreados** | `.scaffold-state.yaml` |
 | **Python environment** | A configurar (`pyproject.toml` presente) |
 | **Tests** | Nenhum implementado ainda |

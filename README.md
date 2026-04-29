@@ -1,10 +1,10 @@
-# Enterprise Chathoot Migration
+# Enterprise Chatwoot Migration
 
 > Migração por merge de dados entre instâncias do Chatwoot com deduplicação por chave de negócio
 
 **Domínio**: programming | **Linguagem**: python
 **Criado em**: 2026-04-09T11:37:54Z
-**Repositório**: [git@github.com:yvesmarinho/enterprise-chathoot-migration.git](git@github.com:yvesmarinho/enterprise-chathoot-migration.git)
+**Repositório**: [git@github.com:yvesmarinho/enterprise-chatwoot-migration.git](git@github.com:yvesmarinho/enterprise-chatwoot-migration.git)
 
 ---
 

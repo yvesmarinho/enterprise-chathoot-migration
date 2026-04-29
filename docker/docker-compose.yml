@@ -1,4 +1,4 @@
-# docker-compose.yml — enterprise-chathoot-migration
+# docker-compose.yml — enterprise-chatwoot-migration
 #
 # Execução em wfdb01 (próximo ao wfdb02 onde ficam os bancos de dados).
 # Os segredos ficam no host e são montados read-only no container.

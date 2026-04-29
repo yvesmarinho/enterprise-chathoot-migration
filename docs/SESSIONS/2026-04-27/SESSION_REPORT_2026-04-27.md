@@ -1,6 +1,6 @@
 # 📑 Session Report — 2026-04-27 (Sessão 11)
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: SESSION-11
 **Período**: ~09:08 → ~11:57

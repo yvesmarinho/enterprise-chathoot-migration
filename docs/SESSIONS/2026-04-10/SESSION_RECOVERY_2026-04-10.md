@@ -1,6 +1,6 @@
 # 🔄 Session Recovery — 2026-04-10
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Data**: 2026-04-10
 **Recuperado de**: Sessão 2026-04-09
 **Branch**: `001-enterprise-chatwoot-migration`

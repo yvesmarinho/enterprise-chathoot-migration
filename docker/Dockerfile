@@ -1,5 +1,5 @@
 # ============================================================
-# Dockerfile — enterprise-chathoot-migration
+# Dockerfile — enterprise-chatwoot-migration
 # Executa o pipeline de migração perto do banco (wfdb01 → wfdb02)
 # ============================================================
 FROM python:3.12-slim

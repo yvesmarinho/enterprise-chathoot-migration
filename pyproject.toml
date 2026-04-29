@@ -1,5 +1,5 @@
 [project]
-name = "enterprise-chathoot-migration"
+name = "enterprise-chatwoot-migration"
 version = "0.1.0"
 description = "Incremental idempotent migration from chatwoot_dev1_db to chatwoot004_dev1_db"
 readme = "README.md"

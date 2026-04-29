@@ -78,7 +78,7 @@
 ### Setup para retomar
 ```bash
 # Verificar estado do DEST
-cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chathoot-migration
+cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chatwoot-migration
 git log --oneline -5
 
 # Validar API (precisa token admin)

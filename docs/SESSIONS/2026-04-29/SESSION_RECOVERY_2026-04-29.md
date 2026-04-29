@@ -161,7 +161,7 @@ Untracked files:
 
 ```bash
 # Navegar para projeto
-cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chathoot-migration
+cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chatwoot-migration
 
 # Verificar estado git
 git status

@@ -1,6 +1,6 @@
 # 🏁 Final Status — Sessão 10 — 2026-04-24
 
-**Projeto**: `enterprise-chathoot-migration`
+**Projeto**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Sessão**: SESSION-2026-04-24 (Sessão 10)
 **Status de Encerramento**: 🟡 PARCIAL — Migração fases 0-4 executadas com sucesso; resequenciar sequences pendente (BUG-06 corrigido)

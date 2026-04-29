@@ -31,7 +31,7 @@
 | P0: Git commit com arquivo de mensagem (≥6 linhas) | ✅ |
 | P1: Docs de sessão em `docs/SESSIONS/YYYY-MM-DD/` | ✅ |
 
-Arquivos de regras: `.copilot-rules-enterprise-chathoot-migration.md` | `.github/copilot-instructions.md`
+Arquivos de regras: `.copilot-rules-enterprise-chatwoot-migration.md` | `.github/copilot-instructions.md`
 
 ---
 
@@ -97,5 +97,5 @@ fffb059 add tmp folder to gitignore
 ```
 ✅ Contexto recuperado. Última sessão: 2026-04-20.
 Itens pendentes de alta prioridade (P0): D5-B2, D5-B3, D5-C1.
-Regras ativas carregadas: .copilot-rules-enterprise-chathoot-migration.md
+Regras ativas carregadas: .copilot-rules-enterprise-chatwoot-migration.md
 ```

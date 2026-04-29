@@ -1,7 +1,7 @@
 # 🔍 Session Recovery — 2026-04-13
 
 **Recovered from**: Sessão 2026-04-10 (commit `0f34d32`)
-**Project**: `enterprise-chathoot-migration`
+**Project**: `enterprise-chatwoot-migration`
 **Branch**: `001-enterprise-chatwoot-migration`
 **Recovery time**: 2026-04-13T10:53:00Z
 
