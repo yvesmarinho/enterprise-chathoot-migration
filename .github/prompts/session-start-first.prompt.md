@@ -31,6 +31,34 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ---
 
+### Passo 1.1 — Criar Ambiente Virtual (projetos Python)
+
+**Para projetos Python-based**, criar ambiente virtual usando `uv`:
+
+```bash
+# Criar ambiente virtual com uv
+uv venv
+
+# Ativar ambiente virtual
+source .venv/bin/activate  # Linux/Mac
+# ou .venv\Scripts\activate  # Windows
+
+# Instalar dependências do projeto
+uv pip install -e ".[dev,security]"
+
+# Verificar instalação
+uv pip list
+```
+
+**Verificar que `.venv/` está no `.gitignore`**:
+```bash
+grep -q ".venv" .gitignore && echo "✅ .venv ignorado pelo Git" || echo "❌ ADICIONAR .venv ao .gitignore"
+```
+
+**Nota**: O `uv` gerencia dependências de forma mais eficiente que pip tradicional. Para projetos que já têm `pyproject.toml`, o comando `uv sync` pode ser usado como alternativa a `uv pip install -e .`.
+
+---
+
 ### Passo 2 — Verificar Configuração MCP
 
 **Ação do agente**: ler `.vscode/mcp.json` e confirmar que os servidores `memory` e `sequential-thinking` estão configurados e **não comentados**.
@@ -41,7 +69,25 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Se o `.vscode/mcp.json` ainda não existir (projeto zerado), será criado pelo `scaffold.py` no Passo 4.
 
-> Para verificar se os servidores estão *em execução*: `Command Palette → "MCP: List Servers"` (ação manual do usuário). Se não aparecerem: `Command Palette → "MCP: Refresh Servers"`.
+**⚠️ IMPORTANTE — Ação Manual do Usuário Necessária:**
+
+Após o scaffold, os servidores MCP estão **configurados** mas **não iniciados**. O usuário DEVE executar:
+
+1. `Command Palette → "MCP: Refresh Servers"` — inicializar servidores
+2. `Command Palette → "MCP: List Servers"` — verificar que aparecem 4 servidores
+
+**Instrução ao usuário**:
+```
+⚠️  MCP servers configurados mas não iniciados.
+
+AÇÃO NECESSÁRIA (manual):
+  1. Abra Command Palette (Ctrl+Shift+P ou Cmd+Shift+P)
+  2. Digite "MCP: Refresh Servers"
+  3. Aguarde inicialização (~10 segundos)
+  4. Verifique com "MCP: List Servers"
+
+Esperado: 4 servidores ativos (memory, sequential-thinking, filesystem, github)
+```
 
 ---
 
@@ -173,7 +219,66 @@ Verificar também:
 
 ---
 
-### Passo 8 — Criar Documentação Inicial de Sessão
+### Passo 8 — Inicializar Sistemas de Rastreamento
+
+**Ação do agente**: Inicializar session-index e session-time após scaffold.
+
+#### 8.1 — Inicializar Session Index
+
+```bash
+# Criar database SQLite para busca em sessões
+python scripts/session-index.py --rebuild
+```
+
+**Resultado esperado**: `.session-index/index.db` criado (~50KB)
+
+#### 8.2 — Inicializar Session Time Tracker
+
+```bash
+# Criar arquivo CSV de histórico de tempo
+python scripts/session-time-tracker.py start
+python scripts/session-time-tracker.py stop
+```
+
+**Resultado esperado**: `.session-time/history.csv` criado com header
+
+#### 8.3 — Verificar Sistemas Ativos
+
+```bash
+# Verificar que arquivos foram criados
+ls -lh .session-index/index.db .session-time/history.csv
+```
+
+**Resultado esperado**:
+```
+✅ .session-index/index.db presente (~50KB)
+✅ .session-time/history.csv presente (~200 bytes)
+```
+
+#### 8.4 — Inicializar Memory System
+
+```bash
+# Criar estrutura .memory/ com diretórios e templates
+python scripts/create_memory_structure.py
+```
+
+**Resultado esperado**:
+- `.memory/index/.gitignore` criado
+- `.memory/memories/project/` criado
+- `.memory/memories/team/` criado
+- `.memory/memories/sessions/` criado
+- `.memory/memories/.templates/` criado
+- `.memory/memories/.templates/example_decision.md` criado
+
+**Verificar estrutura criada**:
+```bash
+ls -la .memory/index/
+ls -la .memory/memories/
+```
+
+---
+
+### Passo 9 — Criar Documentação Inicial de Sessão
 
 Criar pasta e arquivos da primeira sessão:
 
@@ -187,7 +292,7 @@ Atualizar `docs/TODO.md` com os primeiros itens de trabalho identificados.
 
 ---
 
-### Passo 9 — Declarar Domínio e Objetivo
+### Passo 10 — Declarar Domínio e Objetivo
 
 ```
 Modo: [PROGRAMMING | INFRASTRUCTURE | ANALYSIS]
@@ -206,6 +311,7 @@ Carregar Domain Profile correspondente:
 ## ✅ Checklist de Primeira Sessão
 
 - [ ] Pré-requisitos: `uv`, `git`, `python3 ≥3.10` presentes
+- [ ] **Ambiente virtual Python criado**: `uv venv` + `.venv/` no `.gitignore` (projetos Python)
 - [ ] MCP verificado (ou será criado pelo scaffold)
 - [ ] `scaffold.py` executado com sucesso
 - [ ] Estrutura de diretórios criada
@@ -216,6 +322,10 @@ Carregar Domain Profile correspondente:
 - [ ] `git push -u origin main` executado
 - [ ] `.copilot-rules.md` e `.copilot-rules-[projeto].md` lidos
 - [ ] Scan de segurança: 🟢 LIMPO
+- [ ] **Session-index inicializado**: `.session-index/index.db` criado
+- [ ] **Session-time inicializado**: `.session-time/history.csv` criado
+- [ ] **Memory system inicializado**: `.memory/memories/` structure criada
+- [ ] **MCP servers iniciados**: usuário executou "MCP: Refresh Servers" (ação manual)
 - [ ] `docs/SESSIONS/[data]/` criada com SESSION_RECOVERY + DAILY_ACTIVITIES
 - [ ] `docs/TODO.md` com primeiros itens
 - [ ] Domínio declarado + Domain Profile carregado

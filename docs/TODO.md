@@ -1,7 +1,58 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-04-27 — Sessão 11: pipeline Vya Digital re-executado do zero (banco restaurado). Sequences resequenciadas. Infra Docker criada (docker/). Migração reportada como bem-sucedida pela equipe ops — aguardando validação formal.
-**Status**: 🟡 EM ANDAMENTO — Vya Digital migrado ✅ aguardando validação ops | inbox_members pendente | outros 4 accounts pendentes
+**Last Updated**: 2026-05-13 — Sessão 13: D15-T1 EXECUTADO → Taxa de sucesso é temporal (98% recente vs 26% aleatório). Unimed Guaxupé SEM attachments migrados.
+**Status**: 🔴 BLOQUEADOR — Validação de attachments S3: depende de policy de retenção (recente=98% OK, histórico=26% falha). Unimed Guaxupé não migrou attachments (0 de 1.847).
+
+---
+
+## 🔴 D15 — DESCOBERTA CRÍTICA: Migração S3 Incompleta
+
+> Origem: [D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md](debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md)
+
+### P0 — Investigação Imediata (Sessão 13)
+
+- [x] **D15-T1** ✅ Análise temporal: correlacionar `created_at` com taxa de sucesso/falha
+  **RESULTADO**: Taxa de sucesso é **98% para recentes** (2025-2026) vs **26% para aleatórios** (mix 2020-2026).
+  **CONCLUSÃO**: Arquivos antigos foram deletados do S3 ou nunca existiram. Arquivos recentes existem e são acessíveis.
+  **ARTEFATO**: `.tmp/validacao_attachments_s3_20260513_120012.json` (100 recentes, 98 OK, 2 fail)
+
+- [ ] **D15-T1.1** 🆕 Investigar por que Unimed Guaxupé NÃO tem attachments no DEST
+  **DESCOBERTA**: SOURCE (account_id=25) tem 1.847 attachments, DEST (account_id=46) tem 0.
+  **EVIDÊNCIA**: `.tmp/verificar_source_guaxupe.py` — 1.837 attachments com blob S3 válido no SOURCE.
+  **AÇÕES**:
+  - [ ] Verificar logs de migração do account 25 → 46
+  - [ ] Verificar se migration script `01_migrar_account.py` inclui attachments
+  - [ ] Decidir se é necessário re-executar migração de attachments para este account
+
+- [ ] **D15-T2** Identificar bucket SOURCE correto
+  - Consultar ops: qual bucket `chat.vya.digital` usa?
+  - Testar blob_keys contra buckets candidatos
+  - Verificar `config/storage.yml` no ambiente SOURCE
+
+- [ ] **D15-T3** Contar attachments órfãos no SOURCE
+  ```sql
+  SELECT COUNT(*) FROM attachments att
+  LEFT JOIN messages m ON m.id = att.message_id
+  WHERE att.account_id = 17 AND m.id IS NULL;
+  ```
+
+### P1 — Decisões de Negócio (Próxima Sessão)
+
+- [ ] **D15-B** Decisão: Ampliar escopo para migração S3 ou aceitar 26% de cobertura?
+  - Opção 1: Aceitar como está (validação de metadados apenas)
+  - Opção 2: Implementar fase 6 — Sync S3-to-S3
+  - Opção 3: Investigar mais antes de decidir ✅ (recomendado)
+
+- [ ] **D15-C** Definir taxa de sucesso aceitável para homologação
+  - Consultar stakeholders sobre impacto de 74% de attachments com 404
+  - Avaliar métricas de negócio: acesso a attachments, NPS, custo S3
+
+### P2 — Implementação (Se D15-B = Opção 2)
+
+- [ ] **D15-IMPL-1** Implementar sync S3-to-S3 (boto3 ou aws-cli)
+- [ ] **D15-IMPL-2** Testar sync com account menor (ex: Sol Copernico)
+- [ ] **D15-IMPL-3** Executar sync completo para todos os accounts migrados
+- [ ] **D15-IMPL-4** Re-validar com `19_validar_attachments_s3.py`
 
 ---
 

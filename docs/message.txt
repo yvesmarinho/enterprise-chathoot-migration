@@ -1,0 +1,76 @@
+SELECT 
+    c.account_id,
+    a.name AS account_name,
+    c.inbox_id,
+    i.name AS inbox_name,
+    c.team_id AS team_id,
+    t.name AS team_name,
+    c.assignee_id AS assignee_id,
+    u.name AS user_name,
+    u.email AS user_email,
+    ct.name AS contact_name,
+    ct.email AS contact_email,
+    ct.phone_number AS contact_phone_number,
+    i.channel_type,
+    c.id AS conversation_id,
+    c.display_id AS conversation_display,
+    CASE 
+        WHEN c.status = 0 THEN 'Open' 
+        WHEN c.status = 1 THEN 'Closed' 
+        WHEN c.status = 2 THEN 'Pending' 
+        ELSE NULL 
+    END AS conversation_status,
+    (
+        SELECT string_agg(DISTINCT tg.name, ' | ') 
+        FROM taggings tgs 
+        JOIN tags tg ON tg.id = tgs.tag_id 
+        WHERE tgs.taggable_id = c.id 
+          AND tgs.taggable_type = 'Conversation' 
+          AND tgs.context = 'labels'
+    ) AS labels,
+    (c.created_at AT TIME ZONE 'America/Sao_Paulo' - INTERVAL '3 hours') AS conversation_created_at,
+    (m.created_at AT TIME ZONE 'America/Sao_Paulo' - INTERVAL '3 hours') AS message_created_at,
+    m.id AS message_id,
+    CASE 
+        WHEN m.message_type = 0 THEN 'Incoming' 
+        WHEN m.message_type = 1 THEN 'Outgoing' 
+        WHEN m.message_type = 2 THEN 'Action' 
+        WHEN m.message_type = 3 THEN 'Automatic' 
+        ELSE NULL 
+    END AS message_type, 
+    m.private AS message_private,
+    m.content AS message_content,
+    CASE 
+        WHEN (att.id IS NULL) THEN false 
+        ELSE true 
+    END AS has_attachment,
+    att.id AS attachment_id,
+    ast.id AS storage_attachment_id,
+    asb.id AS blob_id,
+    asb.key AS blob_key,
+    asb.filename,
+    asb.content_type,
+    CASE 
+        WHEN (asb.key IS NOT NULL) THEN CONCAT('https://assets-chat-vya-digital.s3.amazonaws.com/', asb.key) 
+        ELSE NULL 
+    END AS attachment_link 
+
+FROM conversations c
+INNER JOIN accounts a ON a.id = c.account_id
+INNER JOIN inboxes i ON i.account_id = c.account_id AND i.id = c.inbox_id
+LEFT JOIN contacts ct ON ct.account_id = c.account_id AND ct.id = c.contact_id
+LEFT JOIN messages m ON m.account_id = c.account_id AND m.conversation_id = c.id
+LEFT JOIN attachments att ON att.account_id = m.account_id AND att.message_id = m.id
+LEFT JOIN active_storage_attachments ast ON att.id = ast.record_id
+LEFT JOIN active_storage_blobs asb ON asb.id = ast.blob_id
+LEFT JOIN users u ON u.id = c.assignee_id
+LEFT JOIN teams t ON t.id = c.team_id
+
+WHERE c.account_id = 1 -- Substituir por $accountId
+  AND DATE(m.created_at) BETWEEN '2023-01-01' AND '2023-12-31' -- Substituir por $dateInit e $dateFinish
+  -- AND i.id = 5 -- Descomentar se houver $inboxId
+
+ORDER BY c.id ASC, m.id ASC
+
+-- Paginação (Exemplo para $page=1, $itens=20)
+LIMIT 20 OFFSET 0;

@@ -136,3 +136,8 @@ Correto: [alternativa válida]
 - 001-enterprise-chatwoot-migration (2026-04-22): ARQUITETURA CORRIGIDA: SOURCE DB=chatwoot_dev1_db (site: chat.vya.digital); DEST DB=chatwoot004_dev1_db (site: vya-chat-dev.vya.digital). synchat.vya.digital = site de produção separado — NÃO é o site DEST. chatwoot004_dev1_db foi clonado de synchat em fase anterior, mas o site de destino da migração é exclusivamente vya-chat-dev.vya.digital. API SOURCE=chat.vya.digital; API DEST=vya-chat-dev.vya.digital. D7 debate revisado com migration gap confirmado.
 - 001-enterprise-chatwoot-migration (2026-04-24): D11 CAUSA RAIZ ENCONTRADA: container vya-chat-dev.vya.digital aponta para chatwoot004_dev_db (ERRADO) — não para chatwoot004_dev1_db (correto). Evidência: API /profile retorna account_id=44, que existe em chatwoot004_dev_db mas NÃO em chatwoot004_dev1_db. chatwoot004_dev_db tem 18 inboxes account_id=1 (igual ao retornado pela API); chatwoot004_dev1_db tem 31 (13 migrados). Ação necessária: reiniciar o container (o .env já está correto com POSTGRES_DATABASE=chatwoot004_dev1_db — processo ainda usa config antiga).
 - 001-enterprise-chatwoot-migration (2026-04-24): FATO CONFIRMADO: admin@vya.digital é administrador global em TODAS as instâncias Chatwoot (não apenas no banco destino). Isso elimina definitivamente H2/H3 em qualquer análise de visibilidade. Não usar presença/ausência do admin como discriminante entre instâncias.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

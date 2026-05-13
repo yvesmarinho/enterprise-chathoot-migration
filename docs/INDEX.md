@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-04-24 (encerramento Sessão 10 — D11 container DB corrigido, 309 convs migradas para account_id=1, BUG-06 corrigido em `app/01_migrar_account.py`. Sessão 11 pendente: resequenciar sequences + inbox_members + outros 4 accounts)
-**Last Session**: 2026-04-24 (Sessão 10 — container `chat-vya-digital` recriado, migração Vya Digital 309 convs + 13.164 msgs, BUG-06 diagnosticado e corrigido)
+**Last Updated**: 2026-05-13 (encerramento Sessão 13 — D15 descoberta crítica: migração S3 incompleta, 74% attachments HTTP 404)
+**Last Session**: 2026-05-13 (Sessão 13 — Validação attachments S3, descoberta crítica: metadados migrados ✅ mas arquivos físicos S3 74% ausentes)
 
 ---
 
@@ -61,6 +61,7 @@ SESSIONS/
 | [debates/D5-REVISAO-METODO-VALIDACAO-2026-04-21.md](debates/D5-REVISAO-METODO-VALIDACAO-2026-04-21.md) | Revisão do método de validação API — D5 (2026-04-21) |
 | [debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md](debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md) | D6 — Arquitetura de validação por hash MD5 + BKs + resultados finais |
 | [debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md](debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md) | D7 — Visibilidade Marcus pós-migração — causa: display_id resequenciado (BUG-04) |
+| [debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md](debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md) | **D15 — CRÍTICO** — Migração S3 incompleta: 74% attachments HTTP 404, metadados OK mas arquivos físicos ausentes |
 
 ## Scripts de Relatório (reutilizáveis)
 

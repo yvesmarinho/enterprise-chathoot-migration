@@ -18,18 +18,31 @@ Invoke this agent when:
 - Need to recover context from previous sessions
 - Organizing project structure and documentation
 - Validating security and credential protection
+- Pausing work for breaks (coffee, lunch, meetings)
+- Resuming work after breaks
 
-**Trigger phrases:**
+**Trigger phrases (English):**
 - `/session-start` or `/start-session`
 - `/init-session` or `/begin-work`
 - `/recover-context`
 - `/first-time-setup`
 - `/session-end` or `/end-session`
+- `/pause-work` or `/take-break` (for time tracking pause)
+- `/resume-work` or `/back-to-work` (for time tracking resume)
+
+**Trigger phrases (Português/Brasil):**
+- `/iniciar-sessao` ou `/comecar-sessao`
+- `/inicio-sessao` ou `/comecar-trabalho`
+- `/recuperar-contexto`
+- `/configuracao-inicial`
+- `/encerrar-sessao` ou `/fim-sessao`
+- `/pausar-trabalho` ou `/pausa` (para pausar time tracking)
+- `/retomar-trabalho` ou `/voltar` (para retomar time tracking)
 
 ## Core Responsibilities
 
 ### 1. Session Initialization
-- Validate and configure MCP servers (`memory`, `sequential-thinking`)
+- Validate and configure MCP servers (`memory`, `sequential-thinking`, `filesystem`, `github`)
 - Recover context from previous sessions (README, INDEX, TODO, session documents)
 - Load project rules from `.copilot-rules.md` and `.copilot-*` files incrementally
 - Create session documentation structure (`docs/SESSIONS/YYYY-MM-DD/`)
@@ -46,13 +59,20 @@ Invoke this agent when:
 - Maintain incremental documentation (append-only, never overwrite)
 - Validate project structure consistency
 
-### 4. First-Time Setup (when applicable)
+### 4. Time Tracking
+- Start time tracking at session initialization
+- Support pause/resume for breaks (café, almoço, etc.)
+- Stop tracking and save metrics at session end
+- Generate CSV with session duration, pauses, and net work time
+- Integration: `scripts/session-time-tracker.py`
+
+### 5. First-Time Setup (when applicable)
 - Generate initial project documentation (README, INDEX, TODO)
 - Create session directories: `docs/SESSIONS/YYYY-MM-DD/`
 - Generate session files: `DAILY_ACTIVITIES_*.md`, `SESSION_REPORT_*.md`, `FINAL_STATUS_*.md`
 - Create GitHub branch for current work
 
-### 5. Session End & Closure
+### 6. Session End & Closure
 - Update all session documentation with final state
 - Validate and update project rules if needed
 - Perform final security scan
@@ -109,8 +129,9 @@ Invoke this agent when:
 
 1. **Validate MCP Configuration**
    - Read `.vscode/mcp.json`
-   - Ensure `memory` and `sequential-thinking` servers are configured
+   - Ensure `memory`, `sequential-thinking`, `filesystem`, and `github` servers are configured
    - Report status: `✅ MCP Config OK` or suggest fixes
+   - Note: `github` server requires `GITHUB_PERSONAL_ACCESS_TOKEN` env var (optional)
 
 2. **Load Project Rules**
    - Read `.copilot-rules.md` (base rules - Layer 1)
@@ -144,10 +165,17 @@ Invoke this agent when:
      - `DAILY_ACTIVITIES_[date].md` (incremental log)
      - `SESSION_REPORT_[date].md` (incremental reports)
 
-7. **Ready for Work**
+7. **Start Time Tracking**
+   - Execute: `python scripts/session-time-tracker.py start`
+   - Confirm tracking started: `✅ Sessão iniciada: [timestamp]`
+   - Inform user about pause/resume commands
+   - Time tracking runs in background (state in `.session-time/current.json`)
+
+8. **Ready for Work**
    - Display pending P0/P1 tasks from TODO
    - Request work mode: PROGRAMMING | INFRASTRUCTURE | ANALYSIS
    - Load appropriate domain profile
+   - Remind: Use `/pause` for breaks (coffee, lunch)
 
 ### First-Time Session Setup
 
@@ -178,6 +206,41 @@ Invoke this agent when:
 6. **Load Rules** (same as recurring)
 
 7. **Create Initial Session Docs** (same as recurring)
+
+### During Session - Pause/Resume Workflow
+
+**When to Pause:**
+- Coffee break (5-15 min)
+- Lunch break (30-60 min)
+- Meetings
+- Any interruption that stops active work
+
+**Pause Work** (trigger: `/pausar-trabalho`, `/pause-work`, `/pausa`)
+
+1. **Pause Time Tracking**
+   - Execute: `python scripts/session-time-tracker.py pause "[reason]"`
+   - Reasons: "café", "almoço", "reunião", "break", "meeting"
+   - Confirm pause: `⏸️  Sessão pausada: [timestamp]`
+   - Example: `python scripts/session-time-tracker.py pause "café"`
+
+2. **Save Current Work** (optional but recommended)
+   - Stage uncommitted changes: `git add .`
+   - Create WIP commit: `git commit -m "wip: pausing for [reason]"`
+   - Allows safe context switch
+
+**Resume Work** (trigger: `/retomar-trabalho`, `/resume-work`, `/voltar`)
+
+1. **Resume Time Tracking**
+   - Execute: `python scripts/session-time-tracker.py resume`
+   - Confirm resume: `▶️  Sessão retomada: [timestamp]`
+   - Display pause duration: `Pausa: HH:MM:SS ([reason])`
+
+2. **Recover Context**
+   - Review last commit/changes
+   - Check TODO for next task
+   - Continue work from where paused
+
+**Note**: Multiple pauses are tracked automatically. Each pause is recorded with duration and reason in the session CSV.
 
 ### Session End Workflow
 
@@ -241,7 +304,23 @@ Invoke this agent when:
    - Use Python stdlib (shutil, pathlib) with logging
    - Execute via `mcp_pylance_mcp_s_pylanceRunCodeSnippet`
 
-7. **Git Repository Update**
+7. **Stop Time Tracking**
+   - Execute: `python scripts/session-time-tracker.py stop`
+   - Capture metrics:
+     - Total duration (wall time)
+     - Pause duration (breaks)
+     - Net duration (actual work time)
+     - Number of pauses
+   - Add time metrics to session documentation:
+     ```markdown
+     ## Session Metrics
+     - **Total Duration**: HH:MM:SS
+     - **Breaks**: HH:MM:SS (N pauses)
+     - **Net Work Time**: HH:MM:SS
+     ```
+   - CSV auto-saved to `.session-time/history.csv`
+
+8. **Git Repository Update**
    - Stage all documentation updates: `git add docs/`
    - Create commit message file with detailed session summary:
      ```
@@ -263,7 +342,7 @@ Invoke this agent when:
    - Push to remote (D-17: mandatory): `git push origin [branch]`
    - If push fails, rebase and retry: `git pull --rebase origin [branch]` then `git push`
 
-8. **Session Closure Report**
+9. **Session Closure Report**
    - Display summary:
      ```
      🏁 Session YYYY-MM-DD Closed
@@ -273,6 +352,11 @@ Invoke this agent when:
         - SESSION_REPORT: [N] decisions documented
         - FINAL_STATUS: Ready for recovery
         - README/INDEX/TODO: Updated
+
+     ⏱️  Time Metrics:
+        - Total: HH:MM:SS
+        - Breaks: HH:MM:SS ([N] pauses)
+        - Net Work: HH:MM:SS
 
      ✅ Security: 🟢 LIMPO
      ✅ Organization: [N] files organized
@@ -409,7 +493,10 @@ This agent works well with:
 
 ```
 User: /session-start
-Agent: [Executes full recurring session workflow]
+Agent: [Executes full recurring session workflow including time tracker start]
+
+User: /iniciar-sessao
+Agent: [Same as above - Portuguese trigger]
 
 User: /first-time-setup
 Agent: [Executes first-time initialization workflow]
@@ -420,11 +507,126 @@ Agent: [Loads previous session state and reports pending tasks]
 User: /security-scan
 Agent: [Performs credential and sensitive file scan only]
 
+User: /pausar-trabalho café
+Agent: [Pauses time tracking with reason "café", safe to take break]
+
+User: /retomar-trabalho
+Agent: [Resumes time tracking, displays pause duration]
+
 User: /session-end
-Agent: [Executes full session closure workflow with documentation updates]
+Agent: [Executes full session closure workflow with time metrics]
+
+User: /encerrar-sessao
+Agent: [Same as above - Portuguese trigger]
+```
+
+## Complete Workflow Example with Time Tracking
+
+**Morning Session Start (09:00):**
+```bash
+User: /iniciar-sessao
+
+Agent:
+✅ MCP Config OK (memory, sequential-thinking active)
+✅ Security Scan: 🟢 LIMPO
+✅ Git Status: branch 060-feature, 2 commits ahead
+✅ Context Recovered: 3 P1 tasks pending
+✅ Session Docs Created: docs/SESSIONS/2026-05-11/
+✅ Time Tracking Started: 09:00:15 UTC
+
+📋 Pending Tasks:
+- [P1] Implement feature X
+- [P1] Update documentation
+- [P2] Refactor module Y
+
+Ready to work. Mode: PROGRAMMING
+```
+
+**Coffee Break (10:30):**
+```bash
+User: /pausa café
+
+Agent:
+⏸️  Time Tracking Paused: 10:30:42 UTC
+   Reason: café
+   Work time so far: 01:30:27
+
+Safe to take a break. Use /voltar when ready.
+```
+
+**Resume Work (10:45):**
+```bash
+User: /voltar
+
+Agent:
+▶️  Time Tracking Resumed: 10:45:18 UTC
+   Break duration: 00:14:36 (café)
+
+Context: Working on feature X implementation
+Next: Complete unit tests
+```
+
+**Lunch Break (12:00):**
+```bash
+User: /pausar-trabalho almoço
+
+Agent:
+⏸️  Time Tracking Paused: 12:00:03 UTC
+   Reason: almoço
+   Work time: 02:45:12 | Breaks: 00:14:36
+```
+
+**Afternoon Session (13:30):**
+```bash
+User: /retomar-trabalho
+
+Agent:
+▶️  Time Tracking Resumed: 13:30:22 UTC
+   Break duration: 01:30:19 (almoço)
+   Total breaks today: 01:44:55 (2 pauses)
+```
+
+**End of Day (17:00):**
+```bash
+User: /encerrar-sessao
+
+Agent:
+📝 Finalizing documentation...
+✅ DAILY_ACTIVITIES: 4 activities logged
+✅ SESSION_REPORT: 2 features implemented
+✅ Security: 🟢 LIMPO
+
+⏱️  Time Tracking Stopped: 17:00:45 UTC
+
+Session Metrics:
+- Total Duration: 08:00:30
+- Breaks: 01:44:55 (2 pauses: café 00:14:36, almoço 01:30:19)
+- Net Work Time: 06:15:35
+
+✅ CSV saved: .session-time/history.csv
+✅ Git commit: docs(sessão): encerramento 2026-05-11
+✅ Pushed to origin/060-feature
+
+🏁 Session 2026-05-11 Closed - Ready for next session
+```
+
+**View Statistics (anytime):**
+```bash
+User: Mostrar estatísticas de tempo da última semana
+
+Agent executes: python scripts/session-time-tracker.py stats
+
+📊 Estatísticas de Sessões — Last 5 days
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Data       Total    Pausas   Líquido  #Pausas
+2026-05-11 08:00:30 01:44:55 06:15:35   2
+2026-05-10 07:30:00 01:30:00 06:00:00   2
+2026-05-09 08:15:20 02:00:00 06:15:20   3
 ```
 
 ## Version History
 
+- **1.3.0** (2026-05-11): Integrated time tracking system with pause/resume workflow and bilingual commands
+- **1.2.0** (2026-05-11): Added Portuguese/Brasil trigger phrases for accessibility
 - **1.1.0** (2026-03-20): Added session end workflow with documentation updates, security scan, and git commit automation
 - **1.0.0** (2026-03-20): Initial agent creation with full session management workflow

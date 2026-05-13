@@ -1,6 +1,6 @@
 scaffold_version: 1.0.0
-created_at: '2026-04-09T11:37:54Z'
-updated_at: '2026-04-09T11:38:44Z'
+created_at: "2026-04-09T11:37:54Z"
+updated_at: "2026-04-09T11:38:44Z"
 project:
   name: enterprise-chatwoot-migration
   title: Enterprise Chatwoot Migration
