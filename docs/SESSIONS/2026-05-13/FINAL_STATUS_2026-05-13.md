@@ -215,6 +215,19 @@ python3 .tmp/19_validar_attachments_s3.py  # alterar ACCOUNT_ID=46 antes
 
 ---
 
+## 🧹 Limpeza de Temporários
+
+**⚠️ .tmp/ NÃO foi limpo nesta sessão**
+
+**Motivo**: Arquivos serão reutilizados na Sessão 14:
+- `validacao_attachments_s3_20260513_120012.json` — 98% sucesso (baseline temporal)
+- `19_validar_attachments_s3.py` — Script reutilizável para outros accounts
+- Outros 4 JSONs de validação (análise temporal)
+
+**Ação para Sessão 14**: Limpar .tmp/ APÓS conclusão das investigações D15-T1.1, D15-T2, D15-T3.
+
+---
+
 **Status Final**: 🟡 **PARCIALMENTE BLOQUEADO**  
 **Próxima Sessão**: Investigação D15-T1.1 + Decisão D15-B  
 **Prioridade**: 🔴 CRÍTICA — Impacto direto em homologação de produção
