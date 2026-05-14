@@ -1,5 +1,5 @@
 [project]
-name = "enterprise-chatwoot-migration"
+name = "enterprise_chatwoot_migration"
 version = "0.1.0"
 description = "Incremental idempotent migration from chatwoot_dev1_db to chatwoot004_dev1_db"
 readme = "README.md"
@@ -10,6 +10,9 @@ dependencies = [
     "alembic==1.18.4",
     "pandas>=2.2.0",
     "requests>=2.33.1",
+    "isort>=8.0.1",
+    "pylance>=6.0.0",
+    "black>=26.3.1",
 ]
 
 [project.optional-dependencies]

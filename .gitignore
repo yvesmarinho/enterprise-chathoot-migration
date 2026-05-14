@@ -55,4 +55,4 @@ Thumbs.db
 *.log
 logs/
 !scripts/logs/.gitkeep
-tmp/
+.tmp/

@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-13 (encerramento Sessão 13 — D15 descoberta crítica: migração S3 incompleta, 74% attachments HTTP 404)
-**Last Session**: 2026-05-13 (Sessão 13 — Validação attachments S3, descoberta crítica: metadados migrados ✅ mas arquivos físicos S3 74% ausentes)
+**Last Updated**: 2026-05-14 (Sessão 14 — Criado CLI check_s3_attachments.py, organizado .tmp/ → docs/evidencias/)
+**Last Session**: 2026-05-14 (Sessão 14 — Ferramental S3: utilitário CLI para validação de attachments, evidências organizadas)
 
 ---
 
@@ -48,7 +48,22 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-04-24.md
     ├── SESSION_REPORT_2026-04-24.md
     └── FINAL_STATUS_2026-04-24.md
+├── 2026-05-13/           ← Sessão 13: D15 — Descoberta crítica: migração S3 incompleta (98% recentes OK, 26% histórico falha)
+│   ├── SESSION_RECOVERY_2026-05-13.md
+│   ├── DAILY_ACTIVITIES_2026-05-13.md
+│   └── FINAL_STATUS_2026-05-13.md
+└── 2026-05-14/           ← Sessão 14: Ferramental S3 — criado CLI check_s3_attachments.py, organizado .tmp/ → docs/evidencias/
+    ├── SESSION_RECOVERY_2026-05-14.md
+    └── DAILY_ACTIVITIES_2026-05-14.md
 ```
+
+## Evidências de Validação S3
+
+| Arquivo | Descrição |
+|---------|-----------|
+| [`evidencias/validacao_attachments_s3_20260513_120012.json`](evidencias/validacao_attachments_s3_20260513_120012.json) | **CRÍTICO** — 100 attachments recentes (2025-2026): 98 OK, 2 fail (98% success rate) |
+| [`evidencias/validacao_attachments_s3_20260513_*.json`](evidencias/) | Validações históricas Session 13: 26% success rate (aleatórios 2020-2026) |
+| [`evidencias/check_s3_attachments_20260514_*.json`](evidencias/) | Validações Session 14: account 1 (100% success), account 46 (0 attachments) |
 
 ## Debates e Decisões
 
@@ -67,6 +82,7 @@ SESSIONS/
 
 | Script | Descrição | Uso |
 |--------|-----------|-----|
+| [`scripts/check_s3_attachments.py`](../scripts/check_s3_attachments.py) | **NOVO** — CLI para validar acessibilidade de attachments S3 via HTTP (conexão via .secrets, relatório JSON detalhado) | `uv run python scripts/check_s3_attachments.py --instance chatwoot004_dev --account-id 1 --limit 100 --date-start 2025-01-01 --date-end 2025-12-31` |
 | [`scripts/reports/relatorio_qualidade_source.py`](../scripts/reports/relatorio_qualidade_source.py) | Qualidade dos dados do SOURCE (6 blocos) | `python3 scripts/reports/relatorio_qualidade_source.py` |
 | [`scripts/reports/relatorio_qualidade_dest.py`](../scripts/reports/relatorio_qualidade_dest.py) | Qualidade dos dados do DEST (7 blocos) | `python3 scripts/reports/relatorio_qualidade_dest.py` |
 | [`scripts/reports/relatorio_qualidade_migracao.py`](../scripts/reports/relatorio_qualidade_migracao.py) | Comparativo SOURCE vs DEST: cobertura, gaps, integridade | `python3 scripts/reports/relatorio_qualidade_migracao.py` |

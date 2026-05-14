@@ -1,0 +1,148 @@
+ uv run python scripts/check_s3_attachments.py --instance chat-vya-digital --account-id 25 --date-start 2026-01-01 --date-end 2026-05-13
+2026-05-14 09:32:34 [INFO] ================================================================================
+2026-05-14 09:32:34 [INFO] CHECK S3 ATTACHMENTS — Validação de Acessibilidade
+2026-05-14 09:32:34 [INFO] ================================================================================
+2026-05-14 09:32:34 [INFO] Instância: chat-vya-digital
+2026-05-14 09:32:34 [INFO] Account ID: 25
+2026-05-14 09:32:34 [INFO] Limit: 100 | Offset: 0
+2026-05-14 09:32:34 [INFO] Date Range: 2026-01-01 → 2026-05-13
+2026-05-14 09:32:34 [INFO]
+2026-05-14 09:32:34 [INFO] 1/5 — Carregando configuração de conexão...
+2026-05-14 09:32:34 [INFO] ✅ Configuração carregada: chatwoot_db @ wfdb02.vya.digital
+2026-05-14 09:32:34 [INFO]
+2026-05-14 09:32:34 [INFO] 2/5 — Criando engine de conexão...
+2026-05-14 09:32:34 [INFO] Conectando a: postgresql://migration_user:***@wfdb02.vya.digital:5432/chatwoot_db
+2026-05-14 09:32:37 [INFO] ✅ Conexão estabelecida
+2026-05-14 09:32:37 [INFO]
+2026-05-14 09:32:37 [INFO] 3/5 — Buscando estatísticas da account...
+2026-05-14 09:32:38 [INFO] 📊 Account: Unimed Guaxupé (ID 25)
+2026-05-14 09:32:38 [INFO] 📊 Total attachments: 1930
+2026-05-14 09:32:38 [INFO] 📊 Total com blob S3: 1919
+2026-05-14 09:32:38 [INFO]
+2026-05-14 09:32:38 [INFO] 4/5 — Buscando attachments do banco de dados...
+2026-05-14 09:32:40 [INFO] ✅ 100 attachments encontrados no range especificado
+2026-05-14 09:32:40 [INFO]
+2026-05-14 09:32:40 [INFO] 5/5 — Validando URLs de attachments via HTTP HEAD...
+2026-05-14 09:32:40 [INFO] [1/100] Validando attachment_id=65716 — comprovante2026-05-12_084625.pdf
+2026-05-14 09:32:40 [INFO] [2/100] Validando attachment_id=65715 — comprovante2026-05-12_084347.pdf
+2026-05-14 09:32:41 [INFO] [3/100] Validando attachment_id=65710 — File.jpg
+2026-05-14 09:32:41 [INFO] [4/100] Validando attachment_id=65694 — File.ogg
+2026-05-14 09:32:42 [INFO] [5/100] Validando attachment_id=65687 — File.jpg
+2026-05-14 09:32:42 [INFO] [6/100] Validando attachment_id=65686 — File.jpg
+2026-05-14 09:32:43 [INFO] [7/100] Validando attachment_id=65664 — ComprovantePagamento.pdf
+2026-05-14 09:32:43 [INFO] [8/100] Validando attachment_id=65595 — File.jpg
+2026-05-14 09:32:44 [INFO] [9/100] Validando attachment_id=65556 — comprovante_28_04_2026_17_57_40.pdf;filename*=
+2026-05-14 09:32:44 [INFO] [10/100] Validando attachment_id=65527 — File.jpg
+2026-05-14 09:32:44 [INFO] [11/100] Validando attachment_id=65526 — File.jpg
+2026-05-14 09:32:45 [INFO] [12/100] Validando attachment_id=65451 — File.jpg
+2026-05-14 09:32:45 [INFO] [13/100] Validando attachment_id=65402 — ComprovantePagamento.pdf
+2026-05-14 09:32:46 [INFO] [14/100] Validando attachment_id=65308 — File.jpg
+2026-05-14 09:32:46 [INFO] [15/100] Validando attachment_id=65307 — File.jpg
+2026-05-14 09:32:47 [INFO] [16/100] Validando attachment_id=65303 — File.jpg
+2026-05-14 09:32:47 [INFO] [17/100] Validando attachment_id=65302 — File.jpg
+2026-05-14 09:32:48 [INFO] [18/100] Validando attachment_id=65213 — comprovante2026-04-14_102039.pdf
+2026-05-14 09:32:48 [INFO] [19/100] Validando attachment_id=65175 — File.jpg
+2026-05-14 09:32:48 [INFO] [20/100] Validando attachment_id=65167 — Document.pdf
+2026-05-14 09:32:49 [INFO] [21/100] Validando attachment_id=65166 — File.jpg
+2026-05-14 09:32:49 [INFO] [22/100] Validando attachment_id=65082 — File.ogg
+2026-05-14 09:32:50 [INFO] [23/100] Validando attachment_id=65047 — File.ogg
+2026-05-14 09:32:50 [INFO] [24/100] Validando attachment_id=65046 — File.jpg
+2026-05-14 09:32:51 [INFO] [25/100] Validando attachment_id=65041 — File.jpg
+2026-05-14 09:32:51 [INFO] [26/100] Validando attachment_id=65040 — ComprovantePagamento.pdf
+2026-05-14 09:32:52 [INFO] [27/100] Validando attachment_id=64978 — File.jpg
+2026-05-14 09:32:52 [INFO] [28/100] Validando attachment_id=64977 — File.jpg
+2026-05-14 09:32:53 [INFO] [29/100] Validando attachment_id=64976 — File.jpg
+2026-05-14 09:32:53 [INFO] [30/100] Validando attachment_id=64975 — File.jpg
+2026-05-14 09:32:53 [INFO] [31/100] Validando attachment_id=64974 — File.jpg
+2026-05-14 09:32:54 [INFO] [32/100] Validando attachment_id=64973 — File.jpg
+2026-05-14 09:32:54 [INFO] [33/100] Validando attachment_id=64971 — File.jpg
+2026-05-14 09:32:55 [INFO] [34/100] Validando attachment_id=64972 — File.jpg
+2026-05-14 09:32:55 [INFO] [35/100] Validando attachment_id=64969 — Comprovante_31-03-2026_181810.pdf
+2026-05-14 09:32:56 [INFO] [36/100] Validando attachment_id=64916 — File.jpg
+2026-05-14 09:32:56 [INFO] [37/100] Validando attachment_id=64900 — File.jpg
+2026-05-14 09:32:57 [INFO] [38/100] Validando attachment_id=64895 — 2026_03_27_17_01_21_818_receipt.pdf
+2026-05-14 09:32:57 [INFO] [39/100] Validando attachment_id=64887 — File.jpg
+2026-05-14 09:32:57 [INFO] [40/100] Validando attachment_id=64886 — File.jpg
+2026-05-14 09:32:58 [INFO] [41/100] Validando attachment_id=64885 — File.jpg
+2026-05-14 09:32:58 [INFO] [42/100] Validando attachment_id=64884 — File.jpg
+2026-05-14 09:32:59 [INFO] [43/100] Validando attachment_id=64883 — File.jpg
+2026-05-14 09:32:59 [INFO] [44/100] Validando attachment_id=64882 — File.jpg
+2026-05-14 09:33:00 [INFO] [45/100] Validando attachment_id=64881 — File.jpg
+2026-05-14 09:33:00 [INFO] [46/100] Validando attachment_id=64880 — File.jpg
+2026-05-14 09:33:01 [INFO] [47/100] Validando attachment_id=64792 — File.ogg
+2026-05-14 09:33:01 [INFO] [48/100] Validando attachment_id=64599 — File.jpg
+2026-05-14 09:33:01 [INFO] [49/100] Validando attachment_id=64597 — File.ogg
+2026-05-14 09:33:02 [INFO] [50/100] Validando attachment_id=64596 — File.jpg
+2026-05-14 09:33:02 [INFO] [51/100] Validando attachment_id=64586 — File.ogg
+2026-05-14 09:33:03 [INFO] [52/100] Validando attachment_id=64573 — comprovante2026-03-16_064648.pdf
+2026-05-14 09:33:03 [INFO] [53/100] Validando attachment_id=64570 — 2026_03_15_09_18_59_945_receipt.pdf
+2026-05-14 09:33:04 [INFO] [54/100] Validando attachment_id=64557 — sicredi_1773621179199.pdf
+2026-05-14 09:33:04 [INFO] [55/100] Validando attachment_id=64556 — comprovante2026-03-16_064648.pdf
+2026-05-14 09:33:05 [INFO] [56/100] Validando attachment_id=64439 — 2026_03_10_21_45_42_282_receipt.pdf
+2026-05-14 09:33:05 [INFO] [57/100] Validando attachment_id=64438 — comprovante_10_03_2026_19_04_43.pdf;filename*=
+2026-05-14 09:33:05 [INFO] [58/100] Validando attachment_id=64408 — sicoob_2026_03_10_11_21_48.pdf
+2026-05-14 09:33:06 [INFO] [59/100] Validando attachment_id=64377 — comprovante_09_03_2026_05_41_02.pdf;filename*=
+2026-05-14 09:33:06 [INFO] [60/100] Validando attachment_id=64370 — File.jpg
+2026-05-14 09:33:07 [INFO] [61/100] Validando attachment_id=64332 — File.jpg
+2026-05-14 09:33:07 [INFO] [62/100] Validando attachment_id=64301 — File.jpg
+2026-05-14 09:33:08 [INFO] [63/100] Validando attachment_id=64254 — comprovante_05_03_2026_11_41_39.pdf;filename*=
+2026-05-14 09:33:08 [INFO] [64/100] Validando attachment_id=64251 — comprovante_05_03_2026_11_39_39.pdf;filename*=
+2026-05-14 09:33:09 [INFO] [65/100] Validando attachment_id=64117 — File.jpg
+2026-05-14 09:33:09 [INFO] [66/100] Validando attachment_id=64116 — File.jpg
+2026-05-14 09:33:09 [INFO] [67/100] Validando attachment_id=64110 — sicoob_2026_02_26_13_51_32.pdf
+2026-05-14 09:33:10 [INFO] [68/100] Validando attachment_id=64086 — 85a164e0-1270-11f1-9f07-e300b9c77d9d.pdf
+2026-05-14 09:33:10 [INFO] [69/100] Validando attachment_id=64070 — Comprovante_25-02-2026_090232.pdf
+2026-05-14 09:33:11 [INFO] [70/100] Validando attachment_id=63959 — File.ogg
+2026-05-14 09:33:11 [INFO] [71/100] Validando attachment_id=63945 — File.jpg
+2026-05-14 09:33:12 [INFO] [72/100] Validando attachment_id=63929 — Imagem_Boleto_e_Email_Mkt.jpg;filename*=
+2026-05-14 09:33:12 [INFO] [73/100] Validando attachment_id=63835 — FB.926_-_00_-_FB.926_-_Autoriza_o_para_comercializa_o_fora_da_rea_de_a_o.doc;filename*=
+2026-05-14 09:33:12 [INFO] [74/100] Validando attachment_id=63824 — File.jpg
+2026-05-14 09:33:13 [INFO] [75/100] Validando attachment_id=63799 — File.ogg
+2026-05-14 09:33:13 [INFO] [76/100] Validando attachment_id=63794 — 2026_02_15_15_51_10_907_receipt.pdf
+2026-05-14 09:33:14 [INFO] [77/100] Validando attachment_id=63792 — 2026-02-16_122116.pdf
+2026-05-14 09:33:14 [INFO] [78/100] Validando attachment_id=63733 — comprovante_12_02_2026_21_46_37.pdf;filename*=
+2026-05-14 09:33:15 [INFO] [79/100] Validando attachment_id=63732 — comprovante_12_02_2026_21_45_36.pdf;filename*=
+2026-05-14 09:33:15 [INFO] [80/100] Validando attachment_id=63731 — comprovante_12_02_2026_21_43_41.pdf;filename*=
+2026-05-14 09:33:16 [INFO] [81/100] Validando attachment_id=63675 — File.jpg
+2026-05-14 09:33:16 [INFO] [82/100] Validando attachment_id=63612 — File.jpg
+2026-05-14 09:33:16 [INFO] [83/100] Validando attachment_id=63604 — shareFile.pdf
+2026-05-14 09:33:17 [INFO] [84/100] Validando attachment_id=63597 — comprovante_10_02_2026_10_19_07.pdf;filename*=
+2026-05-14 09:33:17 [INFO] [85/100] Validando attachment_id=63596 — comprovante_10_02_2026_10_18_17.pdf;filename*=
+2026-05-14 09:33:18 [INFO] [86/100] Validando attachment_id=63594 — comprovante_10_02_2026_10_17_39.pdf;filename*=
+2026-05-14 09:33:18 [INFO] [87/100] Validando attachment_id=63593 — comprovante_06_02_2026_091344.pdf
+2026-05-14 09:33:19 [INFO] [88/100] Validando attachment_id=63587 — e46e56a0-0676-11f1-ab0e-9d8814ed529a.pdf
+2026-05-14 09:33:19 [INFO] [89/100] Validando attachment_id=63576 — 2026_02_09_18_04_10_611_receipt.pdf
+2026-05-14 09:33:20 [INFO] [90/100] Validando attachment_id=63570 — ComprovantePagamento.pdf
+2026-05-14 09:33:20 [INFO] [91/100] Validando attachment_id=63408 — File.jpg
+2026-05-14 09:33:21 [INFO] [92/100] Validando attachment_id=63407 — File.jpg
+2026-05-14 09:33:21 [INFO] [93/100] Validando attachment_id=63359 — File.ogg
+2026-05-14 09:33:21 [INFO] [94/100] Validando attachment_id=63345 — File.jpg
+2026-05-14 09:33:22 [INFO] [95/100] Validando attachment_id=63339 — Comprovante_30-01-2026_200621.pdf
+2026-05-14 09:33:22 [INFO] [96/100] Validando attachment_id=63271 — File.jpg
+2026-05-14 09:33:23 [INFO] [97/100] Validando attachment_id=63213 — File.jpg
+2026-05-14 09:33:23 [INFO] [98/100] Validando attachment_id=63171 — File.jpg
+2026-05-14 09:33:24 [INFO] [99/100] Validando attachment_id=63098 — 2026_01_21_16_10_10_713_receipt.pdf
+2026-05-14 09:33:24 [INFO] [100/100] Validando attachment_id=63097 — 2026_01_21_16_06_05_608_receipt.pdf
+2026-05-14 09:33:24 [INFO]
+2026-05-14 09:33:24 [INFO] 6/6 — Gerando relatórios...
+2026-05-14 09:33:24 [INFO] ✅ JSON salvo: .tmp/check_s3_attachments_20260514_093324.json
+2026-05-14 09:33:24 [INFO] ✅ Markdown salvo: .tmp/check_s3_attachments_20260514_093324.md
+2026-05-14 09:33:24 [INFO]
+2026-05-14 09:33:24 [INFO] ================================================================================
+2026-05-14 09:33:24 [INFO] RESUMO DA VALIDAÇÃO
+2026-05-14 09:33:24 [INFO] ================================================================================
+2026-05-14 09:33:24 [INFO] Account: Unimed Guaxupé (ID 25)
+2026-05-14 09:33:24 [INFO] Total validados:  100
+2026-05-14 09:33:24 [INFO] ✅ Sucesso (200): 97
+2026-05-14 09:33:24 [INFO] ❌ Falhas:        3
+2026-05-14 09:33:24 [INFO] 📊 Taxa sucesso:  97.0%
+2026-05-14 09:33:24 [INFO]
+2026-05-14 09:33:24 [WARNING] ⚠️ ATENÇÃO: Attachments com falha detectados!
+2026-05-14 09:33:24 [WARNING] Detalhes completos em: .tmp/check_s3_attachments_20260514_093324.json
+2026-05-14 09:33:24 [WARNING] Resumo executivo em: .tmp/check_s3_attachments_20260514_093324.md
+2026-05-14 09:33:24 [WARNING]
+2026-05-14 09:33:24 [WARNING] Primeiras 5 falhas:
+2026-05-14 09:33:24 [WARNING]   [1] ID=64117 | File.jpg | Error: HTTP 404
+2026-05-14 09:33:24 [WARNING]   [2] ID=64116 | File.jpg | Error: HTTP 404
+2026-05-14 09:33:24 [WARNING]   [3] ID=64110 | sicoob_2026_02_26_13_51_32.pdf | Error: HTTP 404
+2026-05-14 09:33:24 [INFO] ================================================================================

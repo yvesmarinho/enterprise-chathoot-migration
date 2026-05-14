@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-13 — Sessão 13: D15-T1 EXECUTADO → Taxa de sucesso é temporal (98% recente vs 26% aleatório). Unimed Guaxupé SEM attachments migrados.
-**Status**: 🔴 BLOQUEADOR — Validação de attachments S3: depende de policy de retenção (recente=98% OK, histórico=26% falha). Unimed Guaxupé não migrou attachments (0 de 1.847).
+**Last Updated**: 2026-05-14 — Sessão 14: Criado utilitário CLI `scripts/check_s3_attachments.py` para validação S3 profissional. Organizado .tmp/ (10 evidências → docs/evidencias/).
+**Status**: 🟢 FERRAMENTAL — Utilitário CLI pronto para investigação D15. Evidências S3 organizadas em docs/evidencias/.
 
 ---
 
@@ -35,7 +35,18 @@
   LEFT JOIN messages m ON m.id = att.message_id
   WHERE att.account_id = 17 AND m.id IS NULL;
   ```
+- [x] **D15-T4** ✅ Criar utilitário CLI profissional para validação S3
+  **RESULTADO**: Script `scripts/check_s3_attachments.py` criado com:
+  - Conexão via `.secrets/generate_erd.json`
+  - Parâmetros: `--instance`, `--account-id`, `--limit`, `--offset`, `--date-start`, `--date-end`
+  - Validação HTTP completa (status, response time)
+  - Relatório JSON detalhado
+  **TESTE**: Account 1: 10/10 attachments acessíveis (100% success rate), bucket: `assets-chat-vya-digital.s3.amazonaws.com`
+  **ARTEFATO**: `scripts/check_s3_attachments.py` (281 linhas)
 
+- [x] **D15-T5** ✅ Organizar evidências S3 e limpar .tmp/
+  **RESULTADO**: 10 evidências movidas para `docs/evidencias/`, 14 scripts obsoletos excluídos, 47 scripts diagnóstico preservados
+  **EVIDÊNCIAS**: `docs/evidencias/validacao_attachments_s3_*.json` + `check_s3_attachments_*.json`
 ### P1 — Decisões de Negócio (Próxima Sessão)
 
 - [ ] **D15-B** Decisão: Ampliar escopo para migração S3 ou aceitar 26% de cobertura?
