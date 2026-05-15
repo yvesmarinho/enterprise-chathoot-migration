@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-14 (Sessão 14 — Criado CLI check_s3_attachments.py, organizado .tmp/ → docs/evidencias/)
-**Last Session**: 2026-05-14 (Sessão 14 — Ferramental S3: utilitário CLI para validação de attachments, evidências organizadas)
+**Last Updated**: 2026-05-15 (Sessão 15 — Runbook de migração para produção criado)
+**Last Session**: 2026-05-15 (Sessão 15 — Preparação para migração em produção 16/05/2026 14h)
 
 ---
 
@@ -14,6 +14,13 @@
 | [README.md](../README.md) | Documentação pública |
 | [TODO.md](TODO.md) | Tarefas pendentes |
 | [TODAY_ACTIVITIES.md](TODAY_ACTIVITIES.md) | Atividades do dia |
+
+## 🚀 Migração em Produção (16/05/2026 14:00 BRT)
+
+| Arquivo | Descrição |
+|---------|-----------|
+| [**RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md**](RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md) | **Runbook completo** — Procedimentos, validações, rollback, troubleshooting (800 linhas) |
+| [**CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md**](CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md) | **Quick reference** — Checklist resumida para impressão e consulta rápida (200 linhas) |
 
 ## Sessões de Trabalho
 
@@ -52,9 +59,12 @@ SESSIONS/
 │   ├── SESSION_RECOVERY_2026-05-13.md
 │   ├── DAILY_ACTIVITIES_2026-05-13.md
 │   └── FINAL_STATUS_2026-05-13.md
-└── 2026-05-14/           ← Sessão 14: Ferramental S3 — criado CLI check_s3_attachments.py, organizado .tmp/ → docs/evidencias/
-    ├── SESSION_RECOVERY_2026-05-14.md
-    └── DAILY_ACTIVITIES_2026-05-14.md
+├── 2026-05-14/           ← Sessão 14: Ferramental S3 — criado CLI check_s3_attachments.py, organizado .tmp/ → docs/evidencias/
+│   ├── SESSION_RECOVERY_2026-05-14.md
+│   └── DAILY_ACTIVITIES_2026-05-14.md
+└── 2026-05-15/           ← Sessão 15: Preparação para produção — runbook completo, checklist executiva, D15-T1.1 resolvido
+    ├── SESSION_RECOVERY_2026-05-15.md
+    └── DAILY_ACTIVITIES_2026-05-15.md
 ```
 
 ## Evidências de Validação S3
