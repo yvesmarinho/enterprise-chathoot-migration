@@ -2,10 +2,20 @@
 # db.py — Conexões compartilhadas
 # =============================================================================
 # Credenciais carregadas exclusivamente de .secrets/generate_erd.json
-# (schema v2.0 — instâncias nomeadas: primeiro non-_ = SOURCE, segundo = DEST)
+# (schema v2.0 — instâncias nomeadas)
+#
+# Variáveis de ambiente obrigatórias:
+#   MIGRATION_SOURCE_KEY  — chave da instância SOURCE no secrets
+#   MIGRATION_DEST_KEY    — chave da instância DEST no secrets
+#
+# Exemplo (produção):
+#   export MIGRATION_SOURCE_KEY=chat-vya-digital
+#   export MIGRATION_DEST_KEY=synchat-vya-digital
+#
 # Nunca imprime nem loga valores de credenciais.
 # =============================================================================
 import json
+import os
 from pathlib import Path
 
 import psycopg2
@@ -16,22 +26,41 @@ _REQUIRED_KEYS = frozenset({"host", "port", "username", "password", "database"})
 
 
 def _load_secrets() -> tuple[dict, dict]:
-    """Carrega SOURCE e DEST do arquivo de secrets.
+    """Carrega SOURCE e DEST do arquivo de secrets usando env vars.
 
     :returns: Tupla (db_source, db_dest) com dicts prontos para psycopg2.
-    :rtype: tuple[dict, dict]
     :raises FileNotFoundError: Se .secrets/generate_erd.json não existir.
-    :raises KeyError: Se faltar instâncias ou campos obrigatórios.
+    :raises KeyError: Se faltar env vars ou instâncias/campos obrigatórios.
     """
     if not _SECRETS_PATH.exists():
         raise FileNotFoundError(f"Secrets file not found: {_SECRETS_PATH}")
 
-    data: dict = json.loads(_SECRETS_PATH.read_text())
-    instances = [k for k in data if not k.startswith("_")]
+    src_key = os.environ.get("MIGRATION_SOURCE_KEY", "").strip()
+    dest_key = os.environ.get("MIGRATION_DEST_KEY", "").strip()
 
-    if len(instances) < 2:
+    data: dict = json.loads(_SECRETS_PATH.read_text())
+    available = [k for k in data if not k.startswith("_")]
+
+    if not src_key or not dest_key:
         raise KeyError(
-            f"secrets file must have at least 2 database instances, found {len(instances)}"
+            "Variáveis de ambiente obrigatórias não definidas.\n"
+            f"  MIGRATION_SOURCE_KEY={'<não definido>' if not src_key else src_key!r}\n"
+            f"  MIGRATION_DEST_KEY={'<não definido>' if not dest_key else dest_key!r}\n"
+            f"Instâncias disponíveis no secrets: {available}\n"
+            "Execute:\n"
+            "  export MIGRATION_SOURCE_KEY=chat-vya-digital\n"
+            "  export MIGRATION_DEST_KEY=synchat-vya-digital"
+        )
+
+    if src_key not in data:
+        raise KeyError(
+            f"MIGRATION_SOURCE_KEY={src_key!r} não encontrado no secrets.\n"
+            f"Disponíveis: {available}"
+        )
+    if dest_key not in data:
+        raise KeyError(
+            f"MIGRATION_DEST_KEY={dest_key!r} não encontrado no secrets.\n"
+            f"Disponíveis: {available}"
         )
 
     def to_psycopg2(inst: dict) -> dict:
@@ -46,7 +75,7 @@ def _load_secrets() -> tuple[dict, dict]:
             "port": int(inst["port"]),
         }
 
-    return to_psycopg2(data[instances[0]]), to_psycopg2(data[instances[1]])
+    return to_psycopg2(data[src_key]), to_psycopg2(data[dest_key])
 
 
 _DB_SOURCE, _DB_DEST = _load_secrets()

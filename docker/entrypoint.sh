@@ -17,15 +17,27 @@
 
 set -euo pipefail
 
-ACCOUNT_NAME="${ACCOUNT_NAME:-Vya Digital}"
+MIGRATION_SOURCE_KEY="${MIGRATION_SOURCE_KEY:-}"
+MIGRATION_DEST_KEY="${MIGRATION_DEST_KEY:-}"
+ACCOUNT_NAME="${ACCOUNT_NAME:-Unimed Guaxupé}"
 ALL_ACCOUNTS="${ALL_ACCOUNTS:-false}"
 DRY_RUN="${DRY_RUN:-false}"
 SCRIPT="${SCRIPT:-}"
+
+# Validação antecipada das keys obrigatórias
+if [[ -z "${MIGRATION_SOURCE_KEY}" || -z "${MIGRATION_DEST_KEY}" ]]; then
+    echo "[ERRO] MIGRATION_SOURCE_KEY e MIGRATION_DEST_KEY são obrigatórias."
+    echo "  Produção : MIGRATION_SOURCE_KEY=chat-vya-digital  MIGRATION_DEST_KEY=synchat-vya-digital"
+    echo "  Dev/teste: MIGRATION_SOURCE_KEY=chatwoot_dev       MIGRATION_DEST_KEY=chatwoot004_dev"
+    exit 1
+fi
 
 cd /app
 
 echo "========================================================"
 echo "  enterprise-chatwoot-migration — Docker Runner"
+echo "  SOURCE KEY   : ${MIGRATION_SOURCE_KEY}"
+echo "  DEST KEY     : ${MIGRATION_DEST_KEY}"
 echo "  ACCOUNT      : ${ACCOUNT_NAME}"
 echo "  ALL_ACCOUNTS : ${ALL_ACCOUNTS}"
 echo "  DRY_RUN      : ${DRY_RUN}"

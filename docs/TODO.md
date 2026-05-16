@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-15 — Sessão 15: Runbook de migração para produção criado (16/05/2026 14h). Testes em produção confirmaram attachments Unimed Guaxupé OK.
-**Status**: 🟢 PRONTO PARA PRODUÇÃO — Runbook completo, checklists executivas, validações S3 confirmadas.
+**Last Updated**: 2026-05-16 — Sessão 16: Migração Unimed Guaxupé iniciada em produção. Container `chatwoot-migrator-unimed_guaxup` rodando como daemon em wfdb01. 4 usuários ausentes criados no DEST. Docker infra adaptada para prod.
+**Status**: 🟡 EM EXECUÇÃO — Container de migração em andamento (wfdb01). Validações pós-migração e demais accounts pendentes.
 
 ---
 
@@ -62,18 +62,26 @@
 
 ### Ordem de Execução (16/05 14:00 - 18:00)
 
-1. **14:00** Sol Copernico (account 4) — 15 min
-2. **14:30** Unimed Poços PF (account 18) — 20 min
-3. **15:05** Unimed Poços PJ (account 17) — 25 min
-4. **15:50** Unimed Guaxupé (account 25) — 20 min ✅ S3 validado em produção
-5. **16:25** Vya Digital (account 1) — 90 min (maior volume)
+1. **14:00** Sol Copernico (account 4) — 15 min — ⏳ PENDENTE
+2. **14:30** Unimed Poços PF (account 18) — 20 min — ⏳ PENDENTE
+3. **15:05** Unimed Poços PJ (account 17) — 25 min — ⏳ PENDENTE
+4. **15:50** Unimed Guaxupé (account 25) — 🟡 EM EXECUÇÃO (container daemon wfdb01, ID: `9f13b2337b26`)
+5. **16:25** Vya Digital (account 1) — 90 min — ⏳ PENDENTE
 
-### Validações Finais (16/05 18:30 - 19:30)
+### Melhorias Identificadas Durante Execução (docs/avaliação_do_processo.md)
 
-- [ ] **VAL-S3** Validação S3 attachments (3 accounts principais)
-- [ ] **VAL-API** Validação API counts + deep scan
-- [ ] **VAL-HASH** Validação hash MD5 (contacts, conversations, messages, attachments)
-- [ ] **VAL-GO** Go/No-Go decision (19:30)
+- [x] **MELHORIA-1** ✅ Credenciais hardcodadas → refatorado para `MIGRATION_SOURCE_KEY`/`MIGRATION_DEST_KEY` env vars em `app/db.py`
+- [x] **MELHORIA-2** ✅ Processo para usuários ausentes no DEST → `.tmp/create_missing_users.py` criado e executado (4 usuários)
+- [x] **MELHORIA-3** ✅ Container Docker não usado no RUNBOOK → Docker infra adaptada e RUNBOOK atualizado
+
+### Validações Pós-Migração Unimed Guaxupé (após container concluir)
+
+- [ ] **VAL-1** `uv run python app/02_verificar.py "Unimed Guaxupé"` (DEST: synchat-vya-digital)
+- [ ] **VAL-2** `uv run python app/06_verificar_erros.py "Unimed Guaxupé"` (verificar erros de migração)
+- [ ] **VAL-S3** `scripts/check_s3_attachments.py --instance synchat-vya-digital --account-id 45 --limit 100`
+- [ ] **VAL-API** Validação API counts (FASE 3 RUNBOOK)
+- [ ] **VAL-HASH** Validação hash MD5
+- [ ] **VAL-GO** Go/No-Go decision
 
 ---
 

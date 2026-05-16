@@ -1,7 +1,8 @@
 # 🚀 RUNBOOK — Migração Chatwoot para Produção
 
 **Data da Migração**: 16 de maio de 2026 às 14:00 BRT
-**Versão**: 1.0.0
+**Scope**: Unimed Guaxupé (account SOURCE 25 → DEST 46)
+**Versão**: 1.1.0
 **Responsável**: [Nome do Responsável]
 **Aprovador**: [Nome do Aprovador]
 
@@ -14,13 +15,9 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 
 | Account SOURCE | Account ID | Estimativa Registros |
 |----------------|------------|---------------------|
-| Sol Copernico | 4 | ~5.000 |
-| Unimed Poços PF | 18 | ~15.000 |
-| Unimed Poços PJ | 17 | ~35.000 |
 | Unimed Guaxupé | 25 | ~8.000 |
-| Vya Digital | 1 | ~220.000 |
 
-**Total estimado**: ~283.000 registros (contacts, conversations, messages, attachments)
+**Total estimado**: ~8.000 registros (contacts, conversations, messages, attachments)
 
 ### Estratégia
 - **Tipo**: Migração MERGE com deduplicação por chave de negócio
@@ -30,8 +27,46 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 
 ### Janela de Manutenção
 - **Início**: 16/05/2026 14:00 BRT
-- **Duração estimada**: 4-6 horas
-- **Término previsto**: 16/05/2026 20:00 BRT
+- **Duração estimada**: 1-2 horas
+- **Término previsto**: 16/05/2026 16:00 BRT
+
+---
+
+## ⚙️ CONEXÕES E VARIÁVEIS
+
+### Ambientes
+
+| Papel | Host | Porta | Banco | Usuário | App URL |
+|-------|------|-------|-------|---------|---------|
+| **SOURCE** (origem) | `wfdb02.vya.digital` | 5432 | `chatwoot_db` | `migration_user` | `chat.vya.digital` |
+| **DEST** (destino) | `wfdb02.vya.digital` | 5432 | `chatwoot004_db` | `migration_user` | `synchat.vya.digital` |
+
+> 🔑 Chave no `.secrets/generate_erd.json`: SOURCE = `chat-vya-digital` | DEST = `synchat-vya-digital`
+
+### Variáveis de Sessão
+
+Execute no terminal **antes** de iniciar qualquer fase da migração:
+
+```bash
+# Selecionar instâncias de produção (obrigatório antes de qualquer script)
+export MIGRATION_SOURCE_KEY=chat-vya-digital
+export MIGRATION_DEST_KEY=synchat-vya-digital
+
+# Carregar credenciais do arquivo de secrets
+export DEST_PASS=$(jq -r '.["synchat-vya-digital"].password' .secrets/generate_erd.json)
+export SRC_PASS=$(jq -r '.["chat-vya-digital"].password' .secrets/generate_erd.json)
+export DEST_API_KEY=$(jq -r '.["synchat-vya-digital"].api_key' .secrets/generate_erd.json)
+
+# Atalhos de conexão (disponíveis na sessão atual do terminal)
+alias psql_dest="PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db"
+alias psql_src="PGPASSWORD=$SRC_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot_db"
+```
+
+### Mapeamento de Accounts SOURCE → DEST
+
+| Account | SOURCE ID | DEST ID |
+|---------|-----------|---------|
+| Unimed Guaxupé | 25 | 46 |
 
 ---
 
@@ -41,19 +76,11 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 |---------|------|---------|-------------|
 | 13:00 - 13:30 | Checklist pré-migração | 30 min | Ops |
 | 13:30 - 14:00 | Backup completo DEST | 30 min | DBA |
-| 14:00 - 14:15 | Sol Copernico (account 4) | 15 min | Dev |
-| 14:15 - 14:30 | Validação Sol Copernico | 15 min | QA |
-| 14:30 - 14:50 | Unimed Poços PF (account 18) | 20 min | Dev |
-| 14:50 - 15:05 | Validação Unimed PF | 15 min | QA |
-| 15:05 - 15:30 | Unimed Poços PJ (account 17) | 25 min | Dev |
-| 15:30 - 15:50 | Validação Unimed PJ | 20 min | QA |
-| 15:50 - 16:10 | Unimed Guaxupé (account 25) | 20 min | Dev |
-| 16:10 - 16:25 | Validação Unimed Guaxupé | 15 min | QA |
-| 16:25 - 18:00 | Vya Digital (account 1) | 90 min | Dev |
-| 18:00 - 18:30 | Validação Vya Digital | 30 min | QA |
-| 18:30 - 19:00 | Validação S3 attachments | 30 min | Ops |
-| 19:00 - 19:30 | Testes integração API | 30 min | QA |
-| 19:30 - 20:00 | Go/No-Go e comunicação | 30 min | Gestão |
+| 14:00 - 14:20 | Unimed Guaxupé (account 25) | 20 min | Dev |
+| 14:20 - 14:35 | Validação Unimed Guaxupé | 15 min | QA |
+| 14:35 - 15:05 | Validação S3 attachments | 30 min | Ops |
+| 15:05 - 15:35 | Testes integração API | 30 min | QA |
+| 15:35 - 16:00 | Go/No-Go e comunicação | 25 min | Gestão |
 
 ---
 
@@ -61,27 +88,30 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 
 ### 1. Infraestrutura e Acesso
 
-- [ ] **1.1** Acesso SSH ao servidor de migração (wfdb01 ou wfdb02) confirmado
-- [ ] **1.2** Conectividade PostgreSQL SOURCE (`wfdb02.vya.digital:5432`) testada
-- [ ] **1.3** Conectividade PostgreSQL DEST (produção) testada
-- [ ] **1.4** Credenciais em `.secrets/generate_erd.json` validadas (SOURCE + DEST + API tokens)
-- [ ] **1.5** Python 3.12+ e dependências (`psycopg2-binary`) instalados
-- [ ] **1.6** Espaço em disco verificado (mínimo 50GB livre para logs/backup)
+- [x] **1.1** Acesso SSH ao servidor de migração (wf001 ou wfdb02) confirmado
+- [x] **1.2** Conectividade PostgreSQL SOURCE (`wfdb02.vya.digital:5432`) testada
+- [x] **1.3** Conectividade PostgreSQL DEST (produção) testada
+- [x] **1.4** Credenciais em `.secrets/generate_erd.json` validadas (SOURCE + DEST + API tokens)
+- [x] **1.5** Python 3.12+ e dependências (`psycopg2-binary`) instalados
+- [x] **1.6** Espaço em disco verificado (mínimo 50GB livre para logs/backup)
 
 ### 2. Backup e Segurança
 
-- [ ] **2.1** Backup completo do banco DEST realizado
+- [x] **2.1** Backup completo do banco DEST realizado
   ```bash
-  pg_dump -h <DEST_HOST> -U <USER> -d <DEST_DB> -F c -f backup_dest_pre_migration_20260516.dump
+  PGPASSWORD=$DEST_PASS pg_dump -h wfdb02.vya.digital -U migration_user \
+      -d chatwoot004_db -F c -f backup_dest_pre_migration_20260516.dump
   ```
-- [ ] **2.2** Backup verificado (teste de restore em ambiente isolado)
-- [ ] **2.3** Snapshot do servidor DEST (se aplicável)
-- [ ] **2.4** Plano de rollback documentado e aprovado
+- [x] **2.2** Backup verificado (teste de restore em ambiente isolado)
+- [x] **2.3** Snapshot do servidor DEST (se aplicável)
+- [x] **2.4** Plano de rollback documentado e aprovado
 
 ### 3. Configurações Críticas (D12)
 
 - [ ] **3.1** ✅ **CRÍTICO** — Regenerar `authentication_token` no DEST
-  ```sql
+  ```bash
+  # DEST: wfdb02.vya.digital / chatwoot004_db
+  PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db << 'EOSQL'
   -- Executar ANTES de iniciar a migração
   UPDATE users
   SET authentication_token = encode(gen_random_bytes(20), 'hex'),
@@ -89,17 +119,22 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
   WHERE id IN (
       SELECT DISTINCT owner_id FROM access_tokens WHERE owner_type = 'User'
   );
+  EOSQL
   ```
 - [ ] **3.2** Verificar duplicatas de `authentication_token` (deve retornar 0)
-  ```sql
-  SELECT authentication_token, COUNT(*)
-  FROM users GROUP BY authentication_token HAVING COUNT(*) > 1;
+  ```bash
+  # DEST: wfdb02.vya.digital / chatwoot004_db
+  PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db \
+      -c "SELECT authentication_token, COUNT(*) FROM users GROUP BY authentication_token HAVING COUNT(*) > 1;"
   ```
 - [ ] **3.3** ✅ **CRÍTICO** — Limpar sessões Devise antigas no DEST
-  ```sql
+  ```bash
+  # DEST: wfdb02.vya.digital / chatwoot004_db
+  PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db << 'EOSQL'
   -- Evita problemas de autenticação após migração
   DELETE FROM active_storage_blobs WHERE created_at < NOW() - INTERVAL '90 days';
   TRUNCATE TABLE sessions;
+  EOSQL
   ```
 - [ ] **3.4** Confirmar que webhooks/integrações do DEST usam URLs corretas (não apontam para SOURCE)
 
@@ -107,26 +142,25 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 
 - [ ] **4.1** Inspecionar volumes de dados SOURCE por account
   ```bash
-  uv run python app/00_inspecionar.py "Sol Copernico"
-  uv run python app/00_inspecionar.py "Unimed Poços PF"
-  uv run python app/00_inspecionar.py "Unimed Poços PJ"
   uv run python app/00_inspecionar.py "Unimed Guaxupé"
-  uv run python app/00_inspecionar.py "Vya Digital"
   ```
 - [ ] **4.2** Verificar contatos com phone duplicado no SOURCE (colisão A-03)
-  ```sql
-  -- chatwoot_dev1_db (SOURCE)
+  ```bash
+  # SOURCE: wfdb02.vya.digital / chatwoot_db
+  PGPASSWORD=$SRC_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot_db << 'EOSQL'
+  -- chatwoot_db (SOURCE)
   SELECT phone_number, COUNT(*) AS n, array_agg(id) AS ids
   FROM contacts
-  WHERE account_id IN (1,4,17,18,25) AND phone_number IS NOT NULL
+  WHERE account_id = 25 AND phone_number IS NOT NULL
   GROUP BY phone_number HAVING COUNT(*) > 1
   ORDER BY n DESC LIMIT 20;
+  EOSQL
   ```
 - [ ] **4.3** Verificar conversas órfãs (contact_id = NULL) no SOURCE
-  ```sql
-  SELECT account_id, COUNT(*) FROM conversations
-  WHERE account_id IN (1,4,17,18,25) AND contact_id IS NULL
-  GROUP BY account_id;
+  ```bash
+  # SOURCE: wfdb02.vya.digital / chatwoot_db
+  PGPASSWORD=$SRC_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot_db \
+      -c "SELECT account_id, COUNT(*) FROM conversations WHERE account_id = 25 AND contact_id IS NULL GROUP BY account_id;"
   ```
 
 ### 5. Preparação do Código
@@ -154,29 +188,53 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 
 ## 🚀 PROCEDIMENTO DE EXECUÇÃO
 
-### FASE 1 — Sol Copernico (Account 4) [14:00 - 14:15]
+### FASE 1 — Unimed Guaxupé (Account 25) [14:00 - 14:20]
 
-#### 1.1 Executar Migração
+**⚠️ NOTA IMPORTANTE**: Teste de attachments na produção confirmou que **todos os arquivos S3 estão acessíveis** para este account.
+
+#### 1.1 Executar Migração (via container — preferido)
+
+> **Recomendado**: executa em **wfdb01** (mesma rede do banco), latência ~0.1ms vs ~50ms remoto.
+
 ```bash
-cd /path/to/enterprise-chathoot-migration
-source .venv/bin/activate  # ou use: uv run
+cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chathoot-migration
 
-# Migração
-uv run python app/01_migrar_account.py "Sol Copernico"
+# Opção A — Deploy + build + execução remota em wfdb01 (preferido para produção)
+./docker/deploy-to-wfdb01.sh --build --run
+# Variáveis já pré-configuradas:
+#   MIGRATION_SOURCE_KEY=chat-vya-digital
+#   MIGRATION_DEST_KEY=synchat-vya-digital
+#   ACCOUNT_NAME=Unimed Guaxupé
+
+# Opção B — Execução local (fallback, aceita latência de rede)
+export MIGRATION_SOURCE_KEY=chat-vya-digital
+export MIGRATION_DEST_KEY=synchat-vya-digital
+uv run python app/01_migrar_account.py "Unimed Guaxupé"
+```
+
+**Acompanhar log no container (se --run)**:
+```bash
+# Em outro terminal, abrir SSH após fwknop:
+fwknop --rc-file ~/.fwknoprc -n wfdb01 && sleep 3
+ssh -p 5010 archaris@wfdb01.vya.digital
+docker logs -f $(docker ps -lq)
 ```
 
 **Saídas esperadas**:
-- Log em `logs/Sol_Copernico_YYYYMMDD_HHMMSS.log`
-- Erros (se houver) em `logs/erros_Sol_Copernico.jsonl`
-- Mensagem final: `✅ Migração concluída: Sol Copernico`
+- Log em `app/logs/Unimed_Guaxupe_YYYYMMDD_HHMMSS.log` (volume montado)
+- Erros (se houver) em `app/logs/erros_Unimed_Guaxupe.jsonl`
+- Mensagem final: `✅ Migração concluída: Unimed Guaxupé`
 
 #### 1.2 Validação Imediata
 ```bash
+export MIGRATION_SOURCE_KEY=chat-vya-digital
+export MIGRATION_DEST_KEY=synchat-vya-digital
+
 # Contagens SOURCE vs DEST
-uv run python app/02_verificar.py "Sol Copernico"
+uv run python app/02_verificar.py "Unimed Guaxupé"
 
 # Verificar erros (se houver)
-uv run python app/06_verificar_erros.py "Sol Copernico"
+uv run python app/06_verificar_erros.py "Unimed Guaxupé"
 ```
 
 **Critérios de Go/No-Go**:
@@ -189,100 +247,13 @@ uv run python app/06_verificar_erros.py "Sol Copernico"
 
 ---
 
-### FASE 2 — Unimed Poços PF (Account 18) [14:30 - 14:50]
-
-Repetir FASE 1 substituindo "Sol Copernico" por "Unimed Poços PF"
+### FASE 2 — Validação S3 Global [14:35 - 15:05]
 
 ```bash
-uv run python app/01_migrar_account.py "Unimed Poços PF"
-uv run python app/02_verificar.py "Unimed Poços PF"
-uv run python app/06_verificar_erros.py "Unimed Poços PF"
-```
-
----
-
-### FASE 3 — Unimed Poços PJ (Account 17) [15:05 - 15:30]
-
-Repetir FASE 1 substituindo por "Unimed Poços PJ"
-
-```bash
-uv run python app/01_migrar_account.py "Unimed Poços PJ"
-uv run python app/02_verificar.py "Unimed Poços PJ"
-uv run python app/06_verificar_erros.py "Unimed Poços PJ"
-```
-
----
-
-### FASE 4 — Unimed Guaxupé (Account 25) [15:50 - 16:10]
-
-**⚠️ NOTA IMPORTANTE**: Teste de attachments na produção confirmou que **todos os arquivos S3 estão acessíveis** para este account.
-
-```bash
-uv run python app/01_migrar_account.py "Unimed Guaxupé"
-uv run python app/02_verificar.py "Unimed Guaxupé"
-uv run python app/06_verificar_erros.py "Unimed Guaxupé"
-```
-
-**Validação adicional S3** (após migração):
-```bash
+# Account 25 (Unimed Guaxupé) — DEST account_id=45 (criada com id=45 em prod)
 uv run python scripts/check_s3_attachments.py \
-    --instance chatwoot_prod \
-    --account-id <DEST_ACCOUNT_ID> \
-    --limit 100 \
-    --date-start 2025-01-01
-```
-
----
-
-### FASE 5 — Vya Digital (Account 1) [16:25 - 18:00]
-
-**⚠️ ACCOUNT MAIOR** — ~220.000 registros. Monitorar progresso ativamente.
-
-```bash
-# Migração (duração estimada: 60-90 min)
-uv run python app/01_migrar_account.py "Vya Digital"
-
-# Validação
-uv run python app/02_verificar.py "Vya Digital"
-uv run python app/06_verificar_erros.py "Vya Digital"
-```
-
-**Monitoramento durante execução**:
-```bash
-# Em terminal separado
-tail -f logs/Vya_Digital_*.log
-```
-
-**Sinais de problema**:
-- ❌ Loop parado (sem novas linhas por > 5 min em fase de messages)
-- ❌ Erros de conexão repetidos (> 10 reconexões na mesma conversa)
-- ❌ `psycopg2.OperationalError` persistente
-
-**Ação corretiva**: Interromper (Ctrl+C), investigar, ajustar BATCH size se necessário, re-executar.
-
----
-
-### FASE 6 — Validação S3 Global [18:30 - 19:00]
-
-```bash
-# Account 1 (Vya Digital)
-uv run python scripts/check_s3_attachments.py \
-    --instance chatwoot_prod \
-    --account-id <ACCOUNT_1_DEST_ID> \
-    --limit 200 \
-    --date-start 2025-01-01
-
-# Account 25 (Unimed Guaxupé)
-uv run python scripts/check_s3_attachments.py \
-    --instance chatwoot_prod \
-    --account-id <ACCOUNT_25_DEST_ID> \
-    --limit 100 \
-    --date-start 2024-01-01
-
-# Account 17 (Unimed Poços PJ)
-uv run python scripts/check_s3_attachments.py \
-    --instance chatwoot_prod \
-    --account-id <ACCOUNT_17_DEST_ID> \
+    --instance synchat-vya-digital \
+    --account-id 45 \
     --limit 100 \
     --date-start 2024-01-01
 ```
@@ -296,7 +267,7 @@ uv run python scripts/check_s3_attachments.py \
 
 ---
 
-### FASE 7 — Validação API e Integridade [19:00 - 19:30]
+### FASE 3 — Validação API e Integridade [15:05 - 15:35]
 
 #### 7.1 Validação API (D5)
 
@@ -345,18 +316,19 @@ uv run python app/01_migrar_account.py "<Account Name>"
 #### Opção B — Rollback Completo
 ```bash
 # 1. Restore do backup
-pg_restore -h <DEST_HOST> -U <USER> -d <DEST_DB> \
-    -c -F c backup_dest_pre_migration_20260516.dump
+PGPASSWORD=$DEST_PASS pg_restore -h wfdb02.vya.digital -U migration_user \
+    -d chatwoot004_db -c -F c backup_dest_pre_migration_20260516.dump
 
 # 2. Verificar integridade pós-restore
-psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db -c "
     SELECT tablename, n_live_tup FROM pg_stat_user_tables
     WHERE schemaname = 'public' AND n_live_tup > 0
     ORDER BY n_live_tup DESC LIMIT 20;
 "
 
 # 3. Limpar migration_state (se existir)
-psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "TRUNCATE TABLE migration_state;"
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user \
+    -d chatwoot004_db -c "TRUNCATE TABLE migration_state;"
 
 # 4. Comunicar rollback aos stakeholders
 ```
@@ -375,7 +347,9 @@ psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "TRUNCATE TABLE migration_state;"
 **Ação**:
 
 #### 2.1 Análise Rápida
-```sql
+```bash
+# DEST: wfdb02.vya.digital / chatwoot004_db
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db << 'EOSQL'
 -- Conversas migradas com problemas
 SELECT status, COUNT(*) FROM conversations
 WHERE created_at >= '2026-05-16 14:00:00'::timestamp
@@ -386,36 +360,41 @@ SELECT COUNT(*) FILTER (WHERE file_type IS NULL) AS sem_tipo,
        COUNT(*) FILTER (WHERE account_id IS NULL) AS sem_account
 FROM attachments
 WHERE created_at >= '2026-05-16 14:00:00'::timestamp;
+EOSQL
 ```
 
 #### 2.2 Rollback Seletivo (se < 3 accounts afetadas)
-```sql
--- Deletar registros migrados de UMA account
+```bash
+# DEST: wfdb02.vya.digital / chatwoot004_db
+# Substituir <DEST_ACCOUNT_ID> pelo ID DEST da account a reverter (ver mapeamento acima)
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db << 'EOSQL'
+-- Deletar registros migrados de Unimed Guaxupé (account DEST = 46)
 BEGIN;
 
 DELETE FROM messages WHERE conversation_id IN (
     SELECT id FROM conversations
-    WHERE account_id = <DEST_ACCOUNT_ID>
+    WHERE account_id = 46
       AND created_at >= '2026-05-16 14:00:00'::timestamp
 );
 
 DELETE FROM conversations
-WHERE account_id = <DEST_ACCOUNT_ID>
+WHERE account_id = 46
   AND created_at >= '2026-05-16 14:00:00'::timestamp;
 
 DELETE FROM contact_inboxes
 WHERE contact_id IN (
     SELECT id FROM contacts
-    WHERE account_id = <DEST_ACCOUNT_ID>
+    WHERE account_id = 46
       AND created_at >= '2026-05-16 14:00:00'::timestamp
 );
 
 DELETE FROM contacts
-WHERE account_id = <DEST_ACCOUNT_ID>
+WHERE account_id = 46
   AND created_at >= '2026-05-16 14:00:00'::timestamp;
 
 -- COMMIT apenas se tudo estiver OK
 COMMIT;
+EOSQL
 ```
 
 #### 2.3 Rollback Total (se >= 3 accounts afetadas)
@@ -435,7 +414,7 @@ Usar procedimento do Cenário 1 - Opção B.
 # Se persistir (> 10 reconexões), verificar firewall/network
 
 # Ajustar timeout no servidor (temporário)
-psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db -c "
     ALTER SYSTEM SET statement_timeout = '600s';
     SELECT pg_reload_conf();
 "
@@ -462,14 +441,10 @@ BATCH = 50  # aumentar de 30 para 50 ou 100
 **Causa provável**: Permissões de `inbox_members` ausentes.
 
 **Diagnóstico**:
-```sql
--- Verificar se usuário tem acesso aos inboxes migrados
-SELECT u.email, i.name AS inbox_name, im.id AS inbox_member_id
-FROM users u
-LEFT JOIN inbox_members im ON im.user_id = u.id
-LEFT JOIN inboxes i ON i.id = im.inbox_id
-WHERE u.email = 'usuario@exemplo.com'
-  AND i.account_id = <DEST_ACCOUNT_ID>;
+```bash
+# DEST: wfdb02.vya.digital / chatwoot004_db
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db \
+    -c "SELECT u.email, i.name AS inbox_name, im.id AS inbox_member_id FROM users u LEFT JOIN inbox_members im ON im.user_id = u.id LEFT JOIN inboxes i ON i.id = im.inbox_id WHERE u.email = 'usuario@exemplo.com' AND i.account_id = <DEST_ACCOUNT_ID>;"
 ```
 
 **Solução**:
@@ -478,7 +453,7 @@ WHERE u.email = 'usuario@exemplo.com'
 # Ver TODO.md: S11-P0-1
 
 # Workaround manual:
-psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db -c "
     INSERT INTO inbox_members (inbox_id, user_id, created_at, updated_at)
     SELECT i.id, u.id, NOW(), NOW()
     FROM inboxes i
@@ -498,7 +473,7 @@ psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "
 **Diagnóstico**:
 ```bash
 # Verificar bucket no DEST
-psql -h <DEST_HOST> -U <USER> -d <DEST_DB> -c "
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db -c "
     SELECT DISTINCT
         SUBSTRING(file_url FROM 'https://([^/]+)/') AS bucket
     FROM attachments
@@ -522,12 +497,11 @@ curl -I "https://assets-chat-vya-digital.s3.amazonaws.com/<BLOB_KEY>"
 **Causa**: Mensagens órfãs pré-existentes no DEST (não causadas pela migração).
 
 **Verificação**:
-```sql
--- Checar se orphan_messages são pré-migração
-SELECT COUNT(*) FROM messages m
-LEFT JOIN conversations c ON c.id = m.conversation_id
-WHERE m.created_at >= '2026-05-16 14:00:00'::timestamp
-  AND c.id IS NULL;
+```bash
+# DEST: wfdb02.vya.digital / chatwoot004_db
+PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db \
+    -c "SELECT COUNT(*) FROM messages m LEFT JOIN conversations c ON c.id = m.conversation_id WHERE m.created_at >= '2026-05-16 14:00:00'::timestamp AND c.id IS NULL;"
+```
 ```
 
 **Decisão**:
@@ -540,13 +514,13 @@ WHERE m.created_at >= '2026-05-16 14:00:00'::timestamp
 
 | Métrica | Target | Aceitável | Crítico |
 |---------|--------|-----------|---------|
-| **Migração completa** | 5/5 accounts | 4/5 accounts | < 3/5 accounts |
+| **Migração completa** | 1/1 account | 1/1 account | 0/1 account |
 | **Contagens DB** | 100% SOURCE → DEST | >= 95% | < 90% |
 | **Visibilidade API** | 100% | >= 80% | < 70% |
 | **Attachments S3 (recentes)** | 100% OK | >= 95% OK | < 90% OK |
 | **Attachments S3 (históricos)** | 50% OK | >= 25% OK | < 10% OK |
 | **Erros críticos** | 0 | 0 | > 0 |
-| **Tempo total** | < 5h | < 6h | > 8h |
+| **Tempo total** | < 2h | < 3h | > 4h |
 
 ---
 
@@ -571,10 +545,11 @@ WHERE m.created_at >= '2026-05-16 14:00:00'::timestamp
 |---------|------|--------|-------------|
 | 13:00 | Checklist pré-migração iniciado | ⏳ | |
 | 13:30 | Backup DEST iniciado | ⏳ | |
-| 14:00 | Sol Copernico iniciado | ⏳ | |
-| 14:15 | Sol Copernico validação | ⏳ | |
-| 14:30 | Unimed PF iniciado | ⏳ | |
-| ... | ... | ... | |
+| 14:00 | Unimed Guaxupé iniciado | ⏳ | |
+| 14:20 | Unimed Guaxupé validação | ⏳ | |
+| 14:35 | Validação S3 iniciada | ⏳ | |
+| 15:05 | Validação API iniciada | ⏳ | |
+| 15:35 | Go/No-Go | ⏳ | |
 
 **Status**: ⏳ Em progresso | ✅ Concluído | ⚠️ Com avisos | ❌ Erro
 
@@ -586,7 +561,7 @@ WHERE m.created_at >= '2026-05-16 14:00:00'::timestamp
 
 ### Checklist Go-Live
 
-- [ ] Todas as 5 accounts migradas com sucesso
+- [ ] Unimed Guaxupé (account 25 → 46) migrada com sucesso
 - [ ] Validações API: exit code 0 ou 2 (warnings aceitos)
 - [ ] Validações hash: missing < 10%
 - [ ] Validações S3: success rate >= 95% (recentes)

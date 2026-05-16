@@ -8,8 +8,8 @@
 # Uso:
 #   ./docker/deploy-to-wfdb01.sh                      # só rsync
 #   ./docker/deploy-to-wfdb01.sh --build              # rsync + docker build
-#   ./docker/deploy-to-wfdb01.sh --build --all        # rsync + build + inicia migração em BACKGROUND no wfdb01
-#   ./docker/deploy-to-wfdb01.sh --build --run        # rsync + build + run interativo (bloqueia SSH)
+#   ./docker/deploy-to-wfdb01.sh --build --run        # rsync + build + run em BACKGROUND (daemon, não bloqueia)
+#   ./docker/deploy-to-wfdb01.sh --build --all        # rsync + build + migra TODOS os accounts em BACKGROUND
 #
 # Com --all, o processo de migração é iniciado em background no wfdb01 e NÃO
 # depende desta máquina. O SSH é aberto apenas para lançar o nohup e retorna
@@ -18,14 +18,21 @@
 #   ssh -p 5010 archaris@wfdb01.vya.digital 'tail -f ~/chatwoot-migration/logs/migration_all_latest.log'
 #
 # Variáveis customizáveis:
-#   WFDB01_HOST      Host de destino    (padrão: wfdb01.vya.digital)
-#   WFDB01_USER      Usuário SSH        (padrão: archaris)
-#   WFDB01_PORT      Porta SSH          (padrão: 5010)
-#   WFDB01_FWKNOP_RC Arquivo rc fwknop  (padrão: ~/.fwknoprc)
-#   WFDB01_FWKNOP_N  Nome da entrada rc (padrão: wfdb01)
-#   FWKNOP_SLEEP     Segundos de espera após SPA (padrão: 3)
-#   REMOTE_DIR       Diretório remoto   (padrão: ~/chatwoot-migration)
-#   ACCOUNT_NAME     Account a migrar   (padrão: "Vya Digital")
+#   WFDB01_HOST           Host de destino    (padrão: wfdb01.vya.digital)
+#   WFDB01_USER           Usuário SSH        (padrão: archaris)
+#   WFDB01_PORT           Porta SSH          (padrão: 5010)
+#   WFDB01_FWKNOP_RC      Arquivo rc fwknop  (padrão: ~/.fwknoprc)
+#   WFDB01_FWKNOP_N       Nome da entrada rc (padrão: wfdb01)
+#   FWKNOP_SLEEP          Segundos de espera após SPA (padrão: 3)
+#   REMOTE_DIR            Diretório remoto   (padrão: ~/chatwoot-migration)
+#   ACCOUNT_NAME          Account a migrar   (padrão: "Unimed Guaxupé")
+#   MIGRATION_SOURCE_KEY  Chave SOURCE no secrets (padrão: chat-vya-digital)
+#   MIGRATION_DEST_KEY    Chave DEST no secrets   (padrão: synchat-vya-digital)
+#
+# Produção — modo recomendado:
+#   ./docker/deploy-to-wfdb01.sh --build --run
+# Ou background (independe do SSH após lançar):
+#   ./docker/deploy-to-wfdb01.sh --build --all
 
 set -euo pipefail
 
@@ -36,7 +43,9 @@ WFDB01_FWKNOP_RC="${WFDB01_FWKNOP_RC:-${HOME}/.fwknoprc}"
 WFDB01_FWKNOP_N="${WFDB01_FWKNOP_N:-wfdb01}"
 FWKNOP_SLEEP="${FWKNOP_SLEEP:-3}"
 REMOTE_DIR="${REMOTE_DIR:-~/chatwoot-migration}"
-ACCOUNT_NAME="${ACCOUNT_NAME:-Vya Digital}"
+ACCOUNT_NAME="${ACCOUNT_NAME:-Unimed Guaxupé}"
+MIGRATION_SOURCE_KEY="${MIGRATION_SOURCE_KEY:-chat-vya-digital}"
+MIGRATION_DEST_KEY="${MIGRATION_DEST_KEY:-synchat-vya-digital}"
 
 SSH_OPTS="-p ${WFDB01_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=15"
 
@@ -110,12 +119,39 @@ if [[ "${BUILD}" == "true" ]]; then
     echo "✅ Build concluído"
 fi
 
-# --- run (uma account específica) — foreground OK para tarefas curtas --------
+# --- run (uma account específica) — daemon, independente do SSH ---------------
+# O container roda em background no wfdb01; o SSH retorna imediatamente.
+# Acompanhar: docker logs -f <container>
 if [[ "${RUN}" == "true" ]]; then
+    # Nome único por account (substitui espaços/acentos por _)
+    CONTAINER="chatwoot-migrator-$(echo "${ACCOUNT_NAME}" | tr ' ' '_' | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')"
     knock
-    echo "→ Executando migração em ${WFDB01_HOST} (account: ${ACCOUNT_NAME})..."
-    ssh_run "cd ${REMOTE_DIR} && ACCOUNT_NAME='${ACCOUNT_NAME}' docker compose -f docker/docker-compose.yml run --rm migrator"
-    echo "✅ Migração executada"
+    echo "→ Iniciando migração em ${WFDB01_HOST} (account: ${ACCOUNT_NAME})..."
+    echo "  SOURCE: ${MIGRATION_SOURCE_KEY}  DEST: ${MIGRATION_DEST_KEY}"
+    echo "  Container: ${CONTAINER}  (modo: detached — não bloqueia o SSH)"
+
+    ssh_run "
+        cd ${REMOTE_DIR}
+        docker rm -f '${CONTAINER}' 2>/dev/null || true
+        MIGRATION_SOURCE_KEY='${MIGRATION_SOURCE_KEY}' \
+        MIGRATION_DEST_KEY='${MIGRATION_DEST_KEY}' \
+        ACCOUNT_NAME='${ACCOUNT_NAME}' \
+        docker compose -f docker/docker-compose.yml run \
+            -d \
+            --name '${CONTAINER}' \
+            migrator
+        echo 'Container ID:' \$(docker inspect -f '{{.Id}}' '${CONTAINER}' | cut -c1-12)
+    "
+
+    echo ""
+    echo "✅ Container iniciado em background: ${CONTAINER}"
+    echo ""
+    echo "Para acompanhar os logs:"
+    echo "  fwknop --rc-file ${WFDB01_FWKNOP_RC} -n ${WFDB01_FWKNOP_N} && sleep ${FWKNOP_SLEEP}"
+    echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST} 'docker logs -f ${CONTAINER}'"
+    echo ""
+    echo "Para verificar status:"
+    echo "  ssh -p ${WFDB01_PORT} ${WFDB01_USER}@${WFDB01_HOST} 'docker ps -a --filter name=${CONTAINER}'"
 fi
 
 # --- run all — container DETACHED (independente do SSH) -----------------------
@@ -132,6 +168,8 @@ if [[ "${RUN_ALL}" == "true" ]]; then
     ssh_run "
         cd ${REMOTE_DIR}
         docker rm -f '${CONTAINER}' 2>/dev/null || true
+        MIGRATION_SOURCE_KEY='${MIGRATION_SOURCE_KEY}' \
+        MIGRATION_DEST_KEY='${MIGRATION_DEST_KEY}' \
         docker compose -f docker/docker-compose.yml run \
             -d \
             --name '${CONTAINER}' \

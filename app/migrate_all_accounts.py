@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-migrate_all_accounts.py — Migra TODOS os accounts SOURCE → DEST em sequência.
+migrate_all_accounts.py — Migra accounts SOURCE → DEST em sequência.
 
-Consulta todos os accounts do SOURCE, executa 01_migrar_account.py para cada
-um em subprocesso isolado, e grava um relatório final em JSON.
+Somente os accounts listados em _ACCOUNTS_WHITELIST serão migrados.
+Para migrar um account diferente, ajuste a lista abaixo.
 
 Uso:
     python app/migrate_all_accounts.py
@@ -30,6 +30,10 @@ from app.db import cur, src  # noqa: E402
 _DRY_RUN = "--dry-run" in sys.argv
 _OUT_DIR = _ROOT / ".tmp"
 
+# Accounts autorizados para esta execução de migração.
+# Alterar para incluir outros accounts quando necessário.
+_ACCOUNTS_WHITELIST: set[str] = {"Unimed Guaxupé"}
+
 
 def _fmt_elapsed(seconds: float) -> str:
     """Formata segundos em Xh Ym Zs, Ym Zs ou Zs."""
@@ -48,13 +52,21 @@ _OUT = _ROOT / ".tmp" / f"migrate_all_{_TS}.json"
 
 
 def get_source_accounts() -> list[dict]:
-    """Retorna todos os accounts do SOURCE ordenados por id."""
+    """Retorna accounts do SOURCE filtrados por _ACCOUNTS_WHITELIST."""
     sc = src()
     with cur(sc) as c:
         c.execute("SELECT id, name, status FROM public.accounts ORDER BY id")
         rows = c.fetchall()
     sc.close()
-    return [dict(r) for r in rows]
+    all_accounts = [dict(r) for r in rows]
+    filtered = [a for a in all_accounts if a["name"] in _ACCOUNTS_WHITELIST]
+    if not filtered:
+        raise SystemExit(
+            f"Nenhum account do whitelist encontrado no SOURCE.\n"
+            f"Whitelist: {_ACCOUNTS_WHITELIST}\n"
+            f"Disponíveis: {[a['name'] for a in all_accounts]}"
+        )
+    return filtered
 
 
 def run_account(name: str) -> dict:
@@ -90,7 +102,8 @@ def run_account(name: str) -> dict:
 def main() -> None:
     t_start_dt = datetime.now()
     print("=" * 65)
-    print(f"  MIGRAÇÃO COMPLETA — TODOS OS ACCOUNTS")
+    print(f"  MIGRAÇÃO — ACCOUNTS SELECIONADOS")
+    print(f"  Whitelist: {sorted(_ACCOUNTS_WHITELIST)}")
     print(f"  Modo     : {'DRY-RUN' if _DRY_RUN else 'REAL'}")
     print(f"  Início   : {t_start_dt.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 65)
