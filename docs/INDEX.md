@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-15 (Sessão 15 — Runbook de migração para produção criado)
-**Last Session**: 2026-05-15 (Sessão 15 — Preparação para migração em produção 16/05/2026 14h)
+**Last Updated**: 2026-05-16 (Sessão 16 — Migração Unimed Guaxupé executada — container daemon wfdb01)
+**Last Session**: 2026-05-16 (Sessão 16 — Docker adapt + deploy prod + 4 usuários criados + container rodando)
 
 ---
 
@@ -62,9 +62,12 @@ SESSIONS/
 ├── 2026-05-14/           ← Sessão 14: Ferramental S3 — criado CLI check_s3_attachments.py, organizado .tmp/ → docs/evidencias/
 │   ├── SESSION_RECOVERY_2026-05-14.md
 │   └── DAILY_ACTIVITIES_2026-05-14.md
-└── 2026-05-15/           ← Sessão 15: Preparação para produção — runbook completo, checklist executiva, D15-T1.1 resolvido
-    ├── SESSION_RECOVERY_2026-05-15.md
-    └── DAILY_ACTIVITIES_2026-05-15.md
+├── 2026-05-15/           ← Sessão 15: Preparação para produção — runbook completo, checklist executiva, D15-T1.1 resolvido
+│   ├── SESSION_RECOVERY_2026-05-15.md
+│   └── DAILY_ACTIVITIES_2026-05-15.md
+└── 2026-05-16/           ← Sessão 16: Migração prod Unimed Guaxupé — Docker daemon deploy wfdb01, 4 usuários criados, container rodando
+    ├── DAILY_ACTIVITIES_2026-05-16.md
+    └── FINAL_STATUS_2026-05-16.md
 ```
 
 ## Evidências de Validação S3
