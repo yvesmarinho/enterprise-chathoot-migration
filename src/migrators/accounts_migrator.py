@@ -42,8 +42,7 @@ class AccountsMigrator(BaseMigrator):
         dest_meta = MetaData()
         dest_table = Table("accounts", dest_meta, autoload_with=self.dest_engine)
 
-        with self.source_engine.connect() as conn:
-            rows = [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        rows = self._select_source_rows(src_table)
 
         self.logger.info("AccountsMigrator: %d source rows fetched", len(rows))
 
@@ -126,5 +125,4 @@ class AccountsMigrator(BaseMigrator):
         """
         src_meta = MetaData()
         src_table = Table("accounts", src_meta, autoload_with=self.source_engine)
-        with self.source_engine.connect() as conn:
-            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        return self._select_source_rows(src_table)

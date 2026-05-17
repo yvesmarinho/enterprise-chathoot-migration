@@ -46,6 +46,11 @@ REMOTE_DIR="${REMOTE_DIR:-~/chatwoot-migration}"
 ACCOUNT_NAME="${ACCOUNT_NAME:-Unimed Guaxupé}"
 MIGRATION_SOURCE_KEY="${MIGRATION_SOURCE_KEY:-chat-vya-digital}"
 MIGRATION_DEST_KEY="${MIGRATION_DEST_KEY:-synchat-vya-digital}"
+# PIPELINE: "full" (src/migrar.py — pipeline completo)
+#         | "legacy" (app/01_migrar_account.py — contacts+conversations apenas)
+PIPELINE="${PIPELINE:-full}"
+# MIGRATION_ENV: "prod" | "dev" — atalho para SOURCE/DEST keys (usado por src/migrar.py)
+MIGRATION_ENV="${MIGRATION_ENV:-prod}"
 
 SSH_OPTS="-p ${WFDB01_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=15"
 
@@ -136,6 +141,8 @@ if [[ "${RUN}" == "true" ]]; then
         MIGRATION_SOURCE_KEY='${MIGRATION_SOURCE_KEY}' \
         MIGRATION_DEST_KEY='${MIGRATION_DEST_KEY}' \
         ACCOUNT_NAME='${ACCOUNT_NAME}' \
+        PIPELINE='${PIPELINE}' \
+        MIGRATION_ENV='${MIGRATION_ENV}' \
         docker compose -f docker/docker-compose.yml run \
             -d \
             --name '${CONTAINER}' \
@@ -170,6 +177,8 @@ if [[ "${RUN_ALL}" == "true" ]]; then
         docker rm -f '${CONTAINER}' 2>/dev/null || true
         MIGRATION_SOURCE_KEY='${MIGRATION_SOURCE_KEY}' \
         MIGRATION_DEST_KEY='${MIGRATION_DEST_KEY}' \
+        PIPELINE='${PIPELINE}' \
+        MIGRATION_ENV='${MIGRATION_ENV}' \
         docker compose -f docker/docker-compose.yml run \
             -d \
             --name '${CONTAINER}' \

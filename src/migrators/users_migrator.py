@@ -64,10 +64,18 @@ class UsersMigrator(BaseMigrator):
             }
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
 
-        # Fetch all source users
+        # Fetch all source users (filtered by account if account_id_filter is set)
         with self.source_engine.connect() as conn:
             rows = [dict(r) for r in conn.execute(src_users.select()).mappings().all()]
             au_rows = [dict(r) for r in conn.execute(src_au.select()).mappings().all()]
+
+        # When migrating a single account, restrict to users belonging to it
+        if self.account_id_filter is not None:
+            _target_user_ids: set[int] = {
+                int(r["user_id"]) for r in au_rows if int(r["account_id"]) == self.account_id_filter
+            }
+            rows = [r for r in rows if int(r["id"]) in _target_user_ids]
+            au_rows = [r for r in au_rows if int(r["account_id"]) == self.account_id_filter]
 
         self.logger.info(
             "UsersMigrator: %d users, %d account_users fetched from source",
@@ -233,8 +241,18 @@ class UsersMigrator(BaseMigrator):
         """
         src_meta = MetaData()
         src_users = Table("users", src_meta, autoload_with=self.source_engine)
+        src_au = Table("account_users", src_meta, autoload_with=self.source_engine)
         with self.source_engine.connect() as conn:
-            return [dict(r) for r in conn.execute(src_users.select()).mappings().all()]
+            rows = [dict(r) for r in conn.execute(src_users.select()).mappings().all()]
+            if self.account_id_filter is not None:
+                au_rows = [dict(r) for r in conn.execute(src_au.select()).mappings().all()]
+                _target_ids = {
+                    int(r["user_id"])
+                    for r in au_rows
+                    if int(r["account_id"]) == self.account_id_filter
+                }
+                rows = [r for r in rows if int(r["id"]) in _target_ids]
+        return rows
 
     def _classify_row_poc(  # type: ignore[override]
         self,

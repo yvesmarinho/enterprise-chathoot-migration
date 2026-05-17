@@ -1,8 +1,8 @@
 # 🚀 RUNBOOK — Migração Chatwoot para Produção
 
 **Data da Migração**: 16 de maio de 2026 às 14:00 BRT
-**Scope**: Unimed Guaxupé (account SOURCE 25 → DEST 46)
-**Versão**: 1.1.0
+**Scope**: Unimed Guaxupé (account SOURCE 25 → DEST 46) — ou todas as accounts
+**Versão**: 1.2.0 _(atualizado 17/05/2026 — pipeline completo `src/migrar.py`)_
 **Responsável**: [Nome do Responsável]
 **Aprovador**: [Nome do Aprovador]
 
@@ -17,11 +17,13 @@ Migrar dados das seguintes accounts do Chatwoot SOURCE (`chat.vya.digital`) para
 |----------------|------------|---------------------|
 | Unimed Guaxupé | 25 | ~8.000 |
 
-**Total estimado**: ~8.000 registros (contacts, conversations, messages, attachments)
+**Total estimado**: ~8.000 registros (contacts, conversations, messages, attachments, teams, labels, inbox_members)
 
 ### Estratégia
 - **Tipo**: Migração MERGE com deduplicação por chave de negócio
-- **Método**: Account-by-account (uma de cada vez)
+- **Método**: Account-by-account (uma de cada vez) **ou todas de uma vez** — ambos suportados
+- **Pipeline**: `src/migrar.py` — pipeline **completo** (teams, labels, contacts, conversations, messages, attachments, inbox_members, contact_inboxes)
+- **Idempotência**: Baseada em `migration_state` no DEST — re-execução segura sem duplicação
 - **Ordem**: Do menor para o maior (validação progressiva)
 - **Rollback**: Backup completo do DEST antes da migração
 
@@ -192,7 +194,9 @@ alias psql_src="PGPASSWORD=$SRC_PASS psql -h wfdb02.vya.digital -U migration_use
 
 **⚠️ NOTA IMPORTANTE**: Teste de attachments na produção confirmou que **todos os arquivos S3 estão acessíveis** para este account.
 
-#### 1.1 Executar Migração (via container — preferido)
+> **Pipeline atual**: `src/migrar.py` — cobre **teams, labels, contacts, contact_inboxes, conversations, messages, attachments, inbox_members**. Substitui `app/01_migrar_account.py` (legado, apenas contacts + conversations).
+
+#### 1.1 Executar Migração — Account Única
 
 > **Recomendado**: executa em **wfdb01** (mesma rede do banco), latência ~0.1ms vs ~50ms remoto.
 
@@ -200,16 +204,18 @@ alias psql_src="PGPASSWORD=$SRC_PASS psql -h wfdb02.vya.digital -U migration_use
 cd /home/yves_marinho/Documentos/DevOps/Vya-Jobs/enterprise-chathoot-migration
 
 # Opção A — Deploy + build + execução remota em wfdb01 (preferido para produção)
-./docker/deploy-to-wfdb01.sh --build --run
-# Variáveis já pré-configuradas:
-#   MIGRATION_SOURCE_KEY=chat-vya-digital
-#   MIGRATION_DEST_KEY=synchat-vya-digital
-#   ACCOUNT_NAME=Unimed Guaxupé
+# PIPELINE=full usa src/migrar.py; MIGRATION_ENV=prod usa chaves SOURCE/DEST de produção
+ACCOUNT_NAME="Unimed Guaxupé" PIPELINE=full MIGRATION_ENV=prod \
+    ./docker/deploy-to-wfdb01.sh --build --run
 
 # Opção B — Execução local (fallback, aceita latência de rede)
-export MIGRATION_SOURCE_KEY=chat-vya-digital
-export MIGRATION_DEST_KEY=synchat-vya-digital
-uv run python app/01_migrar_account.py "Unimed Guaxupé"
+uv run python src/migrar.py --env prod --account "Unimed Guaxupé"
+
+# Dry-run (sem escrita — validar antes de executar)
+uv run python src/migrar.py --env prod --account "Unimed Guaxupé" --dry-run
+
+# Migrar apenas uma tabela específica (ex: apenas teams)
+uv run python src/migrar.py --env prod --account "Unimed Guaxupé" --only-table teams
 ```
 
 **Acompanhar log no container (se --run)**:
@@ -221,9 +227,27 @@ docker logs -f $(docker ps -lq)
 ```
 
 **Saídas esperadas**:
-- Log em `app/logs/Unimed_Guaxupe_YYYYMMDD_HHMMSS.log` (volume montado)
-- Erros (se houver) em `app/logs/erros_Unimed_Guaxupe.jsonl`
-- Mensagem final: `✅ Migração concluída: Unimed Guaxupé`
+- Log em `logs/migration_YYYYMMDD_HHMMSS.jsonl` (gerado por `src/migrar.py`)
+- Tabelas migradas na ordem: `accounts → inboxes → users → teams → labels → contacts → contact_inboxes → conversations → messages → attachments → conversation_labels`
+- Mensagem final: `=== Migration completed (exit 0) ===`
+
+#### 1.1b Migrar TODAS as Accounts
+
+> Use quando todas as accounts do SOURCE precisam ser migradas de uma só vez.
+
+```bash
+# Via container em wfdb01 (preferido)
+ALL_ACCOUNTS=true PIPELINE=full MIGRATION_ENV=prod \
+    ./docker/deploy-to-wfdb01.sh --all
+
+# Localmente
+uv run python src/migrar.py --env prod
+
+# Dry-run de todas as accounts
+uv run python src/migrar.py --env prod --dry-run
+```
+
+> **Idempotência**: Re-executar `src/migrar.py` é seguro — registros já migrados são detectados via tabela `migration_state` e pulados automaticamente. Não há duplicação.
 
 #### 1.2 Validação Imediata
 ```bash
@@ -309,8 +333,11 @@ make validate-hash TABLES=contacts,conversations,messages,attachments
 
 #### Opção A — Continuar (se <= 20% de erros)
 ```bash
-# Script é idempotente — re-executar
-uv run python app/01_migrar_account.py "<Account Name>"
+# Pipeline completo — idempotente via migration_state (registros já migrados são pulados)
+uv run python src/migrar.py --env prod --account "<Account Name>"
+
+# Ou para todas as accounts:
+uv run python src/migrar.py --env prod
 ```
 
 #### Opção B — Rollback Completo
@@ -428,30 +455,33 @@ PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot00
 
 **Solução**:
 ```python
-# Editar app/01_migrar_account.py
-BATCH = 50  # aumentar de 30 para 50 ou 100
+# Editar src/migrators/base_migrator.py
+_BATCH_SIZE = 100  # aumentar de 50 para 100 ou 200
 
-# Re-executar (script é idempotente)
+# Re-executar (idempotente via migration_state)
+uv run python src/migrar.py --env prod --account "<Account Name>"
 ```
 
 ---
 
 ### Problema 3: "Conversas migradas não aparecem na UI do Chatwoot"
 
-**Causa provável**: Permissões de `inbox_members` ausentes.
+**Causa provável**: Permissões de `inbox_members` ausentes (ou `teams`/`labels` não migrados).
 
-**Diagnóstico**:
+> **Nota**: Com `src/migrar.py` (pipeline completo), `teams`, `labels` e `inbox_members` são migrados automaticamente. Este problema ocorre apenas se foi usado o pipeline legado (`app/01_migrar_account.py`). Para corrigir, re-executar com o pipeline completo:
+> ```bash
+> uv run python src/migrar.py --env prod --account "<Account Name>"
+> ```
+
+**Diagnóstico (se persistir após pipeline completo)**:
 ```bash
 # DEST: wfdb02.vya.digital / chatwoot004_db
 PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db \
     -c "SELECT u.email, i.name AS inbox_name, im.id AS inbox_member_id FROM users u LEFT JOIN inbox_members im ON im.user_id = u.id LEFT JOIN inboxes i ON i.id = im.inbox_id WHERE u.email = 'usuario@exemplo.com' AND i.account_id = <DEST_ACCOUNT_ID>;"
 ```
 
-**Solução**:
+**Solução manual (fallback)**:
 ```bash
-# Migrar inbox_members (ainda não implementado no pipeline principal)
-# Ver TODO.md: S11-P0-1
-
 # Workaround manual:
 PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot004_db -c "
     INSERT INTO inbox_members (inbox_id, user_id, created_at, updated_at)
@@ -597,7 +627,60 @@ PGPASSWORD=$DEST_PASS psql -h wfdb02.vya.digital -U migration_user -d chatwoot00
 
 ---
 
-**Versão**: 1.0.0
+## 📋 VARIÁVEIS DE AMBIENTE — REFERÊNCIA RÁPIDA
+
+### `src/migrar.py` (CLI local)
+
+| Flag | Valores | Descrição |
+|------|---------|-----------|
+| `--env prod` | `prod` \| `dev` | Atalho para SOURCE/DEST keys de produção ou DEV |
+| `--account "Nome"` | nome da account (case-insensitive) | Migrar apenas uma account |
+| _(sem --account)_ | — | Migrar **todas** as accounts do SOURCE |
+| `--dry-run` | — | Simulação sem escrita |
+| `--only-table X` | nome da tabela | Migrar apenas a tabela especificada |
+| `--verbose` | — | Log detalhado |
+
+**Exemplos**:
+```bash
+# Uma account, PROD
+uv run python src/migrar.py --env prod --account "Unimed Guaxupé"
+
+# Todas as accounts, PROD
+uv run python src/migrar.py --env prod
+
+# Uma account, DEV (para testar antes de prod)
+uv run python src/migrar.py --env dev --account "Unimed Guaxupé" --dry-run
+
+# Apenas teams de uma account
+uv run python src/migrar.py --env prod --account "Unimed Guaxupé" --only-table teams
+```
+
+### `docker/deploy-to-wfdb01.sh` (container remoto em wfdb01)
+
+| Variável | Padrão | Descrição |
+|----------|--------|-----------|
+| `PIPELINE` | `full` | `full` = `src/migrar.py` \| `legacy` = `app/01_migrar_account.py` |
+| `MIGRATION_ENV` | `prod` | `prod` \| `dev` — atalho SOURCE/DEST keys |
+| `ACCOUNT_NAME` | `Unimed Guaxupé` | Account a migrar (ignorado se `ALL_ACCOUNTS=true`) |
+| `ALL_ACCOUNTS` | `false` | `true` = migra todas as accounts |
+| `DRY_RUN` | `false` | `true` = simulação sem escrita |
+
+**Exemplos**:
+```bash
+# Uma account (pipeline completo, PROD)
+ACCOUNT_NAME="Unimed Guaxupé" ./docker/deploy-to-wfdb01.sh --build --run
+
+# Todas as accounts (pipeline completo, PROD)
+./docker/deploy-to-wfdb01.sh --all
+
+# Dry-run de uma account em DEV
+ACCOUNT_NAME="Unimed Guaxupé" MIGRATION_ENV=dev DRY_RUN=true \
+    ./docker/deploy-to-wfdb01.sh --run
+```
+
+---
+
+**Versão**: 1.2.0 _(atualizado 17/05/2026)_
 **Data de criação**: 2026-05-15
 **Última atualização**: 2026-05-15
 **Aprovado por**: [Nome e Assinatura]

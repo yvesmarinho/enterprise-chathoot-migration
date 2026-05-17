@@ -85,14 +85,45 @@ class BaseMigrator(ABC):
         id_remapper: IDRemapper,
         state_repo: MigrationStateRepository,
         logger: logging.Logger,
+        account_id_filter: int | None = None,
     ) -> None:
-        """Initialise the migrator with engines, remapper, state repo, and logger."""
+        """Initialise the migrator with engines, remapper, state repo, and logger.
+
+        :param account_id_filter: When set, restricts source row fetching to
+            this single source account_id (or, for the ``accounts`` table, to
+            the row whose ``id`` matches).  Tables that have no direct
+            ``account_id`` column (team_members, contact_inboxes, etc.) are
+            naturally scoped by the FK-orphan skipping logic in _run_batches.
+        :type account_id_filter: int | None
+        """
         self.source_engine = source_engine
         self.dest_engine = dest_engine
         self.id_remapper = id_remapper
         self.state_repo = state_repo
         self.logger = logger
+        self.account_id_filter = account_id_filter
         self._repo = BaseRepository()
+
+    def _select_source_rows(self, src_table: Table) -> list[dict]:
+        """Fetch source rows, applying :attr:`account_id_filter` when set.
+
+        * For the ``accounts`` table: ``WHERE id = account_id_filter``.
+        * For tables with an ``account_id`` column: ``WHERE account_id = account_id_filter``.
+        * Otherwise: full table scan (no filter added).
+
+        :param src_table: Reflected source table object.
+        :type src_table: Table
+        :returns: List of rows as plain dicts.
+        :rtype: list[dict]
+        """
+        stmt = src_table.select()
+        if self.account_id_filter is not None:
+            if src_table.name == "accounts":
+                stmt = stmt.where(src_table.c.id == self.account_id_filter)
+            elif "account_id" in src_table.c:
+                stmt = stmt.where(src_table.c.account_id == self.account_id_filter)
+        with self.source_engine.connect() as conn:
+            return [dict(r) for r in conn.execute(stmt).mappings().all()]
 
     @abstractmethod
     def migrate(self) -> MigrationResult:

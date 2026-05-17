@@ -33,6 +33,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 import re
 import sys
 import time
@@ -111,11 +112,19 @@ def _load_api_config(timeout_s: int = 10) -> ApiConfig:
         log.error("Secrets file not found: %s", _SECRETS_PATH)
         sys.exit(1)
     data: dict = json.loads(_SECRETS_PATH.read_text())
-    api_section = data.get("vya-chat-dev", {})
+    api_instance = os.environ.get("MIGRATION_API_INSTANCE", "vya-chat-dev")
+    api_section = data.get(api_instance, {})
     api_key = api_section.get("api_key", "")
-    host = api_section.get("host", "")
+    # api_host tem precedência sobre host
+    # (evita usar host do DB como URL de API)
+    host = api_section.get("api_host") or api_section.get("host", "")
     if not api_key or not host:
-        log.error("vya-chat-dev.api_key ou vya-chat-dev.host ausente em %s", _SECRETS_PATH)
+        log.error(
+            "%s.api_key ou %s.api_host ausente em %s",
+            api_instance,
+            api_instance,
+            _SECRETS_PATH,
+        )
         sys.exit(1)
     if not host.startswith("http"):
         host = f"https://{host}"

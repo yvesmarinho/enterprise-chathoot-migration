@@ -29,10 +29,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+from sqlalchemy import text
 
 from src.factory.connection_factory import ConnectionFactory
 from src.migrators.accounts_migrator import AccountsMigrator
@@ -60,6 +63,12 @@ from src.repository.migration_state_repository import MigrationStateRepository
 from src.utils.fk_validator import FKValidator
 from src.utils.id_remapper import IDRemapper
 from src.utils.log_masker import MaskingHandler
+
+# DEV / PROD env presets — shortcut for MIGRATION_SOURCE_KEY / MIGRATION_DEST_KEY
+_ENV_PRESETS: dict[str, tuple[str, str]] = {
+    "dev": ("chatwoot_dev", "chatwoot004_dev"),
+    "prod": ("chat-vya-digital", "synchat-vya-digital"),
+}
 
 # Canonical FK migration order
 _MIGRATION_ORDER = [
@@ -173,6 +182,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Set log level to DEBUG.",
     )
+    parser.add_argument(
+        "--env",
+        choices=["dev", "prod"],
+        help=(
+            "Convenience shortcut that sets MIGRATION_SOURCE_KEY and "
+            "MIGRATION_DEST_KEY automatically. "
+            "dev = chatwoot_dev / chatwoot004_dev. "
+            "prod = chat-vya-digital / synchat-vya-digital. "
+            "Overrides the env vars when provided."
+        ),
+    )
+    parser.add_argument(
+        "--account",
+        metavar="ACCOUNT_NAME",
+        help=(
+            "Migrate only this account (matched by name, case-insensitive). "
+            "If omitted, migrates all accounts found in SOURCE."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -185,9 +213,25 @@ def main(argv: list[str] | None = None) -> int:
     :rtype: int
     """
     args = _parse_args(argv)
+
+    # Apply --env shortcut before ConnectionFactory reads the env vars
+    if args.env:
+        src_key, dst_key = _ENV_PRESETS[args.env]
+        os.environ["MIGRATION_SOURCE_KEY"] = src_key
+        os.environ["MIGRATION_DEST_KEY"] = dst_key
+
     logger, log_file = _setup_logging(args.verbose)
 
     logger.info("=== Enterprise Chatwoot Migration starting ===")
+    if args.env:
+        logger.info(
+            "--env %s → SOURCE_KEY=%s DEST_KEY=%s",
+            args.env,
+            os.environ["MIGRATION_SOURCE_KEY"],
+            os.environ["MIGRATION_DEST_KEY"],
+        )
+    if args.account:
+        logger.info("Account filter: %r (single-account mode)", args.account)
     if args.poc and not args.dry_run:
         logger.error("--poc requires --dry-run. Aborting.")
         return 2
@@ -205,6 +249,24 @@ def main(argv: list[str] | None = None) -> int:
     dest_engine = factory.create_dest_engine()
     logger.info("Engines created")
 
+    # (2a) Resolve --account to source account_id
+    account_id_filter: int | None = None
+    if args.account:
+        with source_engine.connect() as _conn:
+            _row = _conn.execute(
+                text("SELECT id FROM public.accounts WHERE LOWER(name) = LOWER(:name)"),
+                {"name": args.account},
+            ).fetchone()
+        if _row is None:
+            logger.error("Account not found in SOURCE: %r", args.account)
+            return 3
+        account_id_filter = int(_row[0])
+        logger.info(
+            "Account filter resolved: %r → src_account_id=%d",
+            args.account,
+            account_id_filter,
+        )
+
     # (2b) Create migration_state table if not exists
     state_repo = MigrationStateRepository()
     if not args.dry_run:
@@ -215,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     # "conversation_labels" is a logical name — actual DB table is "taggings"
     _offset_tables = [t if t != "conversation_labels" else "taggings" for t in _MIGRATION_ORDER]
     remapper = IDRemapper()
-    offsets = remapper.compute_offsets(dest_engine, _offset_tables)
+    remapper.compute_offsets(dest_engine, _offset_tables)
     # Register "conversation_labels" offset so ConversationLabelsMigrator.remap works
     remapper._offsets["conversation_labels"] = remapper._offsets.get("taggings", 0)
     logger.info("Offsets computed: %s", remapper.offsets)
@@ -252,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
             id_remapper=remapper,
             state_repo=state_repo,
             logger=logging.getLogger(f"migrar.{table_name}"),
+            account_id_filter=account_id_filter,
         )
 
         if args.poc:

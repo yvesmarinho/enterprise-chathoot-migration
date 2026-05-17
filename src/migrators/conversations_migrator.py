@@ -230,8 +230,7 @@ class ConversationsMigrator(BaseMigrator):
         """
         src_meta = MetaData()
         src_table = Table("conversations", src_meta, autoload_with=self.source_engine)
-        with self.source_engine.connect() as conn:
-            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        return self._select_source_rows(src_table)
 
     def _classify_row_poc(  # type: ignore[override]
         self,

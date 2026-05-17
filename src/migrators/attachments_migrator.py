@@ -52,8 +52,7 @@ class AttachmentsMigrator(BaseMigrator):
             migrated_messages = self.state_repo.get_migrated_ids(conn, "messages")
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
 
-        with self.source_engine.connect() as conn:
-            rows = [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        rows = self._select_source_rows(src_table)
 
         self.logger.info("AttachmentsMigrator: %d source rows fetched", len(rows))
 
@@ -123,8 +122,7 @@ class AttachmentsMigrator(BaseMigrator):
         """
         src_meta = MetaData()
         src_table = Table("attachments", src_meta, autoload_with=self.source_engine)
-        with self.source_engine.connect() as conn:
-            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        return self._select_source_rows(src_table)
 
     def _classify_row_poc(  # type: ignore[override]
         self,

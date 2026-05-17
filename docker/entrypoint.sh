@@ -23,6 +23,13 @@ ACCOUNT_NAME="${ACCOUNT_NAME:-Unimed Guaxupé}"
 ALL_ACCOUNTS="${ALL_ACCOUNTS:-false}"
 DRY_RUN="${DRY_RUN:-false}"
 SCRIPT="${SCRIPT:-}"
+# PIPELINE: "full" (src/migrar.py — teams, labels, attachments, etc.)
+#         | "legacy" (app/01_migrar_account.py — contacts+conversations only)
+# Padrão: "full" — pipeline completo e idempotente
+PIPELINE="${PIPELINE:-full}"
+# MIGRATION_ENV: "prod" | "dev" — atalho para as chaves SOURCE/DEST
+# Ignorado se MIGRATION_SOURCE_KEY e MIGRATION_DEST_KEY já estiverem definidas.
+MIGRATION_ENV="${MIGRATION_ENV:-}"
 
 # Validação antecipada das keys obrigatórias
 if [[ -z "${MIGRATION_SOURCE_KEY}" || -z "${MIGRATION_DEST_KEY}" ]]; then
@@ -41,7 +48,8 @@ echo "  DEST KEY     : ${MIGRATION_DEST_KEY}"
 echo "  ACCOUNT      : ${ACCOUNT_NAME}"
 echo "  ALL_ACCOUNTS : ${ALL_ACCOUNTS}"
 echo "  DRY_RUN      : ${DRY_RUN}"
-echo "  SCRIPT       : ${SCRIPT:-01_migrar_account.py (default)}"
+echo "  PIPELINE     : ${PIPELINE}"
+echo "  SCRIPT       : ${SCRIPT:-<padrão pelo PIPELINE>}"
 echo "========================================================"
 
 # Script customizado tem prioridade máxima
@@ -56,16 +64,33 @@ if [[ "${ALL_ACCOUNTS}" == "true" ]]; then
     mkdir -p /app/app/logs
     # Symlink "latest" para facilitar tail -f
     ln -sf "${LOG_FILE}" /app/app/logs/migration_all_latest.log
-    echo "→ Migrando TODOS os accounts (migrate_all_accounts.py)"
-    echo "→ Log salvo em: ${LOG_FILE}"
-    ARGS=()
-    [[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
-    # tee: exibe no stdout (docker logs) e salva em arquivo no volume montado
-    python app/migrate_all_accounts.py "${ARGS[@]}" 2>&1 | tee "${LOG_FILE}"
+    if [[ "${PIPELINE}" == "full" ]]; then
+        echo "→ Migrando TODOS os accounts — pipeline completo (src/migrar.py)"
+        echo "→ Log salvo em: ${LOG_FILE}"
+        ARGS=()
+        [[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
+        [[ -n "${MIGRATION_ENV}" ]] && ARGS+=("--env" "${MIGRATION_ENV}")
+        python src/migrar.py "${ARGS[@]}" 2>&1 | tee "${LOG_FILE}"
+    else
+        echo "→ Migrando TODOS os accounts — pipeline legado (migrate_all_accounts.py)"
+        echo "→ Log salvo em: ${LOG_FILE}"
+        ARGS=()
+        [[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
+        python app/migrate_all_accounts.py "${ARGS[@]}" 2>&1 | tee "${LOG_FILE}"
+    fi
     exit ${PIPESTATUS[0]}
 fi
 
 # Pipeline de uma account específica
-ARGS=("${ACCOUNT_NAME}")
-[[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
-exec python app/01_migrar_account.py "${ARGS[@]}"
+if [[ "${PIPELINE}" == "full" ]]; then
+    echo "→ Pipeline completo: src/migrar.py (account: ${ACCOUNT_NAME})"
+    ARGS=("--account" "${ACCOUNT_NAME}")
+    [[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
+    [[ -n "${MIGRATION_ENV}" ]] && ARGS+=("--env" "${MIGRATION_ENV}")
+    exec python src/migrar.py "${ARGS[@]}"
+else
+    echo "→ Pipeline legado: app/01_migrar_account.py (account: ${ACCOUNT_NAME})"
+    ARGS=("${ACCOUNT_NAME}")
+    [[ "${DRY_RUN}" == "true" ]] && ARGS+=("--dry-run")
+    exec python app/01_migrar_account.py "${ARGS[@]}"
+fi

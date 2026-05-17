@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-16 (Sessão 16 — Migração Unimed Guaxupé executada — container daemon wfdb01)
-**Last Session**: 2026-05-16 (Sessão 16 — Docker adapt + deploy prod + 4 usuários criados + container rodando)
+**Last Updated**: 2026-05-17 (Sessão 18 — Pipeline completo `src/migrar.py` com `--env`/`--account` + Docker PIPELINE=full + RUNBOOK v1.2.0)
+**Last Session**: 2026-05-17 (Sessão 18 — 13 migrators atualizados, account_id_filter, entrypoint.sh PIPELINE=full)
 
 ---
 
@@ -68,6 +68,10 @@ SESSIONS/
 └── 2026-05-16/           ← Sessão 16: Migração prod Unimed Guaxupé — Docker daemon deploy wfdb01, 4 usuários criados, container rodando
     ├── DAILY_ACTIVITIES_2026-05-16.md
     └── FINAL_STATUS_2026-05-16.md
+└── 2026-05-17/           ← Sessão 18: Pipeline completo — `src/migrar.py --env/--account`, `account_id_filter` em 13 migrators, Docker PIPELINE=full, RUNBOOK v1.2.0
+    ├── DAILY_ACTIVITIES_2026-05-17.md
+    ├── SESSION_RECOVERY_2026-05-17.md
+    └── FINAL_STATUS_2026-05-17.md
 ```
 
 ## Evidências de Validação S3

@@ -43,8 +43,7 @@ class CannedResponsesMigrator(BaseMigrator):
         with self.dest_engine.connect() as conn:
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
 
-        with self.source_engine.connect() as conn:
-            rows = [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        rows = self._select_source_rows(src_table)
 
         self.logger.info("CannedResponsesMigrator: %d source rows fetched", len(rows))
 
@@ -139,8 +138,7 @@ class CannedResponsesMigrator(BaseMigrator):
     def _fetch_all_source_rows(self) -> list[dict]:
         src_meta = MetaData()
         src_table = Table("canned_responses", src_meta, autoload_with=self.source_engine)
-        with self.source_engine.connect() as conn:
-            return [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        return self._select_source_rows(src_table)
 
     def _classify_row_poc(
         self,

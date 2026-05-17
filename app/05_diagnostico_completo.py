@@ -2,22 +2,42 @@
 # =============================================================================
 # 05_diagnostico_completo.py — Análise profunda SOURCE vs DEST
 # =============================================================================
-# Executa análise completa e comparativa entre os dois bancos Chatwoot.
-# Cobre: volumes, sobreposição, qualidade de dados, tipos de schema,
-#        migrations diff, campos especiais e estimativa de migração.
-#
 # SOMENTE LEITURA — nunca escreve em nenhum banco.
 # Nenhum dado sensível (email, nome, telefone, conteúdo) é impresso.
 #
 # Uso:
 #   cd app/
-#   python 05_diagnostico_completo.py
-#   python 05_diagnostico_completo.py --salvar   # salva em ../tmp/
+#   uv run python 05_diagnostico_completo.py
+#   uv run python 05_diagnostico_completo.py --account "Unimed Guaxupé"
+#   uv run python 05_diagnostico_completo.py --account "Unimed Guaxupé" --salvar
+#   uv run python 05_diagnostico_completo.py --no-slow          # pula cross-DB lentos
+#   uv run python 05_diagnostico_completo.py --verbose          # log DEBUG
+#
+# Flags:
+#   --account NOME   Filtrar todos os blocos para um único account
+#   --salvar         Salvar saída completa em .tmp/diagnostico_<ACCOUNT>_<TS>.txt
+#                    O arquivo captura tanto os logs quanto as tabelas impressas.
+#   --verbose        Log DEBUG: mostra cada query antes de executar
+#   --no-slow        Pular blocos lentos (bloco_overlap_contacts, bloco_accounts_merge)
+#
+# Variáveis de ambiente (defaults PROD já configurados no código):
+#   MIGRATION_SOURCE_KEY   default: chat-vya-digital
+#   MIGRATION_DEST_KEY     default: synchat-vya-digital
 # =============================================================================
 
+import argparse
 import datetime
+import logging
+import os
 import sys
+import time
 from pathlib import Path
+
+# Credenciais PROD por padrão — sobrescreva via env vars para DEV:
+#   export MIGRATION_SOURCE_KEY=chatwoot_dev
+#   export MIGRATION_DEST_KEY=chatwoot004_dev
+os.environ.setdefault("MIGRATION_SOURCE_KEY", "chat-vya-digital")
+os.environ.setdefault("MIGRATION_DEST_KEY", "synchat-vya-digital")
 
 from db import cur, dst, src
 
@@ -65,12 +85,14 @@ SPECIAL_COLUMNS = [
 
 
 def section(title: str) -> None:
+    log.info(">>> %s", title)
     print(f"\n{SEP}")
     print(f"  {title}")
     print(SEP)
 
 
 def subsection(title: str) -> None:
+    log.debug("    %s", title)
     print(f"\n{SEP2}")
     print(f"  {title}")
     print(SEP2)
@@ -132,10 +154,120 @@ def fmt(n: int) -> str:
     return f"{n:>10,}"
 
 
+log = logging.getLogger("diagnostico")
+
+
+class _Tee:
+    """Duplicate sys.stdout to a file.
+
+    Must be installed BEFORE logging.basicConfig so both print() and
+    log StreamHandler output are captured in the same file.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._file = path.open("w", encoding="utf-8")
+        self._orig = sys.stdout
+        sys.stdout = self
+
+    def write(self, data: str) -> None:
+        self._orig.write(data)
+        self._file.write(data)
+
+    def flush(self) -> None:
+        self._orig.flush()
+        self._file.flush()
+
+    def isatty(self) -> bool:  # required by some logging formatters
+        return False
+
+    def close(self) -> None:
+        sys.stdout = self._orig
+        self._file.close()
+
+
+def _resolve_account(conn, name: str) -> int:
+    """Resolve account name → id; sys.exit if not found."""
+    with cur(conn) as c:
+        c.execute("SELECT id FROM public.accounts WHERE name = %s", (name,))
+        row = c.fetchone()
+    if row is None:
+        raise SystemExit(f"[ERRO] Account '{name}' não encontrado.")
+    return row["id"]
+
+
+def _count_by_table(conn, table: str, acc_id: int | None) -> int:
+    """Count rows filtered by account_id.
+
+    Handles tables without direct account_id (messages, attachments,
+    contact_inboxes) via JOIN.  Returns -1 if the table does not exist.
+    """
+    if acc_id is None:
+        return count_table(conn, table)
+    if table == "messages":
+        return (
+            scalar(
+                conn,
+                """
+            SELECT COUNT(1) FROM public.messages m
+            JOIN public.conversations c ON c.id = m.conversation_id
+            WHERE c.account_id = %s
+        """,
+                (acc_id,),
+            )
+            or 0
+        )
+    if table == "attachments":
+        return (
+            scalar(
+                conn,
+                """
+            SELECT COUNT(1) FROM public.attachments a
+            JOIN public.messages m ON m.id = a.message_id
+            JOIN public.conversations c ON c.id = m.conversation_id
+            WHERE c.account_id = %s
+        """,
+                (acc_id,),
+            )
+            or 0
+        )
+    if table == "contact_inboxes":
+        return (
+            scalar(
+                conn,
+                """
+            SELECT COUNT(1) FROM public.contact_inboxes ci
+            JOIN public.inboxes i ON i.id = ci.inbox_id
+            WHERE i.account_id = %s
+        """,
+                (acc_id,),
+            )
+            or 0
+        )
+    if table == "accounts":
+        # accounts.id IS the account pk — filter to this single account
+        return scalar(conn, "SELECT COUNT(1) FROM public.accounts WHERE id = %s", (acc_id,)) or 0
+    if table == "users":
+        # users don't have account_id — join through account_users
+        return (
+            scalar(
+                conn,
+                """
+            SELECT COUNT(1) FROM public.users u
+            JOIN public.account_users au ON au.user_id = u.id
+            WHERE au.account_id = %s
+        """,
+                (acc_id,),
+            )
+            or 0
+        )
+    return count_where(conn, table, "account_id = %s", (acc_id,))
+
+
 # ── Bloco 1 — Inventário Global ───────────────────────────────────────────────
 
 
-def bloco_inventario(sc, dc) -> None:
+def bloco_inventario(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 1 — INVENTÁRIO GLOBAL DE TABELAS")
     print(f"\n  {'TABELA':<30}  {'SOURCE':>10}  {'DEST':>10}  {'DIFF':>10}")
     print(f"  {'-'*30}  {'-'*10}  {'-'*10}  {'-'*10}")
@@ -143,8 +275,9 @@ def bloco_inventario(sc, dc) -> None:
     totals_src = 0
     totals_dst = 0
     for table in MAIN_TABLES:
-        sv = count_table(sc, table)
-        dv = count_table(dc, table)
+        log.debug("  count %-22s ...", table)
+        sv = _count_by_table(sc, table, src_acc_id)
+        dv = _count_by_table(dc, table, dest_acc_id)
         diff = dv - sv if sv >= 0 and dv >= 0 else 0
         sv_s = fmt(sv) if sv >= 0 else "      N/A "
         dv_s = fmt(dv) if dv >= 0 else "      N/A "
@@ -174,7 +307,7 @@ def bloco_inventario(sc, dc) -> None:
 # ── Bloco 2 — Schema Migrations Diff ─────────────────────────────────────────
 
 
-def bloco_migrations(sc, dc) -> None:
+def bloco_migrations(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 2 — SCHEMA MIGRATIONS DIFF (T2)")
 
     src_migs = {r["version"] for r in fetchall(sc, "SELECT version FROM schema_migrations")}
@@ -207,7 +340,9 @@ def bloco_migrations(sc, dc) -> None:
 # ── Bloco 3 — Tipos de Campos Especiais ──────────────────────────────────────
 
 
-def bloco_field_types(sc, dc) -> None:
+def bloco_field_types(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 3 — TIPOS DE CAMPOS ESPECIAIS (T1)")
     print(f"\n  {'TABELA.COLUNA':<45}  {'TIPO SOURCE':>12}  {'TIPO DEST':>12}  STATUS")
     print(f"  {'-'*45}  {'-'*12}  {'-'*12}  {'-'*20}")
@@ -219,26 +354,37 @@ def bloco_field_types(sc, dc) -> None:
         ok = "✓ iguais" if t_src == t_dst else "⚠ DIVERGENTE"
         print(f"  {label:<45}  {t_src:>12}  {t_dst:>12}  {ok}")
 
-    print(
-        f"""
+    print(f"""
   Legenda de tipos PostgreSQL:
     json     = tipo texto sem indexação — Rails pode retornar String (bug Rails push_event_data)
     jsonb    = binário indexável — Rails retorna Hash corretamente
     uuid     = UUID nativo
     text     = texto livre
     int4/int8 = inteiro
-"""
-    )
+""")
 
 
 # ── Bloco 4 — Accounts ───────────────────────────────────────────────────────
 
 
-def bloco_accounts(sc, dc) -> None:
+def bloco_accounts(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 4 — ACCOUNTS — COLISÃO DE NOMES (T3)")
 
-    src_accounts = fetchall(sc, "SELECT id, name, status FROM public.accounts ORDER BY id")
-    dst_accounts = fetchall(dc, "SELECT id, name, status FROM public.accounts ORDER BY id")
+    if src_acc_id is not None:
+        src_accounts = fetchall(
+            sc,
+            "SELECT id, name, status FROM public.accounts WHERE id = %s ORDER BY id",
+            (src_acc_id,),
+        )
+        dst_accounts = fetchall(
+            dc,
+            "SELECT id, name, status FROM public.accounts WHERE id = %s ORDER BY id",
+            (dest_acc_id,),
+        )
+    else:
+        src_accounts = fetchall(sc, "SELECT id, name, status FROM public.accounts ORDER BY id")
+        dst_accounts = fetchall(dc, "SELECT id, name, status FROM public.accounts ORDER BY id")
+    log.info("accounts: SOURCE=%d  DEST=%d", len(src_accounts), len(dst_accounts))
 
     dst_by_name = {r["name"]: r for r in dst_accounts}
     src_by_name = {r["name"]: r for r in src_accounts}
@@ -271,7 +417,7 @@ def bloco_accounts(sc, dc) -> None:
 # ── Bloco 5 — Users ──────────────────────────────────────────────────────────
 
 
-def bloco_users(sc, dc) -> None:
+def bloco_users(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 5 — USERS — MAPEAMENTO POR EMAIL (sem imprimir emails)")
 
     src_uids = {r["uid"] for r in fetchall(sc, "SELECT uid FROM public.users")}
@@ -321,7 +467,7 @@ def bloco_users(sc, dc) -> None:
 # ── Bloco 6 — Inboxes / Teams / Labels ───────────────────────────────────────
 
 
-def bloco_simples(sc, dc) -> None:
+def bloco_simples(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 6 — INBOXES / TEAMS / LABELS — SOBREPOSIÇÃO POR NOME")
 
     for entity, key_col, extra_col in [
@@ -331,17 +477,24 @@ def bloco_simples(sc, dc) -> None:
     ]:
         subsection(f"{entity.upper()}")
 
+        _sw = " AND account_id = %s" if src_acc_id else ""
+        _dw = " AND account_id = %s" if dest_acc_id else ""
+        _sp = (src_acc_id,) if src_acc_id else ()
+        _dp = (dest_acc_id,) if dest_acc_id else ()
+
         src_all = fetchall(
             sc,
             f"SELECT id, account_id, {key_col}"
             + (f", {extra_col}" if extra_col else "")
-            + f" FROM public.{entity} ORDER BY account_id, id",
+            + f" FROM public.{entity} WHERE 1=1{_sw} ORDER BY account_id, id",
+            _sp,
         )
         dst_all = fetchall(
             dc,
             f"SELECT id, account_id, {key_col}"
             + (f", {extra_col}" if extra_col else "")
-            + f" FROM public.{entity} ORDER BY account_id, id",
+            + f" FROM public.{entity} WHERE 1=1{_dw} ORDER BY account_id, id",
+            _dp,
         )
 
         dst_key = {(r["account_id"], r[key_col]): r["id"] for r in dst_all}
@@ -358,22 +511,34 @@ def bloco_simples(sc, dc) -> None:
 # ── Bloco 7 — Contacts ───────────────────────────────────────────────────────
 
 
-def bloco_contacts(sc, dc) -> None:
+def bloco_contacts(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 7 — CONTACTS — ANÁLISE PROFUNDA")
 
-    src_total = count_table(sc, "contacts")
-    dst_total = count_table(dc, "contacts")
+    _sw = "account_id = %s AND " if src_acc_id else ""
+    _dw = "account_id = %s AND " if dest_acc_id else ""
+    _sp = (src_acc_id,) if src_acc_id else ()
+    _dp = (dest_acc_id,) if dest_acc_id else ()
+
+    src_total = _count_by_table(sc, "contacts", src_acc_id)
+    dst_total = _count_by_table(dc, "contacts", dest_acc_id)
+    log.info("contacts: SOURCE=%d  DEST=%d", src_total, dst_total)
 
     # Rastreio
-    dst_with_src_id = count_where(dc, "contacts", "custom_attributes->>'src_id' IS NOT NULL")
+    dst_with_src_id = count_where(
+        dc, "contacts", f"{_dw}custom_attributes->>'src_id' IS NOT NULL", _dp
+    )
     dst_without_src = dst_total - dst_with_src_id
 
     # Preenchimento de campos de chave no SOURCE
-    src_with_email = count_where(sc, "contacts", "email IS NOT NULL AND email != ''")
-    src_with_phone = count_where(sc, "contacts", "phone_number IS NOT NULL AND phone_number != ''")
-    src_with_ident = count_where(sc, "contacts", "identifier IS NOT NULL AND identifier != ''")
+    src_with_email = count_where(sc, "contacts", f"{_sw}email IS NOT NULL AND email != ''", _sp)
+    src_with_phone = count_where(
+        sc, "contacts", f"{_sw}phone_number IS NOT NULL AND phone_number != ''", _sp
+    )
+    src_with_ident = count_where(
+        sc, "contacts", f"{_sw}identifier IS NOT NULL AND identifier != ''", _sp
+    )
     src_with_nothing = count_where(
-        sc, "contacts", "email IS NULL AND phone_number IS NULL AND identifier IS NULL"
+        sc, "contacts", f"{_sw}email IS NULL AND phone_number IS NULL AND identifier IS NULL", _sp
     )
 
     print(f"\n  SOURCE total contacts:              {fmt(src_total)}")
@@ -484,24 +649,38 @@ def bloco_contacts(sc, dc) -> None:
 # ── Bloco 8 — Conversations ──────────────────────────────────────────────────
 
 
-def bloco_conversations(sc, dc) -> None:
+def bloco_conversations(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 8 — CONVERSATIONS — ANÁLISE E QUALIDADE")
 
-    src_total = count_table(sc, "conversations")
-    dst_total = count_table(dc, "conversations")
+    _sw = "account_id = %s AND " if src_acc_id else ""
+    _dw = "account_id = %s AND " if dest_acc_id else ""
+    _sp = (src_acc_id,) if src_acc_id else ()
+    _dp = (dest_acc_id,) if dest_acc_id else ()
+    _sf = f"AND account_id = {src_acc_id}" if src_acc_id else ""
+    _df = f"AND account_id = {dest_acc_id}" if dest_acc_id else ""
 
-    src_with_src_id = count_where(sc, "conversations", "custom_attributes->>'src_id' IS NOT NULL")
-    dst_with_src_id = count_where(dc, "conversations", "custom_attributes->>'src_id' IS NOT NULL")
+    src_total = _count_by_table(sc, "conversations", src_acc_id)
+    dst_total = _count_by_table(dc, "conversations", dest_acc_id)
+    log.info("conversations: SOURCE=%d  DEST=%d", src_total, dst_total)
+
+    src_with_src_id = count_where(
+        sc, "conversations", f"{_sw}custom_attributes->>'src_id' IS NOT NULL", _sp
+    )
+    dst_with_src_id = count_where(
+        dc, "conversations", f"{_dw}custom_attributes->>'src_id' IS NOT NULL", _dp
+    )
     dst_without_src = dst_total - dst_with_src_id
 
     # UUID duplicado — conversations no SOURCE
     src_dup_uuid = (
         scalar(
             sc,
-            """
+            f"""
         SELECT COUNT(*) FROM (
             SELECT uuid FROM public.conversations
-            WHERE uuid IS NOT NULL
+            WHERE uuid IS NOT NULL {_sf}
             GROUP BY uuid HAVING COUNT(1) > 1
         ) t
     """,
@@ -511,10 +690,10 @@ def bloco_conversations(sc, dc) -> None:
     dst_dup_uuid = (
         scalar(
             dc,
-            """
+            f"""
         SELECT COUNT(*) FROM (
             SELECT uuid FROM public.conversations
-            WHERE uuid IS NOT NULL
+            WHERE uuid IS NOT NULL {_df}
             GROUP BY uuid HAVING COUNT(1) > 1
         ) t
     """,
@@ -523,14 +702,14 @@ def bloco_conversations(sc, dc) -> None:
     )
 
     # Qualidade: conversations sem contact_id
-    src_no_contact = count_where(sc, "conversations", "contact_id IS NULL")
+    src_no_contact = count_where(sc, "conversations", f"{_sw}contact_id IS NULL", _sp)
     # Qualidade: conversations com contact_id que não existe na própria base (FK broken)
     src_broken_contact = (
         scalar(
             sc,
-            """
+            f"""
         SELECT COUNT(1) FROM public.conversations c
-        WHERE c.contact_id IS NOT NULL
+        WHERE c.contact_id IS NOT NULL {_sf}
           AND NOT EXISTS (SELECT 1 FROM public.contacts WHERE id = c.contact_id)
     """,
         )
@@ -541,9 +720,9 @@ def bloco_conversations(sc, dc) -> None:
     src_broken_inbox = (
         scalar(
             sc,
-            """
+            f"""
         SELECT COUNT(1) FROM public.conversations c
-        WHERE c.inbox_id IS NOT NULL
+        WHERE c.inbox_id IS NOT NULL {_sf}
           AND NOT EXISTS (SELECT 1 FROM public.inboxes WHERE id = c.inbox_id)
     """,
         )
@@ -553,13 +732,11 @@ def bloco_conversations(sc, dc) -> None:
     # display_id: max por account no destino
     display_id_by_account = fetchall(
         dc,
-        """
-        SELECT account_id, MAX(display_id) AS max_display_id,
-               COUNT(1) AS total
-        FROM public.conversations
-        GROUP BY account_id
-        ORDER BY account_id
-    """,
+        "SELECT account_id, MAX(display_id) AS max_display_id, COUNT(1) AS total "
+        "FROM public.conversations "
+        + ("WHERE account_id = %s " if dest_acc_id else "")
+        + "GROUP BY account_id ORDER BY account_id",
+        _dp,
     )
 
     print(f"\n  SOURCE total conversations:              {fmt(src_total)}")
@@ -592,14 +769,38 @@ def bloco_conversations(sc, dc) -> None:
 # ── Bloco 9 — Messages ───────────────────────────────────────────────────────
 
 
-def bloco_messages(sc, dc) -> None:
+def bloco_messages(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 9 — MESSAGES — ANÁLISE E QUALIDADE")
 
-    src_total = count_table(sc, "messages")
-    dst_total = count_table(dc, "messages")
+    _sf = f"AND c.account_id = {src_acc_id}" if src_acc_id else ""
+    _df = f"AND c.account_id = {dest_acc_id}" if dest_acc_id else ""
 
-    src_with_src_id = count_where(sc, "messages", "additional_attributes->>'src_id' IS NOT NULL")
-    dst_with_src_id = count_where(dc, "messages", "additional_attributes->>'src_id' IS NOT NULL")
+    src_total = _count_by_table(sc, "messages", src_acc_id)
+    dst_total = _count_by_table(dc, "messages", dest_acc_id)
+    log.info("messages: SOURCE=%d  DEST=%d", src_total, dst_total)
+
+    src_with_src_id = (
+        scalar(
+            sc,
+            f"""
+        SELECT COUNT(1) FROM public.messages m
+        JOIN public.conversations c ON c.id = m.conversation_id
+        WHERE m.additional_attributes->>'src_id' IS NOT NULL {_sf}
+    """,
+        )
+        or 0
+    )
+    dst_with_src_id = (
+        scalar(
+            dc,
+            f"""
+        SELECT COUNT(1) FROM public.messages m
+        JOIN public.conversations c ON c.id = m.conversation_id
+        WHERE m.additional_attributes->>'src_id' IS NOT NULL {_df}
+    """,
+        )
+        or 0
+    )
 
     # Qualidade: messages sem conversation válida na própria base
     src_broken_conv = (
@@ -616,26 +817,51 @@ def bloco_messages(sc, dc) -> None:
     )
 
     # content_attributes: quantas NÃO são NULL no source
-    src_ca_not_null = count_where(sc, "messages", "content_attributes IS NOT NULL")
-    dst_ca_not_null = count_where(dc, "messages", "content_attributes IS NOT NULL")
+    src_ca_not_null = (
+        scalar(
+            sc,
+            f"""
+        SELECT COUNT(1) FROM public.messages m
+        JOIN public.conversations c ON c.id = m.conversation_id
+        WHERE m.content_attributes IS NOT NULL {_sf}
+    """,
+        )
+        or 0
+    )
+    dst_ca_not_null = (
+        scalar(
+            dc,
+            f"""
+        SELECT COUNT(1) FROM public.messages m
+        JOIN public.conversations c ON c.id = m.conversation_id
+        WHERE m.content_attributes IS NOT NULL {_df}
+    """,
+        )
+        or 0
+    )
 
     # Por tipo de mensagem
     msg_types = fetchall(
         sc,
-        "SELECT message_type, COUNT(1) n FROM public.messages GROUP BY 1 ORDER BY 2 DESC",
+        f"SELECT message_type, COUNT(1) n FROM public.messages m "
+        f"JOIN public.conversations c ON c.id = m.conversation_id "
+        f"WHERE 1=1 {_sf} "
+        f"GROUP BY 1 ORDER BY 2 DESC",
     )
 
-    # Distribuição por data (última semana, último mês, último ano)
+    # Distribuição por data (filtrada por account via JOIN)
     msg_age = fetchall(
         sc,
-        """
+        f"""
         SELECT
-            COUNT(1) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')  AS ultimos_7d,
-            COUNT(1) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS ultimos_30d,
-            COUNT(1) FILTER (WHERE created_at >= NOW() - INTERVAL '1 year')  AS ultimo_ano,
-            MIN(created_at)::date AS mais_antigo,
-            MAX(created_at)::date AS mais_recente
-        FROM public.messages
+            COUNT(1) FILTER (WHERE m.created_at >= NOW() - INTERVAL '7 days')  AS ultimos_7d,
+            COUNT(1) FILTER (WHERE m.created_at >= NOW() - INTERVAL '30 days') AS ultimos_30d,
+            COUNT(1) FILTER (WHERE m.created_at >= NOW() - INTERVAL '1 year')  AS ultimo_ano,
+            MIN(m.created_at)::date AS mais_antigo,
+            MAX(m.created_at)::date AS mais_recente
+        FROM public.messages m
+        JOIN public.conversations c ON c.id = m.conversation_id
+        WHERE 1=1 {_sf}
     """,
     )
 
@@ -672,11 +898,16 @@ def bloco_messages(sc, dc) -> None:
 # ── Bloco 10 — Attachments ───────────────────────────────────────────────────
 
 
-def bloco_attachments(sc, dc) -> None:
+def bloco_attachments(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 10 — ATTACHMENTS")
 
-    src_total = count_table(sc, "attachments")
-    dst_total = count_table(dc, "attachments")
+    _sf = f"AND c.account_id = {src_acc_id}" if src_acc_id else ""
+
+    src_total = _count_by_table(sc, "attachments", src_acc_id)
+    dst_total = _count_by_table(dc, "attachments", dest_acc_id)
+    log.info("attachments: SOURCE=%d  DEST=%d", src_total, dst_total)
 
     # FK quebrada: attachment sem message válida
     src_broken = (
@@ -690,14 +921,29 @@ def bloco_attachments(sc, dc) -> None:
         or 0
     )
 
-    # Por file_type
+    # Por file_type (filtrado por account via JOIN)
     types = fetchall(
         sc,
-        "SELECT file_type, COUNT(1) n FROM public.attachments GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+        f"SELECT file_type, COUNT(1) n FROM public.attachments a "
+        f"JOIN public.messages m ON m.id = a.message_id "
+        f"JOIN public.conversations c ON c.id = m.conversation_id "
+        f"WHERE 1=1 {_sf} "
+        f"GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
     )
 
     # Attachments com external_url NULL (sem URL S3)
-    no_url = count_where(sc, "attachments", "external_url IS NULL OR external_url = ''")
+    no_url = (
+        scalar(
+            sc,
+            f"""
+        SELECT COUNT(1) FROM public.attachments a
+        JOIN public.messages m ON m.id = a.message_id
+        JOIN public.conversations c ON c.id = m.conversation_id
+        WHERE (a.external_url IS NULL OR a.external_url = '') {_sf}
+    """,
+        )
+        or 0
+    )
 
     print(f"\n  SOURCE total attachments:  {fmt(src_total)}")
     print(f"  DEST   total attachments:  {fmt(dst_total)}")
@@ -722,30 +968,69 @@ def bloco_attachments(sc, dc) -> None:
 # ── Bloco 11 — contact_inboxes ───────────────────────────────────────────────
 
 
-def bloco_contact_inboxes(sc, dc) -> None:
+def bloco_contact_inboxes(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 11 — CONTACT_INBOXES — CAMPOS ESPECIAIS")
 
-    src_total = count_table(sc, "contact_inboxes")
-    dst_total = count_table(dc, "contact_inboxes")
+    _sf = f"AND i.account_id = {src_acc_id}" if src_acc_id else ""
+    _df = f"AND i.account_id = {dest_acc_id}" if dest_acc_id else ""
 
-    src_pubsub_null = count_where(sc, "contact_inboxes", "pubsub_token IS NULL")
-    dst_pubsub_null = count_where(dc, "contact_inboxes", "pubsub_token IS NULL")
-    src_source_null = count_where(sc, "contact_inboxes", "source_id IS NULL")
+    src_total = _count_by_table(sc, "contact_inboxes", src_acc_id)
+    dst_total = _count_by_table(dc, "contact_inboxes", dest_acc_id)
+    log.info("contact_inboxes: SOURCE=%d  DEST=%d", src_total, dst_total)
 
-    # Colisão de pubsub_token entre as duas bases
-    # (requer cross-db, calculamos via Python)
+    src_pubsub_null = (
+        scalar(
+            sc,
+            f"""
+        SELECT COUNT(1) FROM public.contact_inboxes ci
+        JOIN public.inboxes i ON i.id = ci.inbox_id
+        WHERE ci.pubsub_token IS NULL {_sf}
+    """,
+        )
+        or 0
+    )
+    dst_pubsub_null = (
+        scalar(
+            dc,
+            f"""
+        SELECT COUNT(1) FROM public.contact_inboxes ci
+        JOIN public.inboxes i ON i.id = ci.inbox_id
+        WHERE ci.pubsub_token IS NULL {_df}
+    """,
+        )
+        or 0
+    )
+    src_source_null = (
+        scalar(
+            sc,
+            f"""
+        SELECT COUNT(1) FROM public.contact_inboxes ci
+        JOIN public.inboxes i ON i.id = ci.inbox_id
+        WHERE ci.source_id IS NULL {_sf}
+    """,
+        )
+        or 0
+    )
+
+    # Colisão de pubsub_token entre as duas bases (via Python)
     src_tokens = {
         r["pubsub_token"]
         for r in fetchall(
             sc,
-            "SELECT pubsub_token FROM public.contact_inboxes WHERE pubsub_token IS NOT NULL",
+            "SELECT ci.pubsub_token FROM public.contact_inboxes ci "
+            f"JOIN public.inboxes i ON i.id = ci.inbox_id "
+            f"WHERE ci.pubsub_token IS NOT NULL {_sf}",
         )
     }
     dst_tokens = {
         r["pubsub_token"]
         for r in fetchall(
             dc,
-            "SELECT pubsub_token FROM public.contact_inboxes WHERE pubsub_token IS NOT NULL",
+            "SELECT ci.pubsub_token FROM public.contact_inboxes ci "
+            f"JOIN public.inboxes i ON i.id = ci.inbox_id "
+            f"WHERE ci.pubsub_token IS NOT NULL {_df}",
         )
     }
     token_collision = len(src_tokens & dst_tokens)
@@ -765,7 +1050,7 @@ def bloco_contact_inboxes(sc, dc) -> None:
 # ── Bloco 12 — IDs e Offsets ─────────────────────────────────────────────────
 
 
-def bloco_offsets(sc, dc) -> None:
+def bloco_offsets(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 12 — IDs MÁXIMOS E OFFSETS DE MIGRAÇÃO")
 
     tables_with_seq = [
@@ -802,37 +1087,40 @@ def bloco_offsets(sc, dc) -> None:
         except Exception as e:
             print(f"  {table:<25}  ERRO: {e}")
 
-    print(
-        f"""
+    print(f"""
   Fórmula: novo_id = id_origem + offset  (onde offset = MAX(id_destino))
   Isso garante que o menor novo_id = min_id_origem + max_id_destino
   — nunca colide com IDs existentes no destino.
 
   ⚠  E1 do Debate D3: spec.md FR-002 define offset = max+1 (INCORRETO).
      A fórmula correta é offset = max (sem +1) conforme constitution.md.
-"""
-    )
+""")
 
 
 # ── Bloco 13 — Resumo de Qualidade Geral ─────────────────────────────────────
 
 
-def bloco_qualidade_geral(sc, dc) -> None:
+def bloco_qualidade_geral(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 13 — RESUMO DE QUALIDADE GERAL — PONTOS DE RISCO")
 
     checks = []
 
+    _sf = f"AND c.account_id = {src_acc_id}" if src_acc_id else ""
+    _sw = f"account_id = {src_acc_id} AND " if src_acc_id else ""
+
     # Conversations sem contact_id
-    n = scalar(sc, "SELECT COUNT(1) FROM public.conversations WHERE contact_id IS NULL") or 0
+    n = scalar(sc, f"SELECT COUNT(1) FROM public.conversations WHERE {_sw}contact_id IS NULL") or 0
     checks.append(("⚠ ALTO", f"Conversations SOURCE sem contact_id", n))
 
     # Conversations com contact_id FK broken
     n = (
         scalar(
             sc,
-            """
+            f"""
         SELECT COUNT(1) FROM public.conversations c
-        WHERE c.contact_id IS NOT NULL
+        WHERE {_sw}c.contact_id IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM public.contacts WHERE id = c.contact_id)
     """,
         )
@@ -870,9 +1158,9 @@ def bloco_qualidade_geral(sc, dc) -> None:
     n = (
         scalar(
             sc,
-            """
+            f"""
         SELECT COUNT(1) FROM public.contacts
-        WHERE email IS NULL AND phone_number IS NULL
+        WHERE {_sw}email IS NULL AND phone_number IS NULL
           AND identifier IS NULL
           AND (custom_attributes->>'src_id') IS NULL
     """,
@@ -885,14 +1173,16 @@ def bloco_qualidade_geral(sc, dc) -> None:
     n = (
         scalar(
             sc,
-            "SELECT COUNT(1) FROM public.messages WHERE content_attributes IS NOT NULL",
+            f"SELECT COUNT(1) FROM public.messages m "
+            f"JOIN public.conversations c ON c.id = m.conversation_id "
+            f"WHERE m.content_attributes IS NOT NULL {_sf}",
         )
         or 0
     )
     checks.append(("⚠ ALTO", f"Messages SOURCE com content_attributes (perda de dados)", n))
 
     # Conversations com uuid nulo
-    n = scalar(sc, "SELECT COUNT(1) FROM public.conversations WHERE uuid IS NULL") or 0
+    n = scalar(sc, f"SELECT COUNT(1) FROM public.conversations WHERE {_sw}uuid IS NULL") or 0
     checks.append(("ℹ INFO", f"Conversations SOURCE com uuid NULL", n))
 
     print(f"\n  {'NÍVEL':<8}  {'N':>9}  DESCRIÇÃO")
@@ -905,7 +1195,7 @@ def bloco_qualidade_geral(sc, dc) -> None:
 # ── Bloco 14 — Estimativa de Migração ────────────────────────────────────────
 
 
-def bloco_estimativa(sc, dc) -> None:
+def bloco_estimativa(sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None) -> None:
     section("BLOCO 14 — ESTIMATIVA DE MIGRAÇÃO (T4)")
 
     tables = [
@@ -925,10 +1215,12 @@ def bloco_estimativa(sc, dc) -> None:
 
     print(
         f"\n  Premissas: batch_size={BATCH_SIZE}  latência_simples={latency_fast_ms}ms/batch  "
-        f"latência_dedup={latency_dedup_ms}ms/batch\n"
+        f"latência_dedup={latency_dedup_ms}ms/batch"
     )
+    if src_acc_id:
+        print(f"  Filtrado para account_id SOURCE={src_acc_id}")
     print(
-        f"  {'TABELA':<20}  {'TOTAL SOURCE':>14}  {'BATCHES':>8}  "
+        f"\n  {'TABELA':<20}  {'TOTAL SOURCE':>14}  {'BATCHES':>8}  "
         f"{'S/ DEDUP':>10}  {'C/ DEDUP':>10}"
     )
     print(f"  {'-'*20}  {'-'*14}  {'-'*8}  {'-'*10}  {'-'*10}")
@@ -937,7 +1229,7 @@ def bloco_estimativa(sc, dc) -> None:
     total_slow = 0
 
     for table, note in tables:
-        n = count_table(sc, table)
+        n = _count_by_table(sc, table, src_acc_id)
         batches = (n + BATCH_SIZE - 1) // BATCH_SIZE
         fast_s = batches * latency_fast_ms / 1_000
         slow_s = batches * latency_dedup_ms / 1_000
@@ -948,8 +1240,7 @@ def bloco_estimativa(sc, dc) -> None:
     print(f"  {'-'*20}  {'-'*14}  {'-'*8}  {'-'*10}  {'-'*10}")
     print(f"  {'TOTAL':<20}  {'':>14}  {'':>8}  " f"{total_fast:>9.1f}s  {total_slow:>9.1f}s")
 
-    print(
-        f"""
+    print(f"""
   Estimativa SEM dedup lookup:  {total_fast:.0f}s ({total_fast/60:.1f} min)
   Estimativa COM dedup lookup:  {total_slow:.0f}s ({total_slow/60:.1f} min)
 
@@ -957,8 +1248,7 @@ def bloco_estimativa(sc, dc) -> None:
   (query extra por batch), o tempo real pode ser 2-10× maior em volumes
   de contacts/conversations com dedup por JSON path (custom_attributes).
   Execute --dry-run para medir tempo real antes da migração.
-"""
-    )
+""")
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -967,7 +1257,9 @@ def bloco_estimativa(sc, dc) -> None:
 # ── Bloco 15 — Diff de Colunas entre Schemas ─────────────────────────────────
 
 
-def bloco_diff_colunas(sc, dc) -> None:
+def bloco_diff_colunas(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 15 — DIFF DE COLUNAS ENTRE SCHEMAS (migrations divergentes)")
 
     main_tables_all = [
@@ -1194,25 +1486,33 @@ def bloco_overlap_contacts(sc, dc) -> None:
             matched = acct_match.get(acct_id, 0)
             print(f"  {acct_id:>12}  {total:>12,}  {matched:>12,}  {total - matched:>12,}")
 
-    print(
-        f"""
+    print(f"""
   Regra de deduplicação (chave composta):
     1. Se (account_id_src, phone) existe no DEST → mapear contact_id SOURCE → contact_id DEST (não inserir)
     2. Se (account_id_src, email) existe no DEST → idem (phone tem precedência se ambos batem)
     3. Se sem match na mesma account → inserir com id remapeado normalmente
     Observação: account_id_src = account_id_dest para accounts com match de id+nome (Bloco 17)
-"""
-    )
+""")
 
 
 # ── Bloco 17 — Accounts com id+nome iguais: regra de merge ───────────────────
 
 
-def bloco_accounts_merge(sc, dc) -> None:
+def bloco_accounts_merge(
+    sc, dc, src_acc_id: int | None = None, dest_acc_id: int | None = None
+) -> None:
     section("BLOCO 17 — ACCOUNTS COM id+NOME IGUAIS — REGRA DE MERGE")
 
-    src_accounts = fetchall(sc, "SELECT id, name FROM public.accounts ORDER BY id")
-    dst_accounts = fetchall(dc, "SELECT id, name FROM public.accounts ORDER BY id")
+    if src_acc_id is not None:
+        src_accounts = fetchall(
+            sc, "SELECT id, name FROM public.accounts WHERE id = %s ORDER BY id", (src_acc_id,)
+        )
+        dst_accounts = fetchall(
+            dc, "SELECT id, name FROM public.accounts WHERE id = %s ORDER BY id", (dest_acc_id,)
+        )
+    else:
+        src_accounts = fetchall(sc, "SELECT id, name FROM public.accounts ORDER BY id")
+        dst_accounts = fetchall(dc, "SELECT id, name FROM public.accounts ORDER BY id")
 
     dst_by_id_name = {(r["id"], r["name"]): r for r in dst_accounts}
 
@@ -1313,62 +1613,141 @@ def bloco_accounts_merge(sc, dc) -> None:
         dst_au = count_where(dc, "account_users", "account_id = %s", (acc_id,))
         print(f"\n    {'ACCOUNT_USERS':<18}  SOURCE={src_au:>6,}  DEST={dst_au:>6,}")
 
-    print(
-        f"""
+    print(f"""
   Resumo da regra de importação para accounts com match:
     • A account NÃO é reinserida — dest_id existente é reutilizado como FK
     • Entidades filhas com mesmo nome → não importar (já existem)
     • Entidades filhas sem correspondência → importar com FK = dest_id da account
     • IDs das filhas migradas → offset normal (id_origem + MAX(id_dest) por tabela)
     • Conversations/Messages/Contacts → verificar sobreposição individualmente (Blocos 7/8/16)
-"""
-    )
+""")
 
 
 def main() -> None:
-    salvar = "--salvar" in sys.argv
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    parser = argparse.ArgumentParser(
+        description="Diagnóstico SOURCE vs DEST — análise profunda de volumes e qualidade",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemplos:\n"
+            "  uv run python 05_diagnostico_completo.py\n"
+            '  uv run python 05_diagnostico_completo.py --account "Unimed Guaxupé"\n'
+            '  uv run python 05_diagnostico_completo.py --account "Unimed Guaxupé" --salvar\n'
+            "  uv run python 05_diagnostico_completo.py --no-slow --verbose\n"
+        ),
+    )
+    parser.add_argument(
+        "--account",
+        metavar="NOME",
+        default=None,
+        help="Filtrar todos os blocos para um único account",
+    )
+    parser.add_argument(
+        "--salvar",
+        action="store_true",
+        help=("Salvar saída completa (logs + tabelas) em " ".tmp/diagnostico_<ACCOUNT>_<TS>.txt"),
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Log DEBUG: mostra detalhe de cada query executada",
+    )
+    parser.add_argument(
+        "--no-slow",
+        action="store_true",
+        help="Pular blocos lentos (bloco_overlap_contacts, bloco_accounts_merge)",
+    )
+    args = parser.parse_args()
 
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    level = logging.DEBUG if args.verbose else logging.INFO
+
+    # ── Saída para arquivo ────────────────────────────────────────────────────
+    tee: _Tee | None = None
+    log_file: Path | None = None
+    if args.salvar:
+        out_dir = Path(__file__).parent.parent / ".tmp"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        suffix = f"__{args.account.replace(' ', '_')}" if args.account else ""
+        log_file = out_dir / f"diagnostico{suffix}_{ts}.txt"
+        # _Tee deve ser instalado ANTES de basicConfig para capturar
+        # tanto print() quanto StreamHandler no mesmo arquivo.
+        tee = _Tee(log_file)
+
+    logging.basicConfig(
+        level=level,
+        stream=sys.stdout,  # log vai para stdout (e portanto para o tee, se ativo)
+        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    src_key = os.environ.get("MIGRATION_SOURCE_KEY", "?")
+    dst_key = os.environ.get("MIGRATION_DEST_KEY", "?")
+
+    # ── Header ────────────────────────────────────────────────────────────────
     print(f"\n{SEP}")
     print(f"  DIAGNÓSTICO COMPLETO — SOURCE vs DEST")
     print(f"  {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  SOURCE  : {src_key}")
+    print(f"  DEST    : {dst_key}")
+    if args.account:
+        print(f"  Filtro  : account='{args.account}'")
+    if log_file:
+        print(f"  Log     : {log_file}")
+    else:
+        print(f"  Log     : apenas console  (use --salvar para gravar em arquivo)")
     print(f"  SOMENTE LEITURA — nenhum dado sensível impresso")
     print(SEP)
 
     sc = src()
     dc = dst()
 
+    src_acc_id: int | None = None
+    dest_acc_id: int | None = None
+
+    if args.account:
+        src_acc_id = _resolve_account(sc, args.account)
+        dest_acc_id = _resolve_account(dc, args.account)
+        log.info(
+            "Account '%s' resolvido: SOURCE id=%d  DEST id=%d",
+            args.account,
+            src_acc_id,
+            dest_acc_id,
+        )
+
     try:
-        bloco_inventario(sc, dc)
-        bloco_migrations(sc, dc)
-        bloco_field_types(sc, dc)
-        bloco_accounts(sc, dc)
-        bloco_users(sc, dc)
-        bloco_simples(sc, dc)
-        bloco_contacts(sc, dc)
-        bloco_conversations(sc, dc)
-        bloco_messages(sc, dc)
-        bloco_attachments(sc, dc)
-        bloco_contact_inboxes(sc, dc)
-        bloco_offsets(sc, dc)
-        bloco_qualidade_geral(sc, dc)
-        bloco_estimativa(sc, dc)
-        bloco_diff_colunas(sc, dc)
-        bloco_overlap_contacts(sc, dc)
-        bloco_accounts_merge(sc, dc)
+        bloco_inventario(sc, dc, src_acc_id, dest_acc_id)
+        bloco_migrations(sc, dc, src_acc_id, dest_acc_id)
+        bloco_field_types(sc, dc, src_acc_id, dest_acc_id)
+        bloco_accounts(sc, dc, src_acc_id, dest_acc_id)
+        bloco_users(sc, dc, src_acc_id, dest_acc_id)
+        bloco_simples(sc, dc, src_acc_id, dest_acc_id)
+        bloco_contacts(sc, dc, src_acc_id, dest_acc_id)
+        bloco_conversations(sc, dc, src_acc_id, dest_acc_id)
+        bloco_messages(sc, dc, src_acc_id, dest_acc_id)
+        bloco_attachments(sc, dc, src_acc_id, dest_acc_id)
+        bloco_contact_inboxes(sc, dc, src_acc_id, dest_acc_id)
+        bloco_offsets(sc, dc, src_acc_id, dest_acc_id)
+        bloco_qualidade_geral(sc, dc, src_acc_id, dest_acc_id)
+        bloco_estimativa(sc, dc, src_acc_id, dest_acc_id)
+        bloco_diff_colunas(sc, dc, src_acc_id, dest_acc_id)
+
+        if not args.no_slow:
+            bloco_overlap_contacts(sc, dc, src_acc_id, dest_acc_id)
+            bloco_accounts_merge(sc, dc, src_acc_id, dest_acc_id)
+        else:
+            log.info("Blocos lentos pulados (--no-slow)")
 
         print(f"\n{SEP}")
-        print(f"  FIM DO DIAGNÓSTICO")
+        print(f"  FIM DO DIAGNÓSTICO — {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        if log_file:
+            print(f"  Salvo em: {log_file}")
         print(SEP)
 
     finally:
         sc.close()
         dc.close()
-
-    if salvar:
-        out_dir = Path(__file__).parent.parent / ".tmp"
-        out_dir.mkdir(exist_ok=True)
-        print(f"\n  Use: python 05_diagnostico_completo.py 2>&1 | tee ../.tmp/diagnostico_{ts}.txt")
+        if tee:
+            tee.close()
 
 
 if __name__ == "__main__":

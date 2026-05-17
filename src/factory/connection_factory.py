@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -107,8 +108,8 @@ class ConnectionFactory:
                 f"(found {len(non_meta)})"
             )
 
-        src_key = source_instance or non_meta[0]
-        dst_key = dest_instance or non_meta[1]
+        src_key = source_instance or os.environ.get("MIGRATION_SOURCE_KEY") or non_meta[0]
+        dst_key = dest_instance or os.environ.get("MIGRATION_DEST_KEY") or non_meta[1]
 
         if src_key not in all_instances:
             raise ConfigError(f"Source instance '{src_key}' not found in secrets file")
@@ -149,9 +150,7 @@ class ConnectionFactory:
                 )
             missing = _REQUIRED_INSTANCE_KEYS - set(value.keys())
             if missing:
-                raise ConfigError(
-                    f"Instance '{key}' missing required keys: {sorted(missing)}"
-                )
+                raise ConfigError(f"Instance '{key}' missing required keys: {sorted(missing)}")
         return data
 
     def _build_url(self, instance: dict[str, Any]) -> str:

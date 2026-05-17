@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-16 — Sessão 16: Migração Unimed Guaxupé iniciada em produção. Container `chatwoot-migrator-unimed_guaxup` rodando como daemon em wfdb01. 4 usuários ausentes criados no DEST. Docker infra adaptada para prod.
-**Status**: 🟡 EM EXECUÇÃO — Container de migração em andamento (wfdb01). Validações pós-migração e demais accounts pendentes.
+**Last Updated**: 2026-05-17 — Sessão 18: Pipeline `src/migrar.py` corrigido com `--env {dev,prod}` e `--account`. Docker atualizado com `PIPELINE=full`. RUNBOOK v1.2.0. Todos os migrators receberam `account_id_filter`. Pipeline pronto para execução em produção.
+**Status**: 🟡 PRONTO PARA EXECUÇÃO — Pipeline completo implementado. Próximo passo: executar migração Unimed Guaxupé com pipeline completo (`teams`, `labels`, `attachments`) + demais accounts.
 
 ---
 
@@ -9,29 +9,20 @@
 
 ### Documentação Criada (Sessão 15)
 
-- [x] **RUNBOOK-PROD** ✅ Runbook completo de migração para produção
+- [x] **RUNBOOK-PROD** ✅ Runbook completo de migração para produção — **atualizado para v1.2.0 (Sessão 18)**
   **ARTEFATO**: [`docs/RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md`](RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md)
-  **CONTEÚDO**:
-  - Cronograma detalhado (13:00 - 20:00)
-  - Checklist pré-migração (infraestrutura, backup, segurança, código)
-  - Procedimento de execução por account (5 fases)
-  - Validações pós-migração (S3, API, hash MD5)
-  - Plano de rollback (completo e seletivo)
-  - Troubleshooting (5 cenários comuns)
-  - Critérios de sucesso e Go/No-Go
-  - Contatos e responsáveis
 
 - [x] **CHECKLIST-EXEC** ✅ Checklist executiva resumida
   **ARTEFATO**: [`docs/CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md`](CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md)
-  **PROPÓSITO**: Quick reference para impressão e consulta durante execução
-  **CONTEÚDO**:
-  - Checklist pré-migração condensada
-  - Comandos por account (copy-paste ready)
-  - Validações finais
-  - Go/No-Go rápido
-  - Rollback de emergência
-  - Troubleshooting rápido
-  - Contatos de emergência
+
+### ✅ Pipeline Completo — Implementado (Sessão 18)
+
+- [x] **S18-01** ✅ `BaseMigrator`: `account_id_filter` + `_select_source_rows()` helper
+- [x] **S18-02** ✅ `src/migrar.py`: flags `--env {dev,prod}` e `--account NOME`
+- [x] **S18-03** ✅ 13 migrators atualizados com `_select_source_rows()` em `migrate()` e `_fetch_all_source_rows()`
+- [x] **S18-04** ✅ `users_migrator.py`: filtro via `account_users` join
+- [x] **S18-05** ✅ Docker: `PIPELINE=full` e `MIGRATION_ENV` em `entrypoint.sh`, `docker-compose.yml`, `deploy-to-wfdb01.sh`
+- [x] **S18-06** ✅ RUNBOOK v1.2.0: pipeline completo, por account ou todas, referência rápida
 
 ### Preparativos Pendentes (Executar 16/05 13:00)
 
@@ -65,7 +56,10 @@
 1. **14:00** Sol Copernico (account 4) — 15 min — ⏳ PENDENTE
 2. **14:30** Unimed Poços PF (account 18) — 20 min — ⏳ PENDENTE
 3. **15:05** Unimed Poços PJ (account 17) — 25 min — ⏳ PENDENTE
-4. **15:50** Unimed Guaxupé (account 25) — 🟡 EM EXECUÇÃO (container daemon wfdb01, ID: `9f13b2337b26`)
+4. **15:50** Unimed Guaxupé (account 25) — � REEXECUTAR com pipeline completo
+   - Container anterior (pipeline legado) rodou em 16/05, mas faltavam teams/labels/attachments
+   - **Ação (Sessão 19)**: `ACCOUNT_NAME="Unimed Guaxupé" ./docker/deploy-to-wfdb01.sh --build --run`
+   - Pipeline agora cobre: teams, labels, contacts, contact_inboxes, conversations, messages, attachments
 5. **16:25** Vya Digital (account 1) — 90 min — ⏳ PENDENTE
 
 ### Melhorias Identificadas Durante Execução (docs/avaliação_do_processo.md)

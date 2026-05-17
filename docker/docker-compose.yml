@@ -42,6 +42,12 @@ services:
       ALL_ACCOUNTS: "${ALL_ACCOUNTS:-false}"
       DRY_RUN: "${DRY_RUN:-false}"
       SCRIPT: "${SCRIPT:-}"
+      # PIPELINE: "full" usa src/migrar.py (pipeline completo: teams, labels, attachments)
+      #           "legacy" usa app/01_migrar_account.py (apenas contacts + conversations)
+      PIPELINE: "${PIPELINE:-full}"
+      # MIGRATION_ENV: "prod" | "dev" — atalho para SOURCE/DEST keys no src/migrar.py
+      # Ignorado quando MIGRATION_SOURCE_KEY e MIGRATION_DEST_KEY já estão definidas.
+      MIGRATION_ENV: "${MIGRATION_ENV:-prod}"
       PYTHONUNBUFFERED: "1"
 
     volumes:
