@@ -168,17 +168,39 @@ uv run python -m src.migrar --env dev --account "Unimed Guaxupé" --verbose
 
 ### Limpeza do Repositório e Push (S19-06)
 
-**11:20 — ✅ EM PROGRESSO**
+**11:20 — ✅ COMPLETO**
 
 **Objetivo**: Atualizar documentação, fechar PRs dependabot obsoletos, commit de todas as alterações e merge na master.
 
-**Passos**:
+**Passos executados**:
 1. ✅ Atualização de `DAILY_ACTIVITIES_2026-05-18.md` com S19-02 a S19-05
-2. ⏳ Atualização de `docs/TODO.md`
-3. ⏳ Atualização de repo memory
-4. ⏳ Fechar PRs dependabot obsoletos (#1, #2, #4)
-5. ⏳ Commit de todos os arquivos modificados
-6. ⏳ Merge `001-enterprise-chatwoot-migration` → `master` + push
+2. ✅ Atualização de `docs/TODO.md` — status 🟢 DEV VALIDADO
+3. ✅ Atualização de repo memory (`accounts-status.md`, `enterprise-chathoot-migration.md`)
+4. ✅ PRs dependabot fechados via `gh pr close`: #1 (codeql-action), #2 (checkout), #4 (dependency-review-action)
+5. ✅ Commit `c692e86`: 7 files, 280 insertions
+6. ✅ Merge `001-enterprise-chatwoot-migration` → `master` + push (`2a94df4..c692e86`)
+7. ✅ `.vscode/mcp.json` atualizado: referências `@latest` + `${workspaceFolder}` no MCP filesystem; servidor GitHub MCP configurado com `${env:GITHUB_PERSONAL_ACCESS_TOKEN}`
+
+**Artefatos modificados**:
+| Arquivo | O que mudou |
+|---------|-------------|
+| `src/migrar.py` | Revert `_ENV_PRESETS["dev"]` para `("chatwoot_dev", "chatwoot004_dev")` |
+| `src/migrators/conversations_migrator.py` | Fix: `_select_source_rows()` em `migrate()` |
+| `src/migrators/webhooks_migrator.py` | Fix: `_select_source_rows()` em `_fetch_all_source_rows()` |
+| `docs/TODO.md` | Status atualizado para DEV validado |
+| `docs/SESSIONS/2026-05-18/DAILY_ACTIVITIES_2026-05-18.md` | Atividades S19-00 a S19-06 |
+| `docs/SESSIONS/2026-05-18/SESSION_RECOVERY_2026-05-18.md` | Criado no início da sessão |
+| `.vscode/mcp.json` | MCP servers: `@latest`, `workspaceFolder`, GitHub MCP configurado |
+
+**Status**: ✅ Completo
+
+---
+
+### Ritual de Encerramento (S19-07)
+
+**11:35 — ✅ EM PROGRESSO**
+
+**Objetivo**: Executar ritual session-end — qualidade de código, scan de segurança, FINAL_STATUS, INDEX.md, cleanup .tmp/.
 
 ---
 

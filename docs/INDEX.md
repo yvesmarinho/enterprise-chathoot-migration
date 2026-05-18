@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-17 (Sessão 18 — Pipeline completo `src/migrar.py` com `--env`/`--account` + Docker PIPELINE=full + RUNBOOK v1.2.0)
-**Last Session**: 2026-05-17 (Sessão 18 — 13 migrators atualizados, account_id_filter, entrypoint.sh PIPELINE=full)
+**Last Updated**: 2026-05-18 (Sessão 19 — DEV migration validada 100% — Unimed Guaxupé 4092 convs — pipeline pronto para produção)
+**Last Session**: 2026-05-18 (Sessão 19 — bug fixes conversations/webhooks migrators, `_ENV_PRESETS["dev"]` corrigido, migração DEV Unimed Guaxupé executada e validada)
 
 ---
 
@@ -68,10 +68,10 @@ SESSIONS/
 └── 2026-05-16/           ← Sessão 16: Migração prod Unimed Guaxupé — Docker daemon deploy wfdb01, 4 usuários criados, container rodando
     ├── DAILY_ACTIVITIES_2026-05-16.md
     └── FINAL_STATUS_2026-05-16.md
-└── 2026-05-17/           ← Sessão 18: Pipeline completo — `src/migrar.py --env/--account`, `account_id_filter` em 13 migrators, Docker PIPELINE=full, RUNBOOK v1.2.0
-    ├── DAILY_ACTIVITIES_2026-05-17.md
-    ├── SESSION_RECOVERY_2026-05-17.md
-    └── FINAL_STATUS_2026-05-17.md
+└── 2026-05-18/           ← Sessão 19: DEV migration validada — Unimed Guaxupé 4092 convs 100% integridade; bug fixes conversations/webhooks migrators; _ENV_PRESETS["dev"] corrigido; MCP GitHub configurado
+    ├── DAILY_ACTIVITIES_2026-05-18.md
+    ├── SESSION_RECOVERY_2026-05-18.md
+    └── FINAL_STATUS_2026-05-18.md
 ```
 
 ## Evidências de Validação S3
