@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-17 — Sessão 18: Pipeline `src/migrar.py` corrigido com `--env {dev,prod}` e `--account`. Docker atualizado com `PIPELINE=full`. RUNBOOK v1.2.0. Todos os migrators receberam `account_id_filter`. Pipeline pronto para execução em produção.
-**Status**: 🟡 PRONTO PARA EXECUÇÃO — Pipeline completo implementado. Próximo passo: executar migração Unimed Guaxupé com pipeline completo (`teams`, `labels`, `attachments`) + demais accounts.
+**Last Updated**: 2026-05-18 — Sessão 19: ✅ Teste completo de migração DEV executado com 100% de integridade. Pipeline validado para produção.
+**Status**: 🟢 DEV VALIDADO — Migração DEV Unimed Guaxupé concluída (4092 convs, 22992 msgs, 0 erros). Pipeline pronto para produção.
 
 ---
 
@@ -56,10 +56,10 @@
 1. **14:00** Sol Copernico (account 4) — 15 min — ⏳ PENDENTE
 2. **14:30** Unimed Poços PF (account 18) — 20 min — ⏳ PENDENTE
 3. **15:05** Unimed Poços PJ (account 17) — 25 min — ⏳ PENDENTE
-4. **15:50** Unimed Guaxupé (account 25) — � REEXECUTAR com pipeline completo
-   - Container anterior (pipeline legado) rodou em 16/05, mas faltavam teams/labels/attachments
-   - **Ação (Sessão 19)**: `ACCOUNT_NAME="Unimed Guaxupé" ./docker/deploy-to-wfdb01.sh --build --run`
-   - Pipeline agora cobre: teams, labels, contacts, contact_inboxes, conversations, messages, attachments
+4. **15:50** Unimed Guaxupé (account 25) — ✅ VALIDADO DEV (Sessão 19): 4092 convs, 22992 msgs, 100% integridade
+   - Pipeline completo validado no ambiente DEV em 2026-05-18
+   - bugs fixes: `conversations_migrator.py` + `webhooks_migrator.py` + `_ENV_PRESETS["dev"]` corrigidos
+   - **Ação PROD**: `uv run python -m src.migrar --env prod --account "Unimed Guaxupé" --verbose`
 5. **16:25** Vya Digital (account 1) — 90 min — ⏳ PENDENTE
 
 ### Melhorias Identificadas Durante Execução (docs/avaliação_do_processo.md)

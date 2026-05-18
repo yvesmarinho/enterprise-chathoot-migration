@@ -76,8 +76,7 @@ class ConversationsMigrator(BaseMigrator):
             ).fetchall():
                 _display_id_counters[int(dest_acct_id_row[0])] = int(dest_acct_id_row[1])
 
-        with self.source_engine.connect() as conn:
-            rows = [dict(r) for r in conn.execute(src_table.select()).mappings().all()]
+        rows = self._select_source_rows(src_table)
 
         self.logger.info("ConversationsMigrator: %d source rows fetched", len(rows))
 

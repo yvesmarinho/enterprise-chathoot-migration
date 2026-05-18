@@ -1,15 +1,16 @@
 """CLI entrypoint for the enterprise Chatwoot migration.
 
 :description: Orchestrates the full migration pipeline from ``chatwoot_dev1_db``
-    (source) to ``chatwoot004_dev1_db`` (destination) respecting the FK dependency
-    order:
+    (source, read-only) to ``chatwoot004_dev1_db`` (DEV destination) or
+    ``chatwoot004_db`` (PROD destination) respecting the FK dependency order:
 
     ``accounts → inboxes → users → teams → labels → contacts →
     conversations → messages → attachments``
 
 Usage::
 
-    python src/migrar.py [--dry-run] [--poc] [--only-table <name>] [--verbose]
+    python src/migrar.py --env dev [--account "Nome"] [--dry-run] [--verbose]
+    python src/migrar.py --env prod --account "Nome"
 
 Exit codes:
 
@@ -18,6 +19,8 @@ Exit codes:
     * ``3`` — catastrophic failure in ``accounts`` (root entity) — aborted
 
 Options:
+    ``--env``      ``dev`` (SOURCE=chatwoot_dev1_db DEST=chatwoot004_dev1_db) or
+                  ``prod`` (SOURCE=chatwoot_db DEST=chatwoot004_db).
     ``--dry-run``  Skip all writes; log what *would* be done.
     ``--poc``      Classify all source rows (requires ``--dry-run``);
                   generates ``.tmp/poc_YYYYMMDD_HHMMSS_report.txt``.
@@ -65,6 +68,11 @@ from src.utils.id_remapper import IDRemapper
 from src.utils.log_masker import MaskingHandler
 
 # DEV / PROD env presets — shortcut for MIGRATION_SOURCE_KEY / MIGRATION_DEST_KEY
+#
+# dev:  SOURCE=chatwoot_dev (chatwoot_dev1_db, site: chat.vya.digital — READ-ONLY)
+#               DEST=chatwoot004_dev (chatwoot004_dev1_db, site: vya-chat-dev — READ-WRITE)
+# prod: SOURCE=chat-vya-digital (chatwoot_db)
+#               DEST=synchat-vya-digital (chatwoot004_db)
 _ENV_PRESETS: dict[str, tuple[str, str]] = {
     "dev": ("chatwoot_dev", "chatwoot004_dev"),
     "prod": ("chat-vya-digital", "synchat-vya-digital"),
@@ -188,7 +196,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=(
             "Convenience shortcut that sets MIGRATION_SOURCE_KEY and "
             "MIGRATION_DEST_KEY automatically. "
-            "dev = chatwoot_dev / chatwoot004_dev. "
+            "dev = chatwoot_dev (chatwoot_dev1_db) / chatwoot004_dev (chatwoot004_dev1_db). "
             "prod = chat-vya-digital / synchat-vya-digital. "
             "Overrides the env vars when provided."
         ),
