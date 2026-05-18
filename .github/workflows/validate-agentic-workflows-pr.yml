@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install gh-aw CLI
-        uses: github/gh-aw/actions/setup-cli@f7437f4f94c2bc86e7e6eca0f374e303e98bd66c # v0.61.1
+        uses: github/gh-aw/actions/setup-cli@2c1a237d2048b0e2412e7d7528892ea1257840e2 # v0.74.4
 
       - name: Compile workflow files
         id: compile
