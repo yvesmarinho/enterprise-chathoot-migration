@@ -34,10 +34,10 @@
 
 ## Resultado da Migração DEV
 
-**Account migrado**: Unimed Guaxupé  
-**SOURCE**: `chatwoot_dev1_db`, `account_id=25`  
-**DEST**: `chatwoot004_dev1_db`, `account_id=69` (offset=44)  
-**Inbox**: src=100 → dest=526 (offset=426)  
+**Account migrado**: Unimed Guaxupé
+**SOURCE**: `chatwoot_dev1_db`, `account_id=25`
+**DEST**: `chatwoot004_dev1_db`, `account_id=69` (offset=44)
+**Inbox**: src=100 → dest=526 (offset=426)
 **Data**: 2026-05-18
 
 | Entidade | SOURCE | DEST | Status |
@@ -78,7 +78,7 @@
 
 ## Decisão Técnica desta Sessão
 
-**D-S19**: Pipeline de migração DEV validado com 100% de integridade para Unimed Guaxupé.  
+**D-S19**: Pipeline de migração DEV validado com 100% de integridade para Unimed Guaxupé.
 O pipeline `src/migrar.py --env dev --account "Unimed Guaxupé" --verbose` é **aprovado para uso em produção** com ajuste de env para `prod`.
 
 ---
@@ -106,12 +106,12 @@ O pipeline `src/migrar.py --env dev --account "Unimed Guaxupé" --verbose` é **
 
 ## Contexto para Recuperação
 
-**Branch atual**: `master` (sincronizado com `origin/master` — commit `c692e86`)  
-**Feature branch**: `001-enterprise-chatwoot-migration` (local, mesmo commit que master)  
-**Credenciais**: `.secrets/generate_erd.json` — chave `chatwoot_dev` → SOURCE, `chatwoot004_dev` → DEST DEV  
-**Comando de migração DEV**: `uv run python -m src.migrar --env dev --account "Nome" --verbose`  
-**Comando de migração PROD**: `uv run python -m src.migrar --env prod --account "Nome" --verbose`  
-**RUNBOOK de produção**: `docs/RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md`  
+**Branch atual**: `master` (sincronizado com `origin/master` — commit `c692e86`)
+**Feature branch**: `001-enterprise-chatwoot-migration` (local, mesmo commit que master)
+**Credenciais**: `.secrets/generate_erd.json` — chave `chatwoot_dev` → SOURCE, `chatwoot004_dev` → DEST DEV
+**Comando de migração DEV**: `uv run python -m src.migrar --env dev --account "Nome" --verbose`
+**Comando de migração PROD**: `uv run python -m src.migrar --env prod --account "Nome" --verbose`
+**RUNBOOK de produção**: `docs/RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md`
 **Atenção**: `_ENV_PRESETS["dev"] = ("chatwoot_dev", "chatwoot004_dev")` — NÃO alterar
 
 ---

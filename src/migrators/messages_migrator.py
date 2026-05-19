@@ -6,8 +6,10 @@
     * ``account_id``        → ``account_id + offset_accounts``      (required — skip on orphan)
     * ``conversation_id``   → ``conversation_id + offset_conversations``
                               (nullable — skip record on orphan)
-    * ``sender_id``         → ``sender_id + offset_users``
-      (nullable — NULL-out if unmigrated)
+    * ``sender_id``         → polymorphic: when ``sender_type='User'`` remaps via users
+                              offset; when ``sender_type='Contact'`` remaps via contacts
+                              offset; otherwise NULLed out (AgentBot, etc.).
+      (nullable — NULL-out if unmigrated or unknown sender_type)
 
     ``content`` (TEXT) and ``content_attributes`` (JSONB) are masked in log
     output automatically by the attached ``MaskingHandler``.
@@ -53,6 +55,7 @@ class MessagesMigrator(BaseMigrator):
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
             migrated_conversations = self.state_repo.get_migrated_ids(conn, "conversations")
             migrated_users = self.state_repo.get_migrated_ids(conn, "users")
+            migrated_contacts = self.state_repo.get_migrated_ids(conn, "contacts")
 
         rows = self._select_source_rows(src_table)
 
@@ -95,11 +98,20 @@ class MessagesMigrator(BaseMigrator):
                     return None
                 new_row["conversation_id"] = self.id_remapper.remap(conv_id_origin, "conversations")
 
-            # Nullable FK: sender_id — NULL-out if unmigrated
+            # Nullable FK: sender_id — polymorphic on sender_type
+            # When sender_type='User', sender_id → users.id
+            # When sender_type='Contact', sender_id → contacts.id
+            # All other types (AgentBot, nil) → NULL out
             sender_id = row.get("sender_id")
             if sender_id is not None:
                 sender_id_origin = int(sender_id)
-                if sender_id_origin in migrated_users:
+                sender_type = row.get("sender_type") or ""
+                if sender_type == "Contact":
+                    if sender_id_origin in migrated_contacts:
+                        new_row["sender_id"] = self.id_remapper.remap(sender_id_origin, "contacts")
+                    else:
+                        new_row["sender_id"] = None
+                elif sender_id_origin in migrated_users:
                     new_row["sender_id"] = self.id_remapper.remap(sender_id_origin, "users")
                 else:
                     new_row["sender_id"] = None

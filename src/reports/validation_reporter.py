@@ -39,15 +39,44 @@ _HEADER = "================  Enterprise Chatwoot Migration Report  =============
 
 _TABLE_NAMES_ORDER = [
     "accounts",
+    "custom_attribute_definitions",
+    "canned_responses",
     "inboxes",
+    "webhooks",
     "users",
     "teams",
+    "team_members",
     "labels",
     "contacts",
+    "contact_inboxes",
     "conversations",
     "messages",
     "attachments",
+    "conversation_labels",
 ]
+
+# Logical table name → physical DB table name (only for names that differ)
+_LOGICAL_TO_PHYSICAL: dict[str, str] = {
+    "conversation_labels": "taggings",
+}
+
+# Tables that have a direct ``account_id`` column enabling account-scoped COUNT.
+# ``accounts`` is special: filtered via ``WHERE id = :account_id``.
+_TABLES_WITH_ACCOUNT_ID: frozenset[str] = frozenset(
+    {
+        "accounts",
+        "custom_attribute_definitions",
+        "canned_responses",
+        "inboxes",
+        "webhooks",
+        "teams",
+        "labels",
+        "contacts",
+        "conversations",
+        "messages",
+        "attachments",
+    }
+)
 
 
 class ValidationReporter:
@@ -65,6 +94,7 @@ class ValidationReporter:
         results: list[MigrationResult],
         dest_engine: Engine,
         duration_seconds: float,
+        account_id: int | None = None,
     ) -> Path:
         """Build the report and write it to ``.tmp/``.
 
@@ -74,20 +104,39 @@ class ValidationReporter:
         :type dest_engine: Engine
         :param duration_seconds: Total migration wall-clock duration in seconds.
         :type duration_seconds: float
+        :param account_id: Destination account ID.  When provided, ``DEST_TOTAL``
+            counts are scoped to that account instead of the whole table.
+        :type account_id: int | None
         :returns: Absolute path to the saved report file.
         :rtype: Path
         """
-        # Query destination row counts per table
+        # Query destination row counts per table (account-scoped when account_id set)
         dest_counts: dict[str, int] = {}
         with dest_engine.connect() as conn:
-            for table_name in _TABLE_NAMES_ORDER:
+            for logical_name in _TABLE_NAMES_ORDER:
+                physical = _LOGICAL_TO_PHYSICAL.get(logical_name, logical_name)
                 try:
-                    row = conn.execute(
-                        text(f"SELECT COUNT(*) FROM {table_name}")  # noqa: S608
-                    ).fetchone()
-                    dest_counts[table_name] = int(row[0]) if row else 0
+                    if account_id is not None and logical_name in _TABLES_WITH_ACCOUNT_ID:
+                        if logical_name == "accounts":
+                            row = conn.execute(
+                                text("SELECT COUNT(*) FROM accounts WHERE id = :aid"),
+                                {"aid": account_id},
+                            ).fetchone()
+                        else:
+                            row = conn.execute(
+                                text(
+                                    f"SELECT COUNT(*) FROM {physical}"  # noqa: S608
+                                    f" WHERE account_id = :aid"
+                                ),
+                                {"aid": account_id},
+                            ).fetchone()
+                    else:
+                        row = conn.execute(
+                            text(f"SELECT COUNT(*) FROM {physical}")  # noqa: S608
+                        ).fetchone()
+                    dest_counts[logical_name] = int(row[0]) if row else 0
                 except Exception:  # noqa: BLE001
-                    dest_counts[table_name] = -1
+                    dest_counts[logical_name] = -1
 
         # Index results by table name
         result_map = {r.table: r for r in results}

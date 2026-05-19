@@ -1,7 +1,26 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-18 — Sessão 19: ✅ Teste completo de migração DEV executado com 100% de integridade. Pipeline validado para produção.
-**Status**: 🟢 DEV VALIDADO — Migração DEV Unimed Guaxupé concluída (4092 convs, 22992 msgs, 0 erros). Pipeline pronto para produção.
+**Last Updated**: 2026-05-19 — Sessão 20 Parte 2: ✅ Scripts reorganizados e refatorados. 7 utilitários parametrizados em ./scripts/ com documentação completa.
+**Status**: 🟢 DEV VALIDADO + SCRIPTS OPERACIONAIS — Migração DEV validada (FK integrity 100%). Scripts de validação/diagnóstico prontos para produção.
+
+---
+
+## ✅ CONCLUÍDO NESTA SESSÃO (S20 — 2026-05-19)
+
+### Parte 1: Code Review + Migração DEV Completa
+- [x] **BUG-SENDER** ✅ Corrigido em `messages_migrator.py` — sender_type='Contact' agora remapeia sender_id via `migrated_contacts`
+- [x] **VALIDATION-REFACTOR** ✅ `fk_validator.py` + `validation_reporter.py` + `migrar.py` — account-scoped queries implementadas
+- [x] **MIGRATION-DEV-UNIMED** ✅ Migração DEV Unimed Guaxupé executada: 35.976 registros, 0 erros, FK integrity 100% clean
+
+### Parte 2: Reorganização de Scripts
+- [x] **SCRIPTS-REFACTOR** ✅ 7 scripts refatorados com argparse (CLI parametrizado):
+  - `validate_migration.py`, `check_conversations.py`, `check_inbox_mapping.py`
+  - `check_db_schema.py`, `rollback_account.py`, `test_api_endpoints.py`, `validate_api.py`
+- [x] **SCRIPTS-CREDENTIALS** ✅ Credenciais externalizadas para `.secrets/`:
+  - DB: `.secrets/generate_erd.json` (env vars `MIGRATION_SOURCE_KEY`/`MIGRATION_DEST_KEY`)
+  - API: `.secrets/chatwoot_api_tokens.json` (instance→{base_url, token})
+- [x] **SCRIPTS-DOCS** ✅ Documentação completa: `scripts/README.md` (300+ linhas, exemplos de uso, troubleshooting)
+- [x] **CLEANUP-TMP** ✅ `.tmp/` limpo: 45 arquivos deletados (diag scripts + outputs antigos), 4 preservados (essenciais)
 
 ---
 

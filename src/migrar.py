@@ -303,6 +303,13 @@ def main(argv: list[str] | None = None) -> int:
                 total_aliases += len(pairs)
         logger.info("Pre-loaded %d ID mappings from migration_state into remapper", total_aliases)
 
+    # (3c) Resolve destination account_id for account-scoped validation.
+    # Uses remapper.remap() so aliases from merged accounts are honoured.
+    dest_account_id: int | None = None
+    if account_id_filter is not None:
+        dest_account_id = remapper.remap(account_id_filter, "accounts")
+        logger.info("Destination account_id for validation: %d", dest_account_id)
+
     # (4) Determine which tables to migrate
     tables_to_migrate = [args.only_table] if args.only_table else list(_MIGRATION_ORDER)
 
@@ -375,17 +382,47 @@ def main(argv: list[str] | None = None) -> int:
 
     if results:
         reporter = ValidationReporter()
-        report_path = reporter.generate(results, dest_engine, elapsed)
+        report_path = reporter.generate(results, dest_engine, elapsed, account_id=dest_account_id)
         logger.info("Validation report saved: %s", report_path)
 
         # (7) FK post-validation
         fk_validator = FKValidator()
-        fk_report = fk_validator.validate(dest_engine)
+        fk_report = fk_validator.validate(dest_engine, account_id=dest_account_id)
         for rel, orphan_count in fk_report.orphan_counts.items():
             if orphan_count > 0:
                 logger.warning("FK violation: %s — %d orphans", rel, orphan_count)
             else:
                 logger.info("FK OK: %s", rel)
+
+    # (7b) Reset PostgreSQL sequences to avoid nextval() collisions (HTTP 500 trigger)
+    if not args.dry_run:
+        _SEQUENCE_TABLES = [
+            ("conversations", "conversations_id_seq"),
+            ("messages", "messages_id_seq"),
+            ("contacts", "contacts_id_seq"),
+            ("contact_inboxes", "contact_inboxes_id_seq"),
+            ("inboxes", "inboxes_id_seq"),
+            ("accounts", "accounts_id_seq"),
+            ("users", "users_id_seq"),
+            ("teams", "teams_id_seq"),
+            ("labels", "labels_id_seq"),
+            ("webhooks", "webhooks_id_seq"),
+            ("attachments", "attachments_id_seq"),
+        ]
+        logger.info("Resetting PostgreSQL sequences post-migration…")
+        with dest_engine.begin() as conn:
+            for table, seq in _SEQUENCE_TABLES:
+                try:
+                    conn.execute(
+                        text(
+                            f"SELECT setval('{seq}',"  # noqa: S608
+                            f" COALESCE((SELECT MAX(id) FROM {table}), 1))"
+                        )
+                    )
+                    logger.debug("Sequence reset: %s", seq)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Could not reset sequence %s: %s", seq, exc)
+        logger.info("Sequence reset complete.")
 
     # (8) Determine exit code
     total_failed = sum(len(r.failed_ids) for r in results)
