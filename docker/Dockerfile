@@ -6,7 +6,8 @@ FROM python:3.12-slim
 
 # Evita bytecode e bufferização desnecessários em logs
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 

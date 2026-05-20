@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-19 — Sessão 20 Parte 2: ✅ Scripts reorganizados e refatorados. 7 utilitários parametrizados em ./scripts/ com documentação completa.
-**Status**: 🟢 DEV VALIDADO + SCRIPTS OPERACIONAIS — Migração DEV validada (FK integrity 100%). Scripts de validação/diagnóstico prontos para produção.
+**Last Updated**: 2026-05-20 — Sessão 21: ✅ D16 Fase 1 concluída + fluxo all-accounts legado ativado e corrigido no wfdb01.
+**Status**: 🟢 MIGRAÇÃO ALL-ACCOUNTS LEGADO EM EXECUÇÃO — pipeline legado em daemon validado no wfdb01.
 
 ---
 
@@ -21,6 +21,17 @@
   - API: `.secrets/chatwoot_api_tokens.json` (instance→{base_url, token})
 - [x] **SCRIPTS-DOCS** ✅ Documentação completa: `scripts/README.md` (300+ linhas, exemplos de uso, troubleshooting)
 - [x] **CLEANUP-TMP** ✅ `.tmp/` limpo: 45 arquivos deletados (diag scripts + outputs antigos), 4 preservados (essenciais)
+
+---
+
+## ✅ CONCLUÍDO NESTA SESSÃO (S21 — 2026-05-20)
+
+- [x] **D16-F1** ✅ Investigação HTTP 500 concluída com causa raiz confirmada (attachments sem vínculo em ActiveStorage).
+- [x] **S21-LEGACY-DEFAULT** ✅ `ALL_ACCOUNTS=true` agora resolve para fluxo legado por default (`entrypoint` + `compose`).
+- [x] **S21-LEGACY-SCOPE** ✅ `migrate_all_accounts.py` atualizado para migrar todas as accounts do SOURCE (whitelist opcional por env).
+- [x] **S21-CONTAINER-IMPORTS** ✅ `PYTHONPATH=/app` adicionado no Dockerfile para resolver `ModuleNotFoundError: No module named 'src'`.
+- [x] **S21-NAMEERROR-OS** ✅ correção de `NameError: os is not defined` no runner legado.
+- [x] **S21-DEPLOY-WFDB01** ✅ deploy remoto executado com build e validação de execução em daemon no wfdb01.
 
 ---
 

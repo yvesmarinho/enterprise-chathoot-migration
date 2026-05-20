@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-18 (Sessão 19 — DEV migration validada 100% — Unimed Guaxupé 4092 convs — pipeline pronto para produção)
-**Last Session**: 2026-05-18 (Sessão 19 — bug fixes conversations/webhooks migrators, `_ENV_PRESETS["dev"]` corrigido, migração DEV Unimed Guaxupé executada e validada)
+**Last Updated**: 2026-05-20 (Sessão 21 — D16 Fase 1 concluída + fluxo `ALL_ACCOUNTS=true` legado ativado e corrigido no wfdb01)
+**Last Session**: 2026-05-20 (Sessão 21 — diagnóstico HTTP500 confirmado; deploy remoto e execução daemon com pipeline legado)
 
 ---
 
@@ -72,6 +72,10 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-05-18.md
     ├── SESSION_RECOVERY_2026-05-18.md
     └── FINAL_STATUS_2026-05-18.md
+└── 2026-05-20/           ← Sessão 21: D16 root cause HTTP500 confirmada; ajustes no fluxo legado all-accounts; deploy wfdb01
+    ├── DAILY_ACTIVITIES_2026-05-20.md
+    ├── SESSION_RECOVERY_2026-05-20.md
+    └── FINAL_STATUS_2026-05-20.md
 ```
 
 ## Evidências de Validação S3
@@ -94,6 +98,8 @@ SESSIONS/
 | [debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md](debates/D6-DEBATE-ARQUITETURA-VALIDACAO-HASH-2026-04-21.md) | D6 — Arquitetura de validação por hash MD5 + BKs + resultados finais |
 | [debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md](debates/D7-DEBATE-VISIBILIDADE-MARCOS-2026-04-22.md) | D7 — Visibilidade Marcus pós-migração — causa: display_id resequenciado (BUG-04) |
 | [debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md](debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md) | **D15 — CRÍTICO** — Migração S3 incompleta: 74% attachments HTTP 404, metadados OK mas arquivos físicos ausentes |
+| [debates/D16-DEBATE-HTTP500-CONVERSACOES-POS-MIGRACAO-2026-05-20.md](debates/D16-DEBATE-HTTP500-CONVERSACOES-POS-MIGRACAO-2026-05-20.md) | **D16** — HTTP500 em conversações pós-migração DEV: causa raiz confirmada em ActiveStorage |
+| [debates/D16-PLANO-INVESTIGACAO-HTTP500-2026-05-20.md](debates/D16-PLANO-INVESTIGACAO-HTTP500-2026-05-20.md) | Plano faseado de investigação/correção/validação para o incidente D16 |
 
 ## Scripts de Relatório (reutilizáveis)
 

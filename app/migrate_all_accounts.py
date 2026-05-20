@@ -2,8 +2,8 @@
 """
 migrate_all_accounts.py — Migra accounts SOURCE → DEST em sequência.
 
-Somente os accounts listados em _ACCOUNTS_WHITELIST serão migrados.
-Para migrar um account diferente, ajuste a lista abaixo.
+Por padrão migra todos os accounts do SOURCE.
+Use a variável de ambiente ACCOUNTS_WHITELIST para restringir o conjunto.
 
 Uso:
     python app/migrate_all_accounts.py
@@ -16,6 +16,7 @@ Saída:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -32,7 +33,12 @@ _OUT_DIR = _ROOT / ".tmp"
 
 # Accounts autorizados para esta execução de migração.
 # Alterar para incluir outros accounts quando necessário.
-_ACCOUNTS_WHITELIST: set[str] = {"Unimed Guaxupé"}
+_ACCOUNTS_WHITELIST_RAW = os.environ.get("ACCOUNTS_WHITELIST", "").strip()
+_ACCOUNTS_WHITELIST: set[str] | None = None
+if _ACCOUNTS_WHITELIST_RAW:
+    _ACCOUNTS_WHITELIST = {
+        item.strip() for item in _ACCOUNTS_WHITELIST_RAW.split(",") if item.strip()
+    }
 
 
 def _fmt_elapsed(seconds: float) -> str:
@@ -52,17 +58,20 @@ _OUT = _ROOT / ".tmp" / f"migrate_all_{_TS}.json"
 
 
 def get_source_accounts() -> list[dict]:
-    """Retorna accounts do SOURCE filtrados por _ACCOUNTS_WHITELIST."""
+    """Retorna accounts do SOURCE, aplicando whitelist apenas se configurada."""
     sc = src()
     with cur(sc) as c:
         c.execute("SELECT id, name, status FROM public.accounts ORDER BY id")
         rows = c.fetchall()
     sc.close()
     all_accounts = [dict(r) for r in rows]
+    if _ACCOUNTS_WHITELIST is None:
+        return all_accounts
+
     filtered = [a for a in all_accounts if a["name"] in _ACCOUNTS_WHITELIST]
     if not filtered:
         raise SystemExit(
-            f"Nenhum account do whitelist encontrado no SOURCE.\n"
+            f"Nenhum account da whitelist encontrado no SOURCE.\n"
             f"Whitelist: {_ACCOUNTS_WHITELIST}\n"
             f"Disponíveis: {[a['name'] for a in all_accounts]}"
         )
@@ -103,7 +112,10 @@ def main() -> None:
     t_start_dt = datetime.now()
     print("=" * 65)
     print(f"  MIGRAÇÃO — ACCOUNTS SELECIONADOS")
-    print(f"  Whitelist: {sorted(_ACCOUNTS_WHITELIST)}")
+    if _ACCOUNTS_WHITELIST is None:
+        print("  Whitelist: <todas as accounts do SOURCE>")
+    else:
+        print(f"  Whitelist: {sorted(_ACCOUNTS_WHITELIST)}")
     print(f"  Modo     : {'DRY-RUN' if _DRY_RUN else 'REAL'}")
     print(f"  Início   : {t_start_dt.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 65)

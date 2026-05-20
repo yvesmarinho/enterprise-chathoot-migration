@@ -8,7 +8,7 @@
 #   - Garantir que .secrets/generate_erd.json existe e tem permissão 600
 #
 # Uso:
-#   # Migração padrão (Vya Digital)
+#   # Migração padrão (todas as accounts via fluxo legado quando ALL_ACCOUNTS=true)
 #   docker compose run --rm migrator
 #
 #   # Outra account
@@ -44,7 +44,8 @@ services:
       SCRIPT: "${SCRIPT:-}"
       # PIPELINE: "full" usa src/migrar.py (pipeline completo: teams, labels, attachments)
       #           "legacy" usa app/01_migrar_account.py (apenas contacts + conversations)
-      PIPELINE: "${PIPELINE:-full}"
+      #           "" (vazio) deixa o entrypoint decidir: legacy se ALL_ACCOUNTS=true, full caso contrário
+      PIPELINE: "${PIPELINE:-}"
       # MIGRATION_ENV: "prod" | "dev" — atalho para SOURCE/DEST keys no src/migrar.py
       # Ignorado quando MIGRATION_SOURCE_KEY e MIGRATION_DEST_KEY já estão definidas.
       MIGRATION_ENV: "${MIGRATION_ENV:-prod}"

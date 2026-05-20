@@ -26,7 +26,7 @@ SCRIPT="${SCRIPT:-}"
 # PIPELINE: "full" (src/migrar.py — teams, labels, attachments, etc.)
 #         | "legacy" (app/01_migrar_account.py — contacts+conversations only)
 # Padrão: "full" — pipeline completo e idempotente
-PIPELINE="${PIPELINE:-full}"
+PIPELINE="${PIPELINE:-}"
 # MIGRATION_ENV: "prod" | "dev" — atalho para as chaves SOURCE/DEST
 # Ignorado se MIGRATION_SOURCE_KEY e MIGRATION_DEST_KEY já estiverem definidas.
 MIGRATION_ENV="${MIGRATION_ENV:-}"
@@ -40,6 +40,16 @@ if [[ -z "${MIGRATION_SOURCE_KEY}" || -z "${MIGRATION_DEST_KEY}" ]]; then
 fi
 
 cd /app
+
+# Se ALL_ACCOUNTS estiver ligado e PIPELINE não foi explicitado,
+# prioriza o fluxo legado para preservar o comportamento antigo.
+if [[ -z "${PIPELINE}" ]]; then
+    if [[ "${ALL_ACCOUNTS}" == "true" ]]; then
+        PIPELINE="legacy"
+    else
+        PIPELINE="full"
+    fi
+fi
 
 echo "========================================================"
 echo "  enterprise-chatwoot-migration — Docker Runner"
