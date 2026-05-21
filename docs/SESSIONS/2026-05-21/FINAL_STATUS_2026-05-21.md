@@ -36,3 +36,4 @@
 - Artefato de investigação: `docs/SESSIONS/2026-05-21/INVESTIGACAO_GUAXUPE_CHAT_SYNCHAT_2026-05-21.md`.
 - Artefato de plano/tarefas: `docs/SESSIONS/2026-05-21/PLANO_E_TAREFAS_RESET_E_MIGRACAO_DEV_ONLY_2026-05-21.md`.
 - O próximo passo recomendado permanece: iniciar Fase A/B apenas após confirmação das dúvidas de escopo.
+- Limpeza de `.tmp/`: executado `./scripts/cleanup-tmp.sh --dry-run` (43 itens candidatos). Decisão: **não limpar nesta virada** para preservar evidências e scripts de diagnóstico usados na investigação da sessão 22.

@@ -184,7 +184,8 @@ O run coletado no wfdb01 não escreveu no destino DEV (`chatwoot004_dev1_db`) us
 3. Atualizado `docs/INDEX.md` com referências da sessão 22 e novos artefatos.
 4. Criado `FINAL_STATUS_2026-05-21.md` com estado consolidado, pendências e próximos passos P0.
 5. Executado security review dos docs de sessão (scan por padrões de segredo/IP privado).
-6. Preparado commit de encerramento e sincronização com remoto.
+6. Executado `./scripts/cleanup-tmp.sh --dry-run` (43 itens candidatos à remoção) e registrada decisão de preservação de evidências da investigação.
+7. Preparado commit de encerramento e sincronização com remoto.
 
 **Decisões desta etapa**:
 - Regra de reconciliação formalizada: em conflito `id` x `nome`, prevalece ID autoritativo (`source_id`/`dest_id`) com log estruturado.
