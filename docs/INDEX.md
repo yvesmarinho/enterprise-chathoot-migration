@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-20 (Sessão 21 — D16 Fase 1 concluída + fluxo `ALL_ACCOUNTS=true` legado ativado e corrigido no wfdb01)
-**Last Session**: 2026-05-20 (Sessão 21 — diagnóstico HTTP500 confirmado; deploy remoto e execução daemon com pipeline legado)
+**Last Updated**: 2026-05-21 (Sessão 22 — investigação chat x synchat concluída; plano DEV-only de reset/revisão consolidado)
+**Last Session**: 2026-05-21 (Sessão 22 — relatório de investigação publicado; plano e tarefas para limpeza seletiva/revisão profunda)
 
 ---
 
@@ -76,6 +76,12 @@ SESSIONS/
     ├── DAILY_ACTIVITIES_2026-05-20.md
     ├── SESSION_RECOVERY_2026-05-20.md
     └── FINAL_STATUS_2026-05-20.md
+└── 2026-05-21/           ← Sessão 22: investigação Guaxupé chat x synchat + plano DEV-only de reset/revisão
+    ├── DAILY_ACTIVITIES_2026-05-21.md
+    ├── SESSION_RECOVERY_2026-05-21.md
+    ├── INVESTIGACAO_GUAXUPE_CHAT_SYNCHAT_2026-05-21.md
+    ├── PLANO_E_TAREFAS_RESET_E_MIGRACAO_DEV_ONLY_2026-05-21.md
+    └── FINAL_STATUS_2026-05-21.md
 ```
 
 ## Evidências de Validação S3

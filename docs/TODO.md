@@ -1,7 +1,16 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-20 — Sessão 21: ✅ D16 Fase 1 concluída + fluxo all-accounts legado ativado e corrigido no wfdb01.
-**Status**: 🟢 MIGRAÇÃO ALL-ACCOUNTS LEGADO EM EXECUÇÃO — pipeline legado em daemon validado no wfdb01.
+**Last Updated**: 2026-05-21 — Sessão 22: ✅ investigação chat x synchat concluída + plano de reset/revisão DEV-only consolidado.
+**Status**: 🟡 Aguardando confirmação de escopo para iniciar Fase A/B (guardrails DEV-only + dry-run de limpeza seletiva).
+
+---
+
+## 🔴 P0 — Foco Sessão 22 (2026-05-21)
+
+- [ ] **S22-P0-1** Acompanhar conclusão do daemon `chatwoot-migrator-all` no wfdb01 e consolidar relatório `.tmp/migrate_all_*.json`
+- [ ] **S22-P0-2** Executar validações pós-migração por account (`app/02_verificar.py`, `app/06_verificar_erros.py`, API/hash)
+- [ ] **S22-P0-3** Definir/aplicar estratégia para gap de ActiveStorage antes da homologação final
+- [x] **S22-P0-3A** Plano de reset + revisão profunda + DEV-only documentado e validado com regra `ID > nome` e trilha de auditoria.
 
 ---
 
