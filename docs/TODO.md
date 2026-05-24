@@ -1,11 +1,62 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-24 — Sessão 23: ritual de início executado e pendências P0 herdadas da sessão 22 priorizadas.
-**Status**: 🟡 Aguardando confirmação de escopo para iniciar Fase A/B (guardrails DEV-only + dry-run de limpeza seletiva).
+**Last Updated**: 2026-05-24 — Sessão 23: ✅ Documentação offboarding + Análise D17 (gap 37 tabelas) + Teste DEV Unimed Guaxupé
+**Status**: 🟢 Teste DEV bem-sucedido (60k registros migrados, 0 falhas). Gaps P0 identificados para PROD.
 
 ---
 
-## 🔴 P0 — Foco Sessão 23 (2026-05-24)
+## 🔴 P0 — CRÍTICO para PROD (baseado em D17)
+
+- [ ] **D17-P0-1** Criar `MentionsMigrator` (tabela `mentions` — menções @user em mensagens)
+- [ ] **D17-P0-2** Criar `ConversationParticipantsMigrator` (tabela `conversation_participants` — participantes multi-user)
+- [ ] **D17-P0-3** Validar uso de `portals` por account (se COUNT > 0 → criar suite de migrators para help center)
+- [ ] **D17-P0-4** Comunicar stakeholders sobre perda de `reporting_events` (analytics históricos não migrados) OU criar migrator seletivo
+
+## 🟡 P1 — ALTA para PROD (baseado em D17)
+
+- [ ] **D17-P1-1** Criar `WorkingHoursMigrator` (evitar reconfiguração manual de horários)
+- [ ] **D17-P1-2** Criar `AutomationRulesMigrator` (JSONB remapping de IDs — complexo)
+- [ ] **D17-P1-3** Criar `MacrosMigrator` + `CampaignsMigrator`
+- [ ] **D17-P1-4** Validar uso de SLAs por account (se usado → criar `SLAMigrator`)
+
+## 🔵 P2 — Investigação Técnica
+
+- [ ] **INV-ORPHANS-1** Confirmar que `contact_inboxes` orphans (7.336) são de outros accounts via SQL
+- [ ] **INV-ORPHANS-2** Confirmar que `conversation_labels` orphans (14.333) são de outros accounts
+- [ ] **INV-UI-1** Validar migração Unimed Guaxupé na UI do vya-chat-dev.vya.digital (8.190 conversas visíveis?)
+
+---
+
+## ✅ CONCLUÍDO NESTA SESSÃO (S23 — 2026-05-24)
+
+### Parte 1: Documentação do Account Offboarding Tool
+- [x] **OFFBOARD-README** ✅ Criado `tools/account_offboarding/README.md` (documentação técnica completa)
+- [x] **OFFBOARD-GUIDE** ✅ Criado `docs/guides/ACCOUNT_OFFBOARDING_GUIDE.md` (workflow operacional, compliance LGPD/GDPR)
+- [x] **OFFBOARD-INDEX** ✅ Atualizado `docs/INDEX.md` (seção Account Offboarding Tool)
+- [x] **INVENTARIO** ✅ Criado `docs/INVENTARIO_COMPLETO_ARQUIVOS_MIGRACAO.md` (170+ arquivos catalogados)
+
+### Parte 2: Análise de Completude da Migração (D17)
+- [x] **D17-ANALISE** ✅ Comparação cleanup.py (52 tabelas) vs migrar.py (15 tabelas) → gap de 37 tabelas identificado
+- [x] **D17-GAPS-CRITICO** ✅ 3 gaps P0 identificados: mentions, conversation_participants, reporting_events
+- [x] **D17-GAPS-MEDIO** ✅ 10 gaps P1 identificados: working_hours, automation_rules, macros, SLAs, etc.
+- [x] **D17-RECOMENDACOES** ✅ Checklist pré-PROD criado (validar uso de portals, comunicar perda de analytics)
+
+### Parte 3: Teste de Migração DEV — Unimed Guaxupé
+- [x] **DEV-SEARCH** ✅ Account "Unimed Guaxupé" identificado no SOURCE (ID: 25)
+- [x] **DEV-MIGRATION** ✅ Migração DEV executada: 60.030 de 81.710 registros migrados (73,4%)
+- [x] **DEV-CORE-DATA** ✅ Dados core 100% migrados: 8.190 conversas, 46.010 mensagens, 1.513 contacts, 1.932 anexos
+- [x] **DEV-FK-VALID** ✅ Validação FK: 12 relações validadas, 0 orphans no escopo migrado
+- [x] **DEV-ORPHANS** ✅ Orphans identificados (contact_inboxes: 7.336, conversation_labels: 14.333) — hipótese: outros accounts
+
+### Git Operations
+- [x] **GIT-COMMIT-1** ✅ `d19de57`: feat(tools): adiciona ferramenta de account offboarding + limpeza prod (20 files, +3,693 lines)
+- [x] **GIT-COMMIT-2** ✅ `3dc7fe5`: docs: adiciona inventário completo de arquivos do processo de migração (1 file, +475 lines)
+- [x] **GIT-COMMIT-3** ✅ `0de6178`: docs(analysis): adiciona debate D17 - análise de cobertura de tabelas da migração (4 files, +357 lines)
+- [x] **GIT-PUSH** ✅ Push para origin/master bem-sucedido (3 commits)
+
+---
+
+## 🔴 P0 — Foco Sessão 23 (2026-05-24) [DESCONTINUADO]
 
 - [ ] **S23-P0-1** Confirmar escopo operacional DEV-only para limpeza seletiva (base-alvo, tabelas e limites de remoção).
 - [ ] **S23-P0-2** Implementar guardrails da Fase A (hard gates de ambiente/chaves) antes de qualquer operação destrutiva.

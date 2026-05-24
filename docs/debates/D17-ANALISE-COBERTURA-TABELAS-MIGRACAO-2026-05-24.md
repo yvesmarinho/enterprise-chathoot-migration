@@ -1,7 +1,7 @@
 # D17 — Análise de Cobertura de Tabelas na Migração
 
-**Data**: 2026-05-24  
-**Sessão**: S23  
+**Data**: 2026-05-24
+**Sessão**: S23
 **Tipo**: Análise Técnica — Validação de Completude do Workflow de Migração
 
 ---
