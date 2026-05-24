@@ -1,7 +1,7 @@
 # 📦 Inventário Completo — Arquivos do Processo de Migração
 
-**Projeto**: enterprise-chatwoot-migration  
-**Data**: 2026-05-24  
+**Projeto**: enterprise-chatwoot-migration
+**Data**: 2026-05-24
 **Sessão**: S23
 
 ---
@@ -466,8 +466,8 @@ uv run pytest test/
 
 ### Responsável
 
-**Equipe**: DevOps / Data Engineering  
-**Última Atualização**: 2026-05-24 (Sessão 23)  
+**Equipe**: DevOps / Data Engineering
+**Última Atualização**: 2026-05-24 (Sessão 23)
 **Próxima Revisão**: 2026-06-01 (ou após conclusão Fase D)
 
 ---

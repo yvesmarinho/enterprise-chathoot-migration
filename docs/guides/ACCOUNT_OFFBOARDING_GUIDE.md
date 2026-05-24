@@ -1,7 +1,7 @@
 # 🗑️ Guia Operacional — Account Offboarding Chatwoot
 
-**Versão**: 1.0.0  
-**Data**: 2026-05-24  
+**Versão**: 1.0.0
+**Data**: 2026-05-24
 **Projeto**: enterprise-chatwoot-migration
 
 ---
@@ -564,7 +564,7 @@ Se caracteres ainda aparecem errados, verificar encoding do terminal (`export LA
 
 ### Versão Atual: 1.0.0
 
-**Criada em:** 2026-05-24 (Sessão 23)  
+**Criada em:** 2026-05-24 (Sessão 23)
 **Testada contra:** Chatwoot schema v3.x, PostgreSQL 16.10
 
 ### Roadmap
@@ -582,7 +582,7 @@ Se caracteres ainda aparecem errados, verificar encoding do terminal (`export LA
 
 ### Manutenção
 
-**Responsável:** Equipe de DevOps/Data Engineering  
+**Responsável:** Equipe de DevOps/Data Engineering
 **Ciclo de revisão:** A cada upgrade major do Chatwoot (verificar novas tabelas)
 
 **Quando atualizar `cleanup.py`:**
@@ -602,6 +602,6 @@ Se caracteres ainda aparecem errados, verificar encoding do terminal (`export LA
 
 ---
 
-**Aprovado por:** [Nome do Tech Lead / DBA Sênior]  
-**Data de aprovação:** [YYYY-MM-DD]  
+**Aprovado por:** [Nome do Tech Lead / DBA Sênior]
+**Data de aprovação:** [YYYY-MM-DD]
 **Próxima revisão:** [YYYY-MM-DD] (sugestão: a cada 6 meses ou upgrade do Chatwoot)

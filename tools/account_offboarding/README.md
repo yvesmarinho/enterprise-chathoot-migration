@@ -459,6 +459,6 @@ O `inspect.py` descobre tabelas **dinamicamente** via:
 
 ---
 
-**Criado em:** 2026-05-24  
-**Versão da ferramenta:** 1.0.0  
+**Criado em:** 2026-05-24
+**Versão da ferramenta:** 1.0.0
 **Testado com:** Chatwoot schema v3.x, PostgreSQL 16.10
