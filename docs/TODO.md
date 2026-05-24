@@ -1,7 +1,15 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-21 — Sessão 22: ✅ investigação chat x synchat concluída + plano de reset/revisão DEV-only consolidado.
+**Last Updated**: 2026-05-24 — Sessão 23: ritual de início executado e pendências P0 herdadas da sessão 22 priorizadas.
 **Status**: 🟡 Aguardando confirmação de escopo para iniciar Fase A/B (guardrails DEV-only + dry-run de limpeza seletiva).
+
+---
+
+## 🔴 P0 — Foco Sessão 23 (2026-05-24)
+
+- [ ] **S23-P0-1** Confirmar escopo operacional DEV-only para limpeza seletiva (base-alvo, tabelas e limites de remoção).
+- [ ] **S23-P0-2** Implementar guardrails da Fase A (hard gates de ambiente/chaves) antes de qualquer operação destrutiva.
+- [ ] **S23-P0-3** Implementar dry-run da Fase B com relatório JSON por tabela/account e revisão de impacto.
 
 ---
 

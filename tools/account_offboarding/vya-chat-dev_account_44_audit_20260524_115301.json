@@ -1,0 +1,251 @@
+{
+  "generated_at": "20260524_115301",
+  "db_key": "vya-chat-dev",
+  "effective_database": "chatwoot004_dev1_db",
+  "account_id": 44,
+  "total_rows": 853,
+  "non_zero_tables": {
+    "account_users": {
+      "strategy": "account_id",
+      "count": 4
+    },
+    "agent_bot_inboxes": {
+      "strategy": "account_id",
+      "count": 2
+    },
+    "agent_bots": {
+      "strategy": "account_id",
+      "count": 1
+    },
+    "attachments": {
+      "strategy": "account_id",
+      "count": 6
+    },
+    "channel_api": {
+      "strategy": "account_id",
+      "count": 2
+    },
+    "contacts": {
+      "strategy": "account_id",
+      "count": 10
+    },
+    "conversations": {
+      "strategy": "account_id",
+      "count": 66
+    },
+    "inboxes": {
+      "strategy": "account_id",
+      "count": 2
+    },
+    "messages": {
+      "strategy": "account_id",
+      "count": 576
+    },
+    "notification_settings": {
+      "strategy": "account_id",
+      "count": 4
+    },
+    "reporting_events": {
+      "strategy": "account_id",
+      "count": 166
+    },
+    "working_hours": {
+      "strategy": "account_id",
+      "count": 14
+    }
+  },
+  "all_tables": {
+    "account_users": {
+      "strategy": "account_id",
+      "count": 4
+    },
+    "agent_bot_inboxes": {
+      "strategy": "account_id",
+      "count": 2
+    },
+    "agent_bots": {
+      "strategy": "account_id",
+      "count": 1
+    },
+    "applied_slas": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "articles": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "attachments": {
+      "strategy": "account_id",
+      "count": 6
+    },
+    "automation_rules": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "campaigns": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "canned_responses": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "categories": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_api": {
+      "strategy": "account_id",
+      "count": 2
+    },
+    "channel_email": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_facebook_pages": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_line": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_sms": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_telegram": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_twilio_sms": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_twitter_profiles": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_web_widgets": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "channel_whatsapp": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "contacts": {
+      "strategy": "account_id",
+      "count": 10
+    },
+    "conversation_participants": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "conversations": {
+      "strategy": "account_id",
+      "count": 66
+    },
+    "csat_survey_responses": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "custom_attribute_definitions": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "custom_filters": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "custom_roles": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "dashboard_apps": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "data_imports": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "email_templates": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "folders": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "inboxes": {
+      "strategy": "account_id",
+      "count": 2
+    },
+    "integrations_hooks": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "labels": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "macros": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "mentions": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "messages": {
+      "strategy": "account_id",
+      "count": 576
+    },
+    "notes": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "notification_settings": {
+      "strategy": "account_id",
+      "count": 4
+    },
+    "notifications": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "portals": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "reporting_events": {
+      "strategy": "account_id",
+      "count": 166
+    },
+    "sla_events": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "sla_policies": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "teams": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "telegram_bots": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "webhooks": {
+      "strategy": "account_id",
+      "count": 0
+    },
+    "working_hours": {
+      "strategy": "account_id",
+      "count": 14
+    }
+  }
+}

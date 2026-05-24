@@ -35,9 +35,39 @@ MIGRATION_ENV="${MIGRATION_ENV:-}"
 if [[ -z "${MIGRATION_SOURCE_KEY}" || -z "${MIGRATION_DEST_KEY}" ]]; then
     echo "[ERRO] MIGRATION_SOURCE_KEY e MIGRATION_DEST_KEY são obrigatórias."
     echo "  Produção : MIGRATION_SOURCE_KEY=chat-vya-digital  MIGRATION_DEST_KEY=synchat-vya-digital"
-    echo "  Dev/teste: MIGRATION_SOURCE_KEY=chatwoot_dev       MIGRATION_DEST_KEY=chatwoot004_dev"
+    echo "  Dev/teste: MIGRATION_SOURCE_KEY=chat-vya-digital  MIGRATION_DEST_KEY=vya-chat-dev"
     exit 1
 fi
+
+# ── DEV-ONLY GUARD ────────────────────────────────────────────────────────
+# Bloqueia execução com chaves de produção por padrão.
+# Para desbloquear: DEV_ONLY_MODE=false (requer autorização explícita).
+# Note: MIGRATION_SOURCE_KEY=chat-vya-digital é SEMPRE a source (dev e prod
+# usam a mesma DB de origem). Apenas DEST e MIGRATION_ENV discriminam o ambiente.
+DEV_ONLY_MODE="${DEV_ONLY_MODE:-true}"
+_PROD_DEST_KEY="synchat-vya-digital"
+
+if [[ "${DEV_ONLY_MODE}" == "true" ]]; then
+    _guard_blocked=""
+    if [[ "${MIGRATION_ENV}" == "prod" ]]; then
+        _guard_blocked="MIGRATION_ENV=prod aponta para produção."
+    elif [[ "${MIGRATION_DEST_KEY}" == "${_PROD_DEST_KEY}" ]]; then
+        _guard_blocked="MIGRATION_DEST_KEY=${MIGRATION_DEST_KEY} é chave de produção."
+    fi
+
+    if [[ -n "${_guard_blocked}" ]]; then
+        echo ""
+        echo "╔══════════════════════════════════════════════════════════════╗"
+        echo "║           ⛔  DEV-ONLY GUARD — EXECUÇÃO BLOQUEADA           ║"
+        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo "  Razão: ${_guard_blocked}"
+        echo "  Para desbloquear: DEV_ONLY_MODE=false"
+        echo ""
+        exit 1
+    fi
+    echo "[GUARDRAIL] DEV-ONLY MODE ATIVO — ambiente validado (DEV). ✅"
+fi
+# ── FIM DEV-ONLY GUARD ────────────────────────────────────────────────────
 
 cd /app
 

@@ -1,8 +1,9 @@
 """CLI entrypoint for the enterprise Chatwoot migration.
 
-:description: Orchestrates the full migration pipeline from ``chatwoot_dev1_db``
-    (source, read-only) to ``chatwoot004_dev1_db`` (DEV destination) or
-    ``chatwoot004_db`` (PROD destination) respecting the FK dependency order:
+:description: Orchestrates the full migration pipeline from ``chatwoot_db``
+    (source, read-only — key ``chat-vya-digital``) to ``chatwoot004_dev1_db``
+    (DEV destination — key ``vya-chat-dev``) or ``chatwoot004_db``
+    (PROD destination — key ``synchat-vya-digital``) respecting FK order:
 
     ``accounts → inboxes → users → teams → labels → contacts →
     conversations → messages → attachments``
@@ -19,7 +20,7 @@ Exit codes:
     * ``3`` — catastrophic failure in ``accounts`` (root entity) — aborted
 
 Options:
-    ``--env``      ``dev`` (SOURCE=chatwoot_dev1_db DEST=chatwoot004_dev1_db) or
+    ``--env``      ``dev`` (SOURCE=chatwoot_db DEST=chatwoot004_dev1_db) or
                   ``prod`` (SOURCE=chatwoot_db DEST=chatwoot004_db).
     ``--dry-run``  Skip all writes; log what *would* be done.
     ``--poc``      Classify all source rows (requires ``--dry-run``);
@@ -63,18 +64,19 @@ from src.migrators.webhooks_migrator import WebhooksMigrator
 from src.reports.poc_reporter import POCReporter
 from src.reports.validation_reporter import ValidationReporter
 from src.repository.migration_state_repository import MigrationStateRepository
+from src.utils.env_guard import assert_dev_only_env
 from src.utils.fk_validator import FKValidator
 from src.utils.id_remapper import IDRemapper
 from src.utils.log_masker import MaskingHandler
 
 # DEV / PROD env presets — shortcut for MIGRATION_SOURCE_KEY / MIGRATION_DEST_KEY
 #
-# dev:  SOURCE=chatwoot_dev (chatwoot_dev1_db, site: chat.vya.digital — READ-ONLY)
-#               DEST=chatwoot004_dev (chatwoot004_dev1_db, site: vya-chat-dev — READ-WRITE)
+# dev:  SOURCE=chat-vya-digital (chatwoot_db @ wfdb02, site: chat.vya.digital — READ-ONLY)
+#               DEST=vya-chat-dev (chatwoot004_dev1_db @ wfdb02, site: vya-chat-dev — READ-WRITE)
 # prod: SOURCE=chat-vya-digital (chatwoot_db)
 #               DEST=synchat-vya-digital (chatwoot004_db)
 _ENV_PRESETS: dict[str, tuple[str, str]] = {
-    "dev": ("chatwoot_dev", "chatwoot004_dev"),
+    "dev": ("chat-vya-digital", "vya-chat-dev"),
     "prod": ("chat-vya-digital", "synchat-vya-digital"),
 }
 
@@ -196,8 +198,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=(
             "Convenience shortcut that sets MIGRATION_SOURCE_KEY and "
             "MIGRATION_DEST_KEY automatically. "
-            "dev = chatwoot_dev (chatwoot_dev1_db) / chatwoot004_dev (chatwoot004_dev1_db). "
-            "prod = chat-vya-digital / synchat-vya-digital. "
+            "dev = chat-vya-digital (chatwoot_db) / vya-chat-dev (chatwoot004_dev1_db). "
+            "prod = chat-vya-digital (chatwoot_db) / synchat-vya-digital (chatwoot004_db). "
             "Overrides the env vars when provided."
         ),
     )
@@ -227,6 +229,9 @@ def main(argv: list[str] | None = None) -> int:
         src_key, dst_key = _ENV_PRESETS[args.env]
         os.environ["MIGRATION_SOURCE_KEY"] = src_key
         os.environ["MIGRATION_DEST_KEY"] = dst_key
+
+    # DEV-only guardrail — must run after --env resolves env vars
+    assert_dev_only_env()
 
     logger, log_file = _setup_logging(args.verbose)
 

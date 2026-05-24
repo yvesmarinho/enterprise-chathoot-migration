@@ -109,6 +109,14 @@ def run_account(name: str) -> dict:
 
 
 def main() -> None:
+    # DEV-only guardrail — block production keys by default
+    try:
+        from src.utils.env_guard import assert_dev_only_env  # noqa: PLC0415
+
+        assert_dev_only_env()
+    except ImportError:
+        pass  # guard not available when running without src/ in path
+
     t_start_dt = datetime.now()
     print("=" * 65)
     print(f"  MIGRAÇÃO — ACCOUNTS SELECIONADOS")

@@ -139,6 +139,37 @@ SESSIONS/
 |--------|-----------|-----|
 | [`scripts/cleanup-tmp.sh`](../scripts/cleanup-tmp.sh) | **NOVO** — Limpeza de `.tmp/` com `--dry-run` e `--verbose` | `./scripts/cleanup-tmp.sh --verbose` |
 
+## 🗑️ Account Offboarding Tool
+
+**Localização**: `tools/account_offboarding/`
+
+| Arquivo | Descrição |
+|---------|-----------|
+| [**README.md**](../tools/account_offboarding/README.md) | **Documentação completa** — Guia de uso, casos de uso, segurança, troubleshooting |
+| [`inspect.py`](../tools/account_offboarding/inspect.py) | **Auditoria read-only** — Identifica quantos registros existem para um account_id (48+ tabelas via direct + FK discovery) |
+| [`cleanup.py`](../tools/account_offboarding/cleanup.py) | **Remoção completa** — Deleta TODOS os dados do account (40+ tabelas, ordem FK-aware, transação única) |
+| [`config.json.example`](../tools/account_offboarding/config.json.example) | Template de configuração (db_key, account_id, secrets_file) |
+
+**Casos de uso:**
+- ✅ Offboarding de cliente (término de contrato)
+- ✅ Limpeza de migração incorreta (ex: account_id=45 migrado para produção por engano)
+- ✅ Remoção de accounts de teste em DEV
+
+**Uso básico:**
+```bash
+# 1. Auditoria
+uv run python tools/account_offboarding/inspect.py --db-key vya-chat-dev --account-id 44
+
+# 2. Dry-run
+uv run python tools/account_offboarding/cleanup.py --db-key vya-chat-dev --account-id 44 --dry-run
+
+# 3. Execução (confirmação interativa obrigatória)
+uv run python tools/account_offboarding/cleanup.py --db-key vya-chat-dev --account-id 44 --execute
+```
+
+**Criado em**: 2026-05-24 (Sessão 23)
+**Testado contra**: chatwoot004_dev1_db (account_id=44, 864 linhas), chatwoot004_db (account_id=45, 2.339 linhas)
+
 ---
 
-*Gerado por scaffold.py em 2026-04-09T11:37:54Z — atualizado manualmente em 2026-04-20 (encerramento sessão 6)*
+*Gerado por scaffold.py em 2026-04-09T11:37:54Z — atualizado manualmente em 2026-05-24 (account offboarding tool, S23)*

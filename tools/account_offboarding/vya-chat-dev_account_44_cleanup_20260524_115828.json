@@ -1,0 +1,379 @@
+{
+  "generated_at": "20260524_115828",
+  "mode": "EXECUÇÃO REAL",
+  "db_key": "vya-chat-dev",
+  "effective_database": "chatwoot004_dev1_db",
+  "account_id": 44,
+  "pre_counts": {
+    "attachments": 6,
+    "mentions": 0,
+    "reporting_events": 166,
+    "messages": 576,
+    "conversation_participants": 0,
+    "csat_survey_responses": 0,
+    "applied_slas": 0,
+    "sla_events": 0,
+    "contact_inboxes": 8,
+    "conversations": 66,
+    "contacts": 10,
+    "agent_bot_inboxes": 2,
+    "inbox_members": 2,
+    "working_hours": 14,
+    "channel_api": 2,
+    "channel_whatsapp": 0,
+    "channel_web_widgets": 0,
+    "channel_email": 0,
+    "channel_facebook_pages": 0,
+    "channel_telegram": 0,
+    "channel_sms": 0,
+    "channel_twilio_sms": 0,
+    "channel_line": 0,
+    "channel_twitter_profiles": 0,
+    "inboxes": 2,
+    "agent_bots": 1,
+    "notification_settings": 4,
+    "notifications": 0,
+    "team_memberships": 0,
+    "teams": 0,
+    "portal_members": 0,
+    "categories": 0,
+    "articles": 0,
+    "folders": 0,
+    "portals": 0,
+    "labels": 0,
+    "canned_responses": 0,
+    "automation_rules": 0,
+    "macros": 0,
+    "campaigns": 0,
+    "dashboard_apps": 0,
+    "custom_attribute_definitions": 0,
+    "custom_filters": 0,
+    "custom_roles": 0,
+    "data_imports": 0,
+    "email_templates": 0,
+    "sla_policies": 0,
+    "webhooks": 0,
+    "integrations_hooks": 0,
+    "telegram_bots": 0,
+    "account_users": 4,
+    "accounts": 1
+  },
+  "deletions": [
+    {
+      "table": "attachments",
+      "deleted": 6,
+      "skipped": false
+    },
+    {
+      "table": "mentions",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "reporting_events",
+      "deleted": 166,
+      "skipped": false
+    },
+    {
+      "table": "messages",
+      "deleted": 576,
+      "skipped": false
+    },
+    {
+      "table": "conversation_participants",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "csat_survey_responses",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "applied_slas",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "sla_events",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "contact_inboxes",
+      "deleted": 8,
+      "skipped": false
+    },
+    {
+      "table": "conversations",
+      "deleted": 66,
+      "skipped": false
+    },
+    {
+      "table": "contacts",
+      "deleted": 10,
+      "skipped": false
+    },
+    {
+      "table": "agent_bot_inboxes",
+      "deleted": 2,
+      "skipped": false
+    },
+    {
+      "table": "inbox_members",
+      "deleted": 2,
+      "skipped": false
+    },
+    {
+      "table": "working_hours",
+      "deleted": 14,
+      "skipped": false
+    },
+    {
+      "table": "channel_api",
+      "deleted": 2,
+      "skipped": false
+    },
+    {
+      "table": "channel_whatsapp",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_web_widgets",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_email",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_facebook_pages",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_telegram",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_sms",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_twilio_sms",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_line",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "channel_twitter_profiles",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "inboxes",
+      "deleted": 2,
+      "skipped": false
+    },
+    {
+      "table": "agent_bots",
+      "deleted": 1,
+      "skipped": false
+    },
+    {
+      "table": "notification_settings",
+      "deleted": 4,
+      "skipped": false
+    },
+    {
+      "table": "notifications",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "team_memberships",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "teams",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "portal_members",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "categories",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "articles",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "folders",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "portals",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "labels",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "canned_responses",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "automation_rules",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "macros",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "campaigns",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "dashboard_apps",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "custom_attribute_definitions",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "custom_filters",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "custom_roles",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "data_imports",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "email_templates",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "sla_policies",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "webhooks",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "integrations_hooks",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "telegram_bots",
+      "deleted": 0,
+      "skipped": true
+    },
+    {
+      "table": "account_users",
+      "deleted": 4,
+      "skipped": false
+    },
+    {
+      "table": "accounts",
+      "deleted": 1,
+      "skipped": false
+    }
+  ],
+  "post_counts": {
+    "attachments": 0,
+    "mentions": 0,
+    "reporting_events": 0,
+    "messages": 0,
+    "conversation_participants": 0,
+    "csat_survey_responses": 0,
+    "applied_slas": 0,
+    "sla_events": 0,
+    "contact_inboxes": 0,
+    "conversations": 0,
+    "contacts": 0,
+    "agent_bot_inboxes": 0,
+    "inbox_members": 0,
+    "working_hours": 0,
+    "channel_api": 0,
+    "channel_whatsapp": 0,
+    "channel_web_widgets": 0,
+    "channel_email": 0,
+    "channel_facebook_pages": 0,
+    "channel_telegram": 0,
+    "channel_sms": 0,
+    "channel_twilio_sms": 0,
+    "channel_line": 0,
+    "channel_twitter_profiles": 0,
+    "inboxes": 0,
+    "agent_bots": 0,
+    "notification_settings": 0,
+    "notifications": 0,
+    "team_memberships": 0,
+    "teams": 0,
+    "portal_members": 0,
+    "categories": 0,
+    "articles": 0,
+    "folders": 0,
+    "portals": 0,
+    "labels": 0,
+    "canned_responses": 0,
+    "automation_rules": 0,
+    "macros": 0,
+    "campaigns": 0,
+    "dashboard_apps": 0,
+    "custom_attribute_definitions": 0,
+    "custom_filters": 0,
+    "custom_roles": 0,
+    "data_imports": 0,
+    "email_templates": 0,
+    "sla_policies": 0,
+    "webhooks": 0,
+    "integrations_hooks": 0,
+    "telegram_bots": 0,
+    "account_users": 0,
+    "accounts": 0
+  },
+  "residual_rows": 0,
+  "verdict": "✅ LIMPEZA COMPLETA"
+}

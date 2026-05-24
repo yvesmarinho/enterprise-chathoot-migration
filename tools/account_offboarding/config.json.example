@@ -1,0 +1,6 @@
+{
+  "_comment": "Configuração para offboarding de accounts Chatwoot. Copie para config.json — nunca versione config.json.",
+  "db_key": "synchat-vya-digital",
+  "account_id": 0,
+  "secrets_file": "../../.secrets/generate_erd.json"
+}
