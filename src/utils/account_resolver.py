@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ def resolve_account_id(engine: Engine, account_name: str, fuzzy: bool = True) ->
         # Busca parcial case-insensitive
         query = text("""
             SELECT id, name, created_at
-            FROM accounts
+            FROM public.accounts
             WHERE name ILIKE :pattern
             ORDER BY created_at DESC
         """)
@@ -36,16 +37,22 @@ def resolve_account_id(engine: Engine, account_name: str, fuzzy: bool = True) ->
         # Match exato
         query = text("""
             SELECT id, name, created_at
-            FROM accounts
+            FROM public.accounts
             WHERE name = :account_name
             ORDER BY created_at DESC
         """)
         pattern = account_name
 
-    with engine.connect() as conn:
-        results = conn.execute(
-            query, {"pattern": pattern} if fuzzy else {"account_name": pattern}
-        ).fetchall()
+    try:
+        with engine.connect() as conn:
+            results = conn.execute(
+                query, {"pattern": pattern} if fuzzy else {"account_name": pattern}
+            ).fetchall()
+    except ProgrammingError as exc:
+        if "accounts" in str(exc).lower():
+            logger.warning("DEST accounts table unavailable — treating as empty DEST")
+            return None
+        raise
 
     if not results:
         logger.warning("Account '%s' not found (fuzzy=%s)", account_name, fuzzy)
@@ -86,25 +93,32 @@ def get_account_stats(engine: Engine, account_id: int) -> dict:
             a.id,
             a.name,
             a.created_at,
-            (SELECT COUNT(*) FROM conversations WHERE account_id = a.id) AS conv_count,
-            (SELECT COUNT(*) FROM messages m
-             JOIN conversations c ON c.id = m.conversation_id
+            (SELECT COUNT(*) FROM public.conversations WHERE account_id = a.id)
+                AS conv_count,
+            (SELECT COUNT(*) FROM public.messages m
+             JOIN public.conversations c ON c.id = m.conversation_id
              WHERE c.account_id = a.id) AS msg_count,
-            (SELECT COUNT(*) FROM attachments att
-             JOIN messages m ON m.id = att.message_id
-             JOIN conversations c ON c.id = m.conversation_id
+            (SELECT COUNT(*) FROM public.attachments att
+             JOIN public.messages m ON m.id = att.message_id
+             JOIN public.conversations c ON c.id = m.conversation_id
              WHERE c.account_id = a.id) AS att_count,
-            (SELECT COUNT(*) FROM active_storage_attachments asa
-             JOIN attachments att ON att.id = asa.record_id AND asa.record_type = 'Attachment'
-             JOIN messages m ON m.id = att.message_id
-             JOIN conversations c ON c.id = m.conversation_id
+            (SELECT COUNT(*) FROM public.active_storage_attachments asa
+             JOIN public.attachments att ON att.id = asa.record_id
+                AND asa.record_type = 'Attachment'
+             JOIN public.messages m ON m.id = att.message_id
+             JOIN public.conversations c ON c.id = m.conversation_id
              WHERE c.account_id = a.id) AS as_count
-        FROM accounts a
+        FROM public.accounts a
         WHERE a.id = :account_id
     """)
 
-    with engine.connect() as conn:
-        result = conn.execute(query, {"account_id": account_id}).fetchone()
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"account_id": account_id}).fetchone()
+    except ProgrammingError as exc:
+        if "accounts" in str(exc).lower():
+            return {}
+        raise
 
     if not result:
         return {}
@@ -140,7 +154,7 @@ def find_account_by_name_in_dest(
     if fuzzy:
         query = text("""
             SELECT id, name, created_at
-            FROM accounts
+            FROM public.accounts
             WHERE name ILIKE :pattern
             ORDER BY created_at DESC
         """)
@@ -148,16 +162,22 @@ def find_account_by_name_in_dest(
     else:
         query = text("""
             SELECT id, name, created_at
-            FROM accounts
+            FROM public.accounts
             WHERE name = :account_name
             ORDER BY created_at DESC
         """)
         pattern = account_name
 
-    with dest_engine.connect() as conn:
-        results = conn.execute(
-            query, {"pattern": pattern} if fuzzy else {"account_name": pattern}
-        ).fetchall()
+    try:
+        with dest_engine.connect() as conn:
+            results = conn.execute(
+                query, {"pattern": pattern} if fuzzy else {"account_name": pattern}
+            ).fetchall()
+    except ProgrammingError as exc:
+        if "accounts" in str(exc).lower():
+            logger.warning("DEST accounts table unavailable — treating as empty DEST")
+            return None
+        raise
 
     if not results:
         return None
@@ -176,7 +196,9 @@ def find_account_by_name_in_dest(
     }
 
 
-def check_account_exists_with_data(dest_engine: Engine, account_name: str) -> tuple[bool, Optional[dict]]:
+def check_account_exists_with_data(
+    dest_engine: Engine, account_name: str
+) -> tuple[bool, Optional[dict]]:
     """Verifica se account existe no DEST e se tem dados.
 
     Args:

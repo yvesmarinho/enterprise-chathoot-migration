@@ -21,8 +21,10 @@
 from __future__ import annotations
 
 from sqlalchemy import MetaData, Table
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class ActiveStorageAttachmentsMigrator(BaseMigrator):
@@ -63,7 +65,22 @@ class ActiveStorageAttachmentsMigrator(BaseMigrator):
         src_meta = MetaData()
         src_table = Table("active_storage_attachments", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_table = Table("active_storage_attachments", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table(
+                "active_storage_attachments", dest_meta, autoload_with=self.dest_engine
+            )
+        except NoSuchTableError:
+            self.logger.warning(
+                "ActiveStorageAttachmentsMigrator: DEST public.active_storage_attachments missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(
+                self.source_engine,
+                self.dest_engine,
+                "active_storage_attachments",
+            )
+            dest_table = Table(
+                "active_storage_attachments", dest_meta, autoload_with=self.dest_engine
+            )
 
         with self.dest_engine.connect() as conn:
             migrated_blobs = self.state_repo.get_migrated_ids(conn, "active_storage_blobs")
@@ -83,6 +100,69 @@ class ActiveStorageAttachmentsMigrator(BaseMigrator):
         rows = self._select_source_rows(src_table)
 
         self.logger.info("ActiveStorageAttachmentsMigrator: %d source rows fetched", len(rows))
+
+        # DEDUPLICACAO: buscar chave unica -> id no DEST
+        # UNIQUE(record_type, record_id, name, blob_id)
+        existing_attachments: dict[tuple[str, int, str, int], int] = {}
+        with self.dest_engine.connect() as conn:
+            from sqlalchemy import select
+
+            existing_query = select(
+                dest_table.c.id,
+                dest_table.c.record_type,
+                dest_table.c.record_id,
+                dest_table.c.name,
+                dest_table.c.blob_id,
+            )
+            for row in conn.execute(existing_query):
+                key = (str(row[1]), int(row[2]), str(row[3]), int(row[4]))
+                existing_attachments[key] = int(row[0])
+
+        self.logger.info(
+            "ActiveStorageAttachmentsMigrator: %d existing attachment keys in DEST",
+            len(existing_attachments),
+        )
+
+        # PRE-PROCESSAR duplicatas no DEST e registrar mapeamentos (bulk)
+        duplicate_pairs: list[tuple[int, int]] = []
+        for row in rows:
+            id_origin = int(row["id"])
+            blob_id_origin = int(row["blob_id"])
+            record_type = str(row["record_type"])
+            record_id_origin = int(row["record_id"])
+            name = str(row["name"])
+
+            if blob_id_origin not in migrated_blobs:
+                continue
+
+            table_name = self.RECORD_TYPE_TABLE_MAP.get(record_type)
+            if not table_name:
+                continue
+
+            migrated_set = migrated_sets.get(table_name)
+            if migrated_set is None or record_id_origin not in migrated_set:
+                continue
+
+            blob_id_dest = self.id_remapper.remap(blob_id_origin, "active_storage_blobs")
+            record_id_dest = self.id_remapper.remap(record_id_origin, table_name)
+            unique_key = (record_type, record_id_dest, name, blob_id_dest)
+
+            if unique_key in existing_attachments:
+                duplicate_pairs.append((id_origin, existing_attachments[unique_key]))
+
+        if duplicate_pairs:
+            with self.dest_engine.begin() as conn:
+                self.state_repo.record_success_bulk(
+                    conn, "active_storage_attachments", duplicate_pairs
+                )
+
+            for src_id, dest_id in duplicate_pairs:
+                self.id_remapper.register_alias("active_storage_attachments", src_id, dest_id)
+
+        self.logger.info(
+            "ActiveStorageAttachmentsMigrator: %d duplicate attachment keys registered in migration_state (bulk)",
+            len(duplicate_pairs),
+        )
 
         def remap_fn(row: dict) -> dict | None:
             """Remap PK and FK columns for an active_storage_attachments row.
@@ -140,12 +220,20 @@ class ActiveStorageAttachmentsMigrator(BaseMigrator):
                 )
                 return None
 
+            blob_id_dest = self.id_remapper.remap(blob_id_origin, "active_storage_blobs")
+            record_id_dest = self.id_remapper.remap(record_id_origin, table_name)
+            unique_key = (record_type, record_id_dest, str(row["name"]), blob_id_dest)
+
+            # Skip se ja existe no DEST (ja registrado no pre-processing acima)
+            if unique_key in existing_attachments:
+                return None
+
             # Remapear IDs
             return {
                 **row,
                 "id": self.id_remapper.remap(id_origin, "active_storage_attachments"),
-                "blob_id": self.id_remapper.remap(blob_id_origin, "active_storage_blobs"),
-                "record_id": self.id_remapper.remap(record_id_origin, table_name),
+                "blob_id": blob_id_dest,
+                "record_id": record_id_dest,
                 # name, record_type, created_at copiados verbatim
             }
 

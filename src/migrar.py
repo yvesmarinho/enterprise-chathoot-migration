@@ -62,6 +62,7 @@ from src.migrators.custom_attribute_definitions_migrator import (
     CustomAttributeDefinitionsMigrator,
 )
 from src.migrators.inboxes_migrator import InboxesMigrator
+from src.migrators.inbox_members_migrator import InboxMembersMigrator
 from src.migrators.labels_migrator import LabelsMigrator
 from src.migrators.messages_migrator import MessagesMigrator
 from src.migrators.team_members_migrator import TeamMembersMigrator
@@ -92,7 +93,7 @@ _ENV_PRESETS: dict[str, tuple[str, str]] = {
 }
 
 # Canonical FK migration order
-# ActiveStorage tables added after attachments (2026-05-26 — D18)
+# Inbox members added for UI visibility; ActiveStorage tables added after attachments (2026-05-26 — D18)
 _MIGRATION_ORDER = [
     "accounts",
     "custom_attribute_definitions",
@@ -102,6 +103,7 @@ _MIGRATION_ORDER = [
     "users",
     "teams",
     "team_members",
+    "inbox_members",
     "labels",
     "contacts",
     "contact_inboxes",
@@ -123,6 +125,7 @@ _MIGRATOR_MAP = {
     "users": UsersMigrator,
     "teams": TeamsMigrator,
     "team_members": TeamMembersMigrator,
+    "inbox_members": InboxMembersMigrator,
     "labels": LabelsMigrator,
     "contacts": ContactsMigrator,
     "contact_inboxes": ContactInboxesMigrator,
@@ -329,14 +332,23 @@ def main(argv: list[str] | None = None) -> int:
                 logger.error("   Conversations: %d", dest_stats["conversations"])
                 logger.error("   Messages: %d", dest_stats["messages"])
                 logger.error("   Attachments: %d", dest_stats["attachments"])
-                logger.error("   ActiveStorage: %d (%.2f%%)", dest_stats["active_storage"], dest_stats["as_coverage_pct"])
+                logger.error(
+                    "   ActiveStorage: %d (%.2f%%)",
+                    dest_stats["active_storage"],
+                    dest_stats["as_coverage_pct"],
+                )
                 logger.error("")
 
                 if not args.force_overwrite:
                     logger.error("Opções:")
-                    logger.error("  1. Use --force-overwrite para sobrescrever (⚠️  PERDA DE DADOS)")
+                    logger.error(
+                        "  1. Use --force-overwrite para sobrescrever (⚠️  PERDA DE DADOS)"
+                    )
                     logger.error("  2. Limpe o account manualmente:")
-                    logger.error("     uv run python scripts/cleanup_accounts.py --account-ids %d", dest_account_id)
+                    logger.error(
+                        "     uv run python scripts/cleanup_accounts.py --account-ids %d",
+                        dest_account_id,
+                    )
                     logger.error("  3. Escolha outro account no SOURCE")
                     return 4
                 else:

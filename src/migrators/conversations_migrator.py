@@ -17,8 +17,10 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import MetaData, Table, text
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class ConversationsMigrator(BaseMigrator):
@@ -46,7 +48,14 @@ class ConversationsMigrator(BaseMigrator):
         src_meta = MetaData()
         src_table = Table("conversations", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_table = Table("conversations", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table("conversations", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "ConversationsMigrator: DEST public.conversations missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "conversations")
+            dest_table = Table("conversations", dest_meta, autoload_with=self.dest_engine)
 
         with self.dest_engine.connect() as conn:
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")

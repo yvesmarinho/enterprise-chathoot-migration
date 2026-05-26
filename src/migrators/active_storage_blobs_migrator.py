@@ -16,8 +16,10 @@
 from __future__ import annotations
 
 from sqlalchemy import MetaData, Table
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class ActiveStorageBlobsMigrator(BaseMigrator):
@@ -48,7 +50,14 @@ class ActiveStorageBlobsMigrator(BaseMigrator):
         src_meta = MetaData()
         src_table = Table("active_storage_blobs", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_table = Table("active_storage_blobs", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table("active_storage_blobs", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "ActiveStorageBlobsMigrator: DEST public.active_storage_blobs missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "active_storage_blobs")
+            dest_table = Table("active_storage_blobs", dest_meta, autoload_with=self.dest_engine)
 
         rows = self._select_source_rows(src_table)
 
@@ -63,35 +72,40 @@ class ActiveStorageBlobsMigrator(BaseMigrator):
             for row in conn.execute(existing_query):
                 existing_key_to_id[row[1]] = row[0]  # key → id
 
-        self.logger.info("ActiveStorageBlobsMigrator: %d existing keys in DEST", len(existing_key_to_id))
+        self.logger.info(
+            "ActiveStorageBlobsMigrator: %d existing keys in DEST", len(existing_key_to_id)
+        )
 
-        # PRÉ-PROCESSAR duplicates e registrar mapeamentos (FIX D21)
-        duplicates_registered = 0
-        with self.dest_engine.begin() as conn:
-            for row in rows:
-                id_origin = int(row["id"])
-                key = row["key"]
+        # PRÉ-PROCESSAR duplicates e registrar mapeamentos (FIX D21 — BULK OPTIMIZED)
+        duplicate_pairs: list[tuple[int, int]] = []
+        for row in rows:
+            id_origin = int(row["id"])
+            key = row["key"]
 
-                if key in existing_key_to_id:
-                    # Key já existe — registrar mapeamento para downstream migrators
-                    id_destino_existente = existing_key_to_id[key]
+            if key in existing_key_to_id:
+                # Key já existe — coletar para bulk insert
+                id_destino_existente = existing_key_to_id[key]
+                duplicate_pairs.append((id_origin, id_destino_existente))
 
-                    # Salvar na migration_state
-                    self.state_repo.save_mapping(
-                        conn, "active_storage_blobs", id_origin, id_destino_existente
-                    )
+                self.logger.debug(
+                    "ActiveStorageBlobsMigrator: id=%d → id=%d (key '%s' exists, reusing)",
+                    id_origin,
+                    id_destino_existente,
+                    key,
+                )
 
-                    self.logger.debug(
-                        "ActiveStorageBlobsMigrator: id=%d → id=%d (key '%s' exists, reusing)",
-                        id_origin,
-                        id_destino_existente,
-                        key,
-                    )
-                    duplicates_registered += 1
+        # BULK INSERT — 1 round-trip em vez de N
+        if duplicate_pairs:
+            with self.dest_engine.begin() as conn:
+                self.state_repo.record_success_bulk(conn, "active_storage_blobs", duplicate_pairs)
+
+            # CRITICAL FIX: Atualizar remapper em memória com os novos mappings
+            for src_id, dest_id in duplicate_pairs:
+                self.id_remapper.register_alias("active_storage_blobs", src_id, dest_id)
 
         self.logger.info(
-            "ActiveStorageBlobsMigrator: %d duplicate keys registered in migration_state",
-            duplicates_registered,
+            "ActiveStorageBlobsMigrator: %d duplicate keys registered in migration_state (bulk)",
+            len(duplicate_pairs),
         )
 
         def remap_fn(row: dict) -> dict | None:

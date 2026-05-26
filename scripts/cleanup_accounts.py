@@ -331,7 +331,7 @@ def delete_account_data(engine, account_ids: list[int], dry_run: bool = False) -
         count = conn.execute(query, {"account_ids": account_ids}).scalar()
         stats["custom_attribute_definitions"] = count
         logger.info("custom_attribute_definitions: %d registros", count)
-        
+
         if not dry_run and count > 0:
             delete_query = text("""
                 DELETE FROM custom_attribute_definitions
@@ -339,11 +339,11 @@ def delete_account_data(engine, account_ids: list[int], dry_run: bool = False) -
             """)
             conn.execute(delete_query, {"account_ids": account_ids})
             logger.info("✅ custom_attribute_definitions deletados")
-        
+
         # 18. migration_state — SKIP (estrutura varia, não crítico)
         stats["migration_state"] = 0
         logger.info("migration_state: SKIP")
-        
+
         # 19. accounts (FINAL)
         query = text("SELECT COUNT(*) FROM accounts WHERE id = ANY(:account_ids)")
         count = conn.execute(query, {"account_ids": account_ids}).scalar()

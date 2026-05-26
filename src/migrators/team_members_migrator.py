@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 from sqlalchemy import MetaData, Table
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class TeamMembersMigrator(BaseMigrator):
@@ -37,7 +39,14 @@ class TeamMembersMigrator(BaseMigrator):
         src_meta = MetaData()
         src_table = Table("team_members", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_table = Table("team_members", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table("team_members", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "TeamMembersMigrator: DEST public.team_members missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "team_members")
+            dest_table = Table("team_members", dest_meta, autoload_with=self.dest_engine)
 
         with self.dest_engine.connect() as conn:
             migrated_teams = self.state_repo.get_migrated_ids(conn, "teams")

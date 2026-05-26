@@ -21,8 +21,10 @@
 from __future__ import annotations
 
 from sqlalchemy import MetaData, Table, text
+from sqlalchemy.exc import NoSuchTableError, ProgrammingError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class ConversationLabelsMigrator(BaseMigrator):
@@ -63,7 +65,14 @@ class ConversationLabelsMigrator(BaseMigrator):
 
         # ── Step 2: Migrate taggings for conversations ─────────────────────
         dest_meta = MetaData()
-        dest_table = Table("taggings", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table("taggings", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "ConversationLabelsMigrator: DEST public.taggings missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "taggings")
+            dest_table = Table("taggings", dest_meta, autoload_with=self.dest_engine)
 
         with self.source_engine.connect() as conn:
             rows = [
@@ -160,8 +169,8 @@ class ConversationLabelsMigrator(BaseMigrator):
                 for r in conn.execute(
                     text(
                         "SELECT DISTINCT t.id, t.name "
-                        "FROM tags t "
-                        "JOIN taggings tg ON tg.tag_id = t.id "
+                        "FROM public.tags t "
+                        "JOIN public.taggings tg ON tg.tag_id = t.id "
                         "WHERE tg.taggable_type = 'Conversation' "
                         "  AND tg.context = 'labels'"
                     )
@@ -173,15 +182,31 @@ class ConversationLabelsMigrator(BaseMigrator):
         if not src_tags:
             return {}
 
+        # Ensure DEST tags table exists in restored environments.
+        ensure_public_table_exists(self.source_engine, self.dest_engine, "tags")
+
         # Fetch existing DEST tags by name (dedup)
         dest_tag_by_name: dict[str, int] = {}
-        with self.dest_engine.connect() as conn:
-            for row in conn.execute(text("SELECT id, name FROM tags")).mappings().all():
-                dest_tag_by_name[str(row["name"]).lower()] = int(row["id"])
+        try:
+            with self.dest_engine.connect() as conn:
+                for row in conn.execute(text("SELECT id, name FROM public.tags")).mappings().all():
+                    dest_tag_by_name[str(row["name"]).lower()] = int(row["id"])
+        except ProgrammingError:
+            # A second safety net for environments where tags was dropped
+            # between runs; bootstrap and retry once.
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "tags")
+            with self.dest_engine.connect() as conn:
+                for row in conn.execute(text("SELECT id, name FROM public.tags")).mappings().all():
+                    dest_tag_by_name[str(row["name"]).lower()] = int(row["id"])
 
         tag_id_map: dict[int, int] = {}
         dest_meta = MetaData()
-        dest_tags_table = Table("tags", dest_meta, autoload_with=self.dest_engine)
+        dest_tags_table = Table(
+            "tags",
+            dest_meta,
+            schema="public",
+            autoload_with=self.dest_engine,
+        )
 
         for src_tag in src_tags:
             src_id = int(src_tag["id"])
@@ -203,7 +228,9 @@ class ConversationLabelsMigrator(BaseMigrator):
             try:
                 with self.dest_engine.connect() as conn:
                     with conn.begin():
-                        new_id: int = conn.execute(text("SELECT nextval('tags_id_seq')")).scalar()
+                        new_id: int = conn.execute(
+                            text("SELECT nextval('public.tags_id_seq')")
+                        ).scalar()
                         conn.execute(
                             dest_tags_table.insert().values(
                                 id=new_id,

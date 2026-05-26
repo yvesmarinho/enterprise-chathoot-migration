@@ -1,7 +1,7 @@
 # CORREÇÕES P0 — Bug D21 (Idempotência Quebrada)
 
-**Data**: 2026-05-26  
-**Autor**: GitHub Copilot  
+**Data**: 2026-05-26
+**Autor**: GitHub Copilot
 **Referência**: [D21-BUG-CRITICO-IDEMPOTENCIA-DEDUPLICACAO-GLOBAL-2026-05-26.md](./debates/D21-BUG-CRITICO-IDEMPOTENCIA-DEDUPLICACAO-GLOBAL-2026-05-26.md)
 
 ---
@@ -33,10 +33,10 @@ def find_account_by_name_in_dest(
     dest_engine: Engine, account_name: str, fuzzy: bool = True
 ) -> Optional[dict]:
     """Busca account no DEST por nome (exato ou fuzzy).
-    
+
     Returns:
         Dict com id, name, created_at se encontrado; None caso contrário
-    
+
     Raises:
         ValueError: Se múltiplos accounts corresponderem (fuzzy=True)
     """
@@ -47,7 +47,7 @@ def check_account_exists_with_data(
     dest_engine: Engine, account_name: str
 ) -> tuple[bool, Optional[dict]]:
     """Verifica se account existe no DEST e se tem dados.
-    
+
     Returns:
         Tupla (has_data: bool, stats: dict|None)
         - has_data=True se account existe E tem conversations/messages/attachments
@@ -64,7 +64,7 @@ Adicionado após linha 300 (após resolução do account no SOURCE):
 # (2a.1) Verificar se account já existe no DEST (validação P0 — D21)
 if not args.dry_run:
     has_data, dest_stats = check_account_exists_with_data(dest_engine, args.account)
-    
+
     if has_data and dest_stats:
         # Account existe COM DADOS
         if not args.force_overwrite:
@@ -76,11 +76,11 @@ if not args.dry_run:
         else:
             # --force-overwrite ativo — cleanup automático
             delete_account_data(dest_engine, [dest_account_id], dry_run=False)
-    
+
     elif dest_stats:
         # Account existe mas VAZIO — apenas warning
         logger.warning("⚠️  Account '%s' já existe mas está VAZIO", ...)
-    
+
     else:
         # Account NÃO existe — OK
         logger.info("✅ Account '%s' não existe no DEST — será criado", ...)
@@ -142,10 +142,10 @@ with self.dest_engine.begin() as conn:
     for row in rows:
         id_origin = int(row["id"])
         key = row["key"]
-        
+
         if key in existing_key_to_id:
             id_destino_existente = existing_key_to_id[key]
-            
+
             # ✅ Registrar mapeamento para downstream migrators
             self.state_repo.save_mapping(
                 conn, "active_storage_blobs", id_origin, id_destino_existente
@@ -217,7 +217,7 @@ uv run python -m src.migrar --env dev --account "Unimed Guaxupé"
 ```bash
 uv run python -m src.migrar --env dev --account "Unimed Guaxupé" --force-overwrite
 ```
-**Esperado**: 
+**Esperado**:
 1. ⚠️ Warning "será sobrescrito"
 2. 🗑️ Cleanup automático
 3. ✅ Migração completa

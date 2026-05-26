@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 from sqlalchemy import MetaData, Table, text
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class AccountsMigrator(BaseMigrator):
@@ -34,13 +36,36 @@ class AccountsMigrator(BaseMigrator):
 
         :returns: Migration result summary for ``accounts``.
         :rtype: MigrationResult
-        :raises SystemExit: Exits with code 3 on any batch failure (catastrophic).
+        :raises SystemExit: Exits with code 3 on any batch failure
+            (catastrophic).
         """
         self.logger.info("AccountsMigrator: starting")
         src_meta = MetaData()
-        src_table = Table("accounts", src_meta, autoload_with=self.source_engine)
+        src_table = Table(
+            "accounts",
+            src_meta,
+            schema="public",
+            autoload_with=self.source_engine,
+        )
         dest_meta = MetaData()
-        dest_table = Table("accounts", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table(
+                "accounts",
+                dest_meta,
+                schema="public",
+                autoload_with=self.dest_engine,
+            )
+        except NoSuchTableError:
+            self.logger.warning(
+                "AccountsMigrator: DEST public.accounts missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "accounts")
+            dest_table = Table(
+                "accounts",
+                dest_meta,
+                schema="public",
+                autoload_with=self.dest_engine,
+            )
 
         rows = self._select_source_rows(src_table)
 
@@ -72,9 +97,15 @@ class AccountsMigrator(BaseMigrator):
             with self.dest_engine.connect() as dest_conn:
                 with dest_conn.begin():
                     for src_id, dest_id in merged:
-                        self.state_repo.record_success(dest_conn, "accounts", src_id, dest_id)
+                        self.state_repo.record_success(
+                            dest_conn,
+                            "accounts",
+                            src_id,
+                            dest_id,
+                        )
             self.logger.info(
-                "AccountsMigrator: %d accounts matched by name — reusing dest_id, skipping INSERT",
+                "AccountsMigrator: %d accounts matched by name — "
+                "reusing dest_id, skipping INSERT",
                 len(merged),
             )
         # ──────────────────────────────────────────────────────────────────────
@@ -87,7 +118,10 @@ class AccountsMigrator(BaseMigrator):
             :returns: Destination row with remapped ``id``.
             :rtype: dict
             """
-            return {**row, "id": self.id_remapper.remap(int(row["id"]), "accounts")}
+            return {
+                **row,
+                "id": self.id_remapper.remap(int(row["id"]), "accounts"),
+            }
 
         result = self._run_batches(rows, "accounts", dest_table, remap_fn)
 
@@ -124,5 +158,10 @@ class AccountsMigrator(BaseMigrator):
         :rtype: list[dict]
         """
         src_meta = MetaData()
-        src_table = Table("accounts", src_meta, autoload_with=self.source_engine)
+        src_table = Table(
+            "accounts",
+            src_meta,
+            schema="public",
+            autoload_with=self.source_engine,
+        )
         return self._select_source_rows(src_table)

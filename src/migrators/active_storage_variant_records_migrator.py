@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 from sqlalchemy import MetaData, Table
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class ActiveStorageVariantRecordsMigrator(BaseMigrator):
@@ -45,9 +47,22 @@ class ActiveStorageVariantRecordsMigrator(BaseMigrator):
             "active_storage_variant_records", src_meta, autoload_with=self.source_engine
         )
         dest_meta = MetaData()
-        dest_table = Table(
-            "active_storage_variant_records", dest_meta, autoload_with=self.dest_engine
-        )
+        try:
+            dest_table = Table(
+                "active_storage_variant_records", dest_meta, autoload_with=self.dest_engine
+            )
+        except NoSuchTableError:
+            self.logger.warning(
+                "ActiveStorageVariantRecordsMigrator: DEST public.active_storage_variant_records missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(
+                self.source_engine,
+                self.dest_engine,
+                "active_storage_variant_records",
+            )
+            dest_table = Table(
+                "active_storage_variant_records", dest_meta, autoload_with=self.dest_engine
+            )
 
         with self.dest_engine.connect() as conn:
             migrated_blobs = self.state_repo.get_migrated_ids(conn, "active_storage_blobs")
@@ -56,12 +71,73 @@ class ActiveStorageVariantRecordsMigrator(BaseMigrator):
 
         self.logger.info("ActiveStorageVariantRecordsMigrator: %d source rows fetched", len(rows))
 
+        # PRÉ-PROCESSAR duplicatas (FIX D21 — mesma lógica de active_storage_blobs)
+        # Consultar registros existentes no DEST por (blob_id, variation_digest)
+        existing_variants: dict[tuple[int, str], int] = {}
+        with self.dest_engine.connect() as conn:
+            from sqlalchemy import select
+
+            existing_query = select(
+                dest_table.c.id, dest_table.c.blob_id, dest_table.c.variation_digest
+            )
+            for row in conn.execute(existing_query):
+                key = (row[1], row[2])  # (blob_id, variation_digest)
+                existing_variants[key] = row[0]  # id
+
+        self.logger.info(
+            "ActiveStorageVariantRecordsMigrator: %d existing variants in DEST",
+            len(existing_variants),
+        )
+
+        # Coletar duplicatas e registrar mappings (bulk)
+        duplicate_pairs: list[tuple[int, int]] = []
+        for row in rows:
+            id_origin = int(row["id"])
+            blob_id_origin = int(row["blob_id"])
+            variation_digest = row["variation_digest"]
+
+            # Skippar se blob_id não foi migrado
+            if blob_id_origin not in migrated_blobs:
+                continue
+
+            # Calcular blob_id remapeado para comparar com DEST
+            blob_id_dest = self.id_remapper.remap(blob_id_origin, "active_storage_blobs")
+            key = (blob_id_dest, variation_digest)
+
+            if key in existing_variants:
+                id_destino_existente = existing_variants[key]
+                duplicate_pairs.append((id_origin, id_destino_existente))
+
+                self.logger.debug(
+                    "ActiveStorageVariantRecordsMigrator: id=%d → id=%d (blob_id=%d, digest '%s' exists)",
+                    id_origin,
+                    id_destino_existente,
+                    blob_id_dest,
+                    variation_digest,
+                )
+
+        # BULK INSERT mappings + atualizar remapper
+        if duplicate_pairs:
+            with self.dest_engine.begin() as conn:
+                self.state_repo.record_success_bulk(
+                    conn, "active_storage_variant_records", duplicate_pairs
+                )
+
+            # Atualizar remapper em memória
+            for src_id, dest_id in duplicate_pairs:
+                self.id_remapper.register_alias("active_storage_variant_records", src_id, dest_id)
+
+        self.logger.info(
+            "ActiveStorageVariantRecordsMigrator: %d duplicate variants registered in migration_state (bulk)",
+            len(duplicate_pairs),
+        )
+
         def remap_fn(row: dict) -> dict | None:
             """Remap PK and FK columns for an active_storage_variant_records row.
 
             :param row: Source row as plain dict.
             :type row: dict
-            :returns: Destination row with remapped IDs or ``None`` if FK orphan.
+            :returns: Destination row with remapped IDs or ``None`` if FK orphan or duplicate.
             :rtype: dict | None
             """
             id_origin = int(row["id"])
@@ -76,10 +152,19 @@ class ActiveStorageVariantRecordsMigrator(BaseMigrator):
                 )
                 return None
 
+            # Skippar duplicatas (já registradas em migration_state)
+            blob_id_dest = self.id_remapper.remap(blob_id_origin, "active_storage_blobs")
+            variation_digest = row["variation_digest"]
+            key = (blob_id_dest, variation_digest)
+
+            if key in existing_variants:
+                # Já existe — skippar insert
+                return None
+
             return {
                 **row,
                 "id": self.id_remapper.remap(id_origin, "active_storage_variant_records"),
-                "blob_id": self.id_remapper.remap(blob_id_origin, "active_storage_blobs"),
+                "blob_id": blob_id_dest,
                 # variation_digest copiado verbatim
             }
 

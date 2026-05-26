@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-24 — Sessão 23: ✅ Documentação offboarding + Análise D17 (gap 37 tabelas) + Teste DEV Unimed Guaxupé
-**Status**: 🟢 Teste DEV bem-sucedido (60k registros migrados, 0 falhas). Gaps P0 identificados para PROD.
+**Last Updated**: 2026-05-26 — Sessão 26: ✅ D23/D24 concluídos + bootstrap on-demand estabilizado + ritual de encerramento executado
+**Status**: 🟡 Pipeline avançou após restauração do DEST; pendente revalidação completa end-to-end e quality gates faltantes no ambiente local.
 
 ---
 
@@ -24,6 +24,20 @@
 - [ ] **INV-ORPHANS-1** Confirmar que `contact_inboxes` orphans (7.336) são de outros accounts via SQL
 - [ ] **INV-ORPHANS-2** Confirmar que `conversation_labels` orphans (14.333) são de outros accounts
 - [ ] **INV-UI-1** Validar migração Unimed Guaxupé na UI do vya-chat-dev.vya.digital (8.190 conversas visíveis?)
+
+## 🔴 P0 — Foco Sessão 26 (2026-05-26)
+
+- [ ] **S26-P0-1** Instalar dependências de qualidade ausentes no ambiente (`pytest`, `flake8`, `mypy`) e registrar baseline local.
+- [ ] **S26-P0-2** Reexecutar gates de qualidade da sessão (`pytest`, `black --check`, `flake8`, `mypy`) após ajuste do ambiente.
+- [ ] **S26-P0-3** Validar ciclo completo da migração para Unimed Guaxupé com estratégia segura (cleanup controlado ou `--force-overwrite` aprovado).
+
+## ✅ CONCLUÍDO NESTA SESSÃO (S26 — 2026-05-26)
+
+- [x] **D23-HISTORICO** ✅ Criado debate histórico de migração parcial com linha do tempo D15→D19.
+- [x] **D24-NOSUCHTABLE** ✅ Corrigido bloqueio `NoSuchTableError: accounts` com bootstrap sob demanda.
+- [x] **D24-FK-GRAPH** ✅ Evoluído bootstrap para dependências FK em `MetaData` compartilhado.
+- [x] **D24-TAGS** ✅ Corrigido `conversation_labels` para bootstrap de `public.tags`/`public.taggings` e SQL qualificado.
+- [x] **S26-FMT** ✅ Formatação validada: `black --check src/` sem divergências.
 
 ---
 

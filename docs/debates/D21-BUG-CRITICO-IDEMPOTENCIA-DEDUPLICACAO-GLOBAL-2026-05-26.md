@@ -1,9 +1,9 @@
 # D21 — BUG CRÍTICO: Idempotência Quebrada por Deduplicação Global
 
-**Data**: 2026-05-26  
-**Severidade**: 🔴 **CRÍTICA** — Pipeline completamente não-funcional para merge  
-**Status**: 🐛 **CONFIRMADO** — Causa raiz identificada  
-**Impacto**: Migração de account resulta em account vazio (0 dados) mesmo com exit code 0  
+**Data**: 2026-05-26
+**Severidade**: 🔴 **CRÍTICA** — Pipeline completamente não-funcional para merge
+**Status**: 🐛 **CONFIRMADO** — Causa raiz identificada
+**Impacto**: Migração de account resulta em account vazio (0 dados) mesmo com exit code 0
 
 ---
 
@@ -60,7 +60,7 @@ ActiveStorageBlobsMigrator:
   2. Para cada blob do SOURCE:
      - if key in existing_keys → SKIP
   3. Resultado: 30.511 blobs SKIPADOS (eram de outros accounts!)
-  
+
 AttachmentsMigrator:
   1. Verifica apenas migration_state (message_id, account_id)
   2. Como messages NÃO foram migrados → attachments SKIPADOS
@@ -73,7 +73,7 @@ AttachmentsMigrator:
 
 ### Bug #1: Deduplicação Global (ActiveStorageBlobsMigrator)
 
-**Arquivo**: `src/migrators/active_storage_blobs_migrator.py`  
+**Arquivo**: `src/migrators/active_storage_blobs_migrator.py`
 **Linhas**: 60-68
 
 ```python
@@ -89,12 +89,12 @@ def remap_fn(row: dict) -> dict | None:
         return None
 ```
 
-**Problema**:  
+**Problema**:
 - A query `SELECT key FROM active_storage_blobs` retorna keys de **TODOS os accounts** no DEST
 - Quando migrando account 69 (limpo), os blobs são skipados porque keys já existem (mas pertencem a accounts 1, 17, 20, etc.)
 - **active_storage_blobs NÃO tem coluna account_id** → impossível fazer scope por account direto
 
-**Solução Necessária**:  
+**Solução Necessária**:
 Deduplicação por `key` está **CORRETA** (UNIQUE constraint), mas a lógica de skip está **ERRADA**:
 - Se `key` já existe no DEST:
   - ✅ **SKIP inserção** (correto — evita UniqueViolation)
@@ -103,7 +103,7 @@ Deduplicação por `key` está **CORRETA** (UNIQUE constraint), mas a lógica de
 
 ### Bug #2: Ausência de Validação de Account Name
 
-**Arquivo**: `src/migrar.py`  
+**Arquivo**: `src/migrar.py`
 **Linhas**: 280-300
 
 ```python
@@ -114,25 +114,25 @@ if args.account:
     # ❌ NÃO verifica se account com mesmo NAME já existe no DEST
 ```
 
-**Problema**:  
+**Problema**:
 1. Usuário executa: `./scripts/start-migration-daemon.sh --env dev --account "Unimed Guaxupé"`
 2. Pipeline resolve: `source_account_id=25`
 3. Pipeline **NÃO verifica** se account "Unimed Guaxupé" já existe no DEST
 4. AccountsMigrator tenta inserir → **já existe** → skip (idempotente) → retorna `dest_account_id=69`
 5. Migrators subsequentes assumem que account 69 está **vazio**, mas na verdade tem dados pré-existentes (de migrações anteriores)
 
-**Requisito Violado**:  
+**Requisito Violado**:
 Usuário havia solicitado explicitamente:
 > "deve ser validado se existe o nome do account na base destino"
 
-**Solução Necessária**:  
+**Solução Necessária**:
 ```python
 # ADICIONAR em src/migrar.py após resolver source account:
 dest_account = check_account_exists_in_dest(dest_engine, args.account)
 if dest_account:
     # Account com mesmo NAME já existe no DEST
     dest_account_id = dest_account["id"]
-    
+
     # Verificar se tem dados
     stats = get_account_stats(dest_engine, dest_account_id)
     if stats["messages"] > 0 or stats["conversations"] > 0:
@@ -155,13 +155,13 @@ if dest_account:
 
 **Arquivo**: `src/migrators/base_migrator.py` (inferido, não lido ainda)
 
-**Problema**:  
+**Problema**:
 Quando `remap_fn()` retorna `None` (skip), o registro **NÃO é gravado** na `migration_state`. Isso causa:
 - Downstream migrators não conseguem resolver FKs
 - Orphan warnings em cascata
 - Dados não migrados sem erro visível
 
-**Exemplo**:  
+**Exemplo**:
 ```python
 # active_storage_blobs migrator
 blob_id_origem = 12345, key = "abc123xyz..."
@@ -174,18 +174,18 @@ blob_id_origem = 12345, key = "abc123xyz..."
 # ❌ Não encontra mapeamento → orphan → SKIP attachment
 ```
 
-**Solução Necessária**:  
+**Solução Necessária**:
 Quando skipando por deduplicação, **AINDA ASSIM** gravar mapeamento:
 ```python
 if key in existing_keys:
     # Key já existe — descobrir id_destino_existente
     id_destino_existente = get_existing_id_by_key(conn, dest_table, key)
-    
+
     # Registrar mapeamento para downstream migrators
     state_repo.save_mapping(
         conn, "active_storage_blobs", id_origem, id_destino_existente
     )
-    
+
     return None  # Skip INSERT (correto)
 ```
 
@@ -222,17 +222,17 @@ if key in existing_keys:
 if args.account and not args.dry_run:
     dest_account_name = resolve_account_name(dest_engine, account_id_filter, source_engine)
     existing_dest_account = find_account_by_name(dest_engine, dest_account_name)
-    
+
     if existing_dest_account:
         dest_account_id = existing_dest_account["id"]
         stats = get_account_stats(dest_engine, dest_account_id)
-        
+
         has_data = (
-            stats["conversations"] > 0 
-            or stats["messages"] > 0 
+            stats["conversations"] > 0
+            or stats["messages"] > 0
             or stats["attachments"] > 0
         )
-        
+
         if has_data and not args.force_overwrite:
             logger.error(
                 "❌ Account '%s' já existe no DEST (ID=%d) com dados:",
@@ -247,7 +247,7 @@ if args.account and not args.dry_run:
             logger.error("  2. Limpe o account manualmente: python scripts/cleanup_accounts.py --account-ids %d", dest_account_id)
             logger.error("  3. Escolha outro account no SOURCE")
             return 4
-        
+
         elif has_data and args.force_overwrite:
             logger.warning(
                 "⚠️  Account '%s' (ID=%d) será SOBRESCRITO (--force-overwrite ativo)",
@@ -258,7 +258,7 @@ if args.account and not args.dry_run:
             logger.info("Limpando dados pré-existentes...")
             delete_account_data(dest_engine, [dest_account_id], dry_run=False)
             logger.info("✅ Cleanup concluído")
-        
+
         else:
             logger.warning(
                 "⚠️  Account '%s' já existe no DEST (ID=%d) mas está VAZIO",
@@ -278,45 +278,45 @@ def migrate(self) -> MigrationResult:
     self.logger.info("ActiveStorageBlobsMigrator: starting")
     src_table = Table("active_storage_blobs", MetaData(), autoload_with=self.source_engine)
     dest_table = Table("active_storage_blobs", MetaData(), autoload_with=self.dest_engine)
-    
+
     rows = self._select_source_rows(src_table)
     self.logger.info("ActiveStorageBlobsMigrator: %d source rows fetched", len(rows))
-    
+
     # Pre-load existing keys → id mapping
     with self.dest_engine.connect() as conn:
         from sqlalchemy import select
         existing_keys_query = select(dest_table.c.id, dest_table.c.key)
         existing_map = {row[1]: row[0] for row in conn.execute(existing_keys_query)}
         # existing_map = {"abc123xyz": 67890, ...}
-    
+
     self.logger.info("ActiveStorageBlobsMigrator: %d existing keys in DEST", len(existing_map))
-    
+
     def remap_fn(row: dict) -> dict | None:
         id_origin = int(row["id"])
         key = row["key"]
-        
+
         if key in existing_map:
             # Key já existe — SKIP insert mas REGISTRAR mapeamento
             id_destino_existente = existing_map[key]
-            
+
             # ✅ CRÍTICO: Registrar mapeamento para downstream migrators
             with self.dest_engine.connect() as conn:
                 self.state_repo.save_mapping(
                     conn, "active_storage_blobs", id_origin, id_destino_existente
                 )
-            
+
             self.logger.debug(
                 "ActiveStorageBlobsMigrator: id=%d → id=%d (key '%s' exists, reusing)",
                 id_origin, id_destino_existente, key
             )
             return None  # Skip INSERT
-        
+
         # Key nova — migrar normalmente
         return {
             **row,
             "id": self.id_remapper.remap(id_origin, "active_storage_blobs"),
         }
-    
+
     # Continue com _run_batches...
 ```
 

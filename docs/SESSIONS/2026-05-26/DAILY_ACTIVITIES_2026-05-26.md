@@ -35,6 +35,89 @@
 
 ---
 
+### 📚 D23 — Documentação histórica da migração parcial
+
+**17:02 — ✅ COMPLETO**
+
+**Objetivo**: Consolidar a linha do tempo histórica que explica por que as mensagens aparecem no DEV enquanto os anexos continuam incompletos.
+
+**Resultado**:
+- Criado [D23-DEBATE-ANALISE-HISTORICA-MIGRACAO-ANEXOS-2026-05-26.md](../../debates/D23-DEBATE-ANALISE-HISTORICA-MIGRACAO-ANEXOS-2026-05-26.md)
+- Atualizado [docs/INDEX.md](../../INDEX.md)
+- Consolidada a cronologia D15 → D16 → D18 → D19 em torno do gap de attachments/ActiveStorage
+
+**Status**: ✅ Completo
+
+---
+
+### 🧩 D24 — Erro `NoSuchTableError` em `accounts` após restauração
+
+**17:40 — ✅ COMPLETO**
+
+**Objetivo**: Registrar e corrigir o bloqueio inicial do pipeline após a restauração do DEST.
+
+**Resultado**:
+- Criado [D24-DEBATE-ERRO-NOSUCHTABLE-ACCOUNTS-RESTAURACAO-2026-05-26.md](../../debates/D24-DEBATE-ERRO-NOSUCHTABLE-ACCOUNTS-RESTAURACAO-2026-05-26.md)
+- Corrigido [src/utils/schema_bootstrap.py](../../../src/utils/schema_bootstrap.py) e [src/migrators/accounts_migrator.py](../../../src/migrators/accounts_migrator.py) para bootstrap sob demanda de `public.accounts`
+- Confirmado `py_compile` sem erro no helper e no migrador de accounts
+
+**Status**: ✅ Completo
+
+### 🧩 D24.1 — Erro `UndefinedTable` em `tags` no `conversation_labels`
+
+**18:29 — ✅ COMPLETO**
+
+**Objetivo**: Corrigir falha de execução em `conversation_labels` após avanço do pipeline.
+
+**Resultado**:
+- Corrigido [src/migrators/conversation_labels_migrator.py](../../../src/migrators/conversation_labels_migrator.py) para bootstrap sob demanda de `public.tags`
+- SQL do migrator qualificado para schema público (`public.tags`, `public.taggings`)
+- Inserção de tags ajustada para sequência `public.tags_id_seq`
+- Atualizado [D24-DEBATE-ERRO-NOSUCHTABLE-ACCOUNTS-RESTAURACAO-2026-05-26.md](../../debates/D24-DEBATE-ERRO-NOSUCHTABLE-ACCOUNTS-RESTAURACAO-2026-05-26.md)
+- Validação: execução de `conversation_labels` avançou além do erro de `relation "tags" does not exist`, com resolução/inserção de tags no DEST
+
+**Status**: ✅ Completo
+
+---
+
+### ✅ [IMP-S26-END] — Ritual de Encerramento de Sessão
+
+**18:57 — ✅ COMPLETO (com pendências rastreadas)**
+
+**Artefatos criados/modificados**:
+| Arquivo | O que mudou |
+|---------|-------------|
+| `docs/SESSIONS/2026-05-26/DAILY_ACTIVITIES_2026-05-26.md` | Registro incremental das atividades de fechamento e status final da sessão |
+| `docs/TODO.md` | Cabeçalho atualizado para S26, itens concluídos adicionados e novos pendentes P0 cadastrados |
+| `src/migrators/conversation_labels_migrator.py` | Ajuste final de formatação para conformidade Black |
+
+**Qualidade de código (modo PROGRAMMING)**:
+- `uv run black --check src/` → ✅ PASSOU
+- `uv run pytest` → ⚠️ não executado (binário `pytest` ausente no ambiente)
+- `uv run flake8 src/` → ⚠️ não executado (binário `flake8` ausente no ambiente)
+- `uv run mypy src/` → ⚠️ não executado (binário `mypy` ausente no ambiente)
+
+**Session docs security review (S26)**:
+- ✅ Revisado `docs/SESSIONS/2026-05-26/DAILY_ACTIVITIES_2026-05-26.md`
+- ✅ Sem credenciais, tokens reais, IPs privados ou dados pessoais sensíveis adicionados nesta sessão
+- ✅ Exemplos mantidos em formato sanitizado e caminhos relativos
+
+**Scan de segurança final (workspace)**:
+- ⚠️ Encontrados padrões históricos sensíveis em arquivos legados de outras sessões e em `.tmp/` (incluindo tokens antigos documentados)
+- ✅ Nenhuma nova exposição sensível introduzida pelos artefatos alterados nesta sessão
+- ✅ Pendência rastreada para saneamento retroativo fora do escopo do hotfix atual
+
+**Limpeza de `.tmp/`**:
+- ✅ Executado `./scripts/cleanup-tmp.sh --dry-run` (165 itens candidatos)
+- ⏭️ Limpeza efetiva adiada para preservar evidências de troubleshooting D18/D22/D24 que serão reutilizadas na retomada imediata
+- ✅ Motivo documentado (sem apagar material de diagnóstico ativo)
+
+**Destaques**: Pipeline saiu do bloqueio inicial em `accounts` após restauração do DEST; próximo passo crítico é revalidar o fluxo end-to-end após reinstalar dependências de quality gate no ambiente local.
+
+---
+
+---
+
 ### 🔍 Investigação D18 — Mensagens Unimed Guaxupé não abrem (DEV)
 
 **09:06 — ✅ COMPLETO**

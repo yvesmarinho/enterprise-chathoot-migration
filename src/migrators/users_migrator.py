@@ -15,9 +15,11 @@ from __future__ import annotations
 import secrets
 
 from sqlalchemy import MetaData, Table, text
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 
 class UsersMigrator(BaseMigrator):
@@ -48,8 +50,22 @@ class UsersMigrator(BaseMigrator):
         src_users = Table("users", src_meta, autoload_with=self.source_engine)
         src_au = Table("account_users", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_users = Table("users", dest_meta, autoload_with=self.dest_engine)
-        dest_au = Table("account_users", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_users = Table("users", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "UsersMigrator: DEST public.users missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "users")
+            dest_users = Table("users", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_au = Table("account_users", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "UsersMigrator: DEST public.account_users missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "account_users")
+            dest_au = Table("account_users", dest_meta, autoload_with=self.dest_engine)
 
         # Load existing emails in destination for collision detection
         with self.dest_engine.connect() as conn:

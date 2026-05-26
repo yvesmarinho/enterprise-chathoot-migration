@@ -108,6 +108,8 @@ SESSIONS/
 | [debates/D16-PLANO-INVESTIGACAO-HTTP500-2026-05-20.md](debates/D16-PLANO-INVESTIGACAO-HTTP500-2026-05-20.md) | Plano faseado de investigação/correção/validação para o incidente D16 |
 | [debates/D18-ANALISE-ACTIVESTORAGE-AUSENTE-2026-05-26.md](debates/D18-ANALISE-ACTIVESTORAGE-AUSENTE-2026-05-26.md) | **D18** — Mensagens não abrem em DEV: root cause = ActiveStorage nunca migrado (tabelas ausentes do pipeline) |
 | [debates/D19-UNIQUEVIOLATION-ACTIVESTORAGE-BLOBS-2026-05-26.md](debates/D19-UNIQUEVIOLATION-ACTIVESTORAGE-BLOBS-2026-05-26.md) | **D19** — UniqueViolation em active_storage_blobs.key após adicionar migrator (fix: deduplicação) |
+| [debates/D23-DEBATE-ANALISE-HISTORICA-MIGRACAO-ANEXOS-2026-05-26.md](debates/D23-DEBATE-ANALISE-HISTORICA-MIGRACAO-ANEXOS-2026-05-26.md) | **D23** — Análise histórica da migração parcial: mensagens ok, anexos incompletos |
+| [debates/D24-DEBATE-ERRO-NOSUCHTABLE-ACCOUNTS-RESTAURACAO-2026-05-26.md](debates/D24-DEBATE-ERRO-NOSUCHTABLE-ACCOUNTS-RESTAURACAO-2026-05-26.md) | **D24** — `NoSuchTableError` em `accounts` após restauração do DEST |
 | [debates/D21-BUG-CRITICO-IDEMPOTENCIA-DEDUPLICACAO-GLOBAL-2026-05-26.md](debates/D21-BUG-CRITICO-IDEMPOTENCIA-DEDUPLICACAO-GLOBAL-2026-05-26.md) | **D21 — 🔴 CRÍTICO** — Pipeline não-idempotente: deduplicação global + ausência de validação account name → 100% skip + account vazio |
 
 ## 🐛 Correções de Bugs

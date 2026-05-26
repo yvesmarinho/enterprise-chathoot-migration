@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.engine import Engine
 
 
@@ -78,8 +79,18 @@ class IDRemapper:
         result: dict[str, int] = {}
         with dest_engine.connect() as conn:
             for table in table_names:
-                row = conn.execute(text(f"SELECT MAX(id) FROM {table}")).fetchone()  # noqa: S608
-                result[table] = int(row[0]) if row and row[0] is not None else 0
+                qualified = table if "." in table else f"public.{table}"
+                try:
+                    row = conn.execute(
+                        text(f"SELECT MAX(id) FROM {qualified}")
+                    ).fetchone()  # noqa: S608
+                    result[table] = int(row[0]) if row and row[0] is not None else 0
+                except ProgrammingError as exc:
+                    conn.rollback()
+                    if "does not exist" in str(exc).lower():
+                        result[table] = 0
+                    else:
+                        raise
         self._offsets = result
         return result
 

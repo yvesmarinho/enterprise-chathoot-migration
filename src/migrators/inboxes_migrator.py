@@ -25,8 +25,10 @@ import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import MetaData, Table, text
+from sqlalchemy.exc import NoSuchTableError
 
 from src.migrators.base_migrator import BaseMigrator, MigrationResult
+from src.utils.schema_bootstrap import ensure_public_table_exists
 
 # ── Channel-type → (dest_table, sequence, {field: generator}) ────────────────
 _CHANNEL_CFG: dict[str, tuple[str, str, dict[str, object]]] = {
@@ -106,7 +108,14 @@ class InboxesMigrator(BaseMigrator):
         src_meta = MetaData()
         src_table = Table("inboxes", src_meta, autoload_with=self.source_engine)
         dest_meta = MetaData()
-        dest_table = Table("inboxes", dest_meta, autoload_with=self.dest_engine)
+        try:
+            dest_table = Table("inboxes", dest_meta, autoload_with=self.dest_engine)
+        except NoSuchTableError:
+            self.logger.warning(
+                "InboxesMigrator: DEST public.inboxes missing — bootstrapping from SOURCE"
+            )
+            ensure_public_table_exists(self.source_engine, self.dest_engine, "inboxes")
+            dest_table = Table("inboxes", dest_meta, autoload_with=self.dest_engine)
 
         with self.dest_engine.connect() as conn:
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
@@ -296,7 +305,15 @@ class InboxesMigrator(BaseMigrator):
 
             # Reflect DEST channel table once per type
             dest_ct_meta = MetaData()
-            dest_ct_table = Table(table_name, dest_ct_meta, autoload_with=self.dest_engine)
+            try:
+                dest_ct_table = Table(table_name, dest_ct_meta, autoload_with=self.dest_engine)
+            except NoSuchTableError:
+                self.logger.warning(
+                    "InboxesMigrator: DEST public.%s missing — bootstrapping from SOURCE",
+                    table_name,
+                )
+                ensure_public_table_exists(self.source_engine, self.dest_engine, table_name)
+                dest_ct_table = Table(table_name, dest_ct_meta, autoload_with=self.dest_engine)
             dest_valid_cols: set[str] = {c.name for c in dest_ct_table.columns}
 
             # Fetch all SOURCE channel records in one query
