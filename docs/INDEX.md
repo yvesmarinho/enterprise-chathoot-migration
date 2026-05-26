@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-21 (Sessão 22 — investigação chat x synchat concluída; plano DEV-only de reset/revisão consolidado)
-**Last Session**: 2026-05-21 (Sessão 22 — relatório de investigação publicado; plano e tarefas para limpeza seletiva/revisão profunda)
+**Last Updated**: 2026-05-26 (Sessão 26 — D21 bug crítico idempotência + correções P0 implementadas)
+**Last Session**: 2026-05-26 (Sessão 26 — Bug D21: pipeline não-idempotente corrigido; validação account + mapeamento deduplicação + --force-overwrite)
 
 ---
 
@@ -106,6 +106,15 @@ SESSIONS/
 | [debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md](debates/D15-DEBATE-MIGRACAO-S3-INCOMPLETA-2026-05-13.md) | **D15 — CRÍTICO** — Migração S3 incompleta: 74% attachments HTTP 404, metadados OK mas arquivos físicos ausentes |
 | [debates/D16-DEBATE-HTTP500-CONVERSACOES-POS-MIGRACAO-2026-05-20.md](debates/D16-DEBATE-HTTP500-CONVERSACOES-POS-MIGRACAO-2026-05-20.md) | **D16** — HTTP500 em conversações pós-migração DEV: causa raiz confirmada em ActiveStorage |
 | [debates/D16-PLANO-INVESTIGACAO-HTTP500-2026-05-20.md](debates/D16-PLANO-INVESTIGACAO-HTTP500-2026-05-20.md) | Plano faseado de investigação/correção/validação para o incidente D16 |
+| [debates/D18-ANALISE-ACTIVESTORAGE-AUSENTE-2026-05-26.md](debates/D18-ANALISE-ACTIVESTORAGE-AUSENTE-2026-05-26.md) | **D18** — Mensagens não abrem em DEV: root cause = ActiveStorage nunca migrado (tabelas ausentes do pipeline) |
+| [debates/D19-UNIQUEVIOLATION-ACTIVESTORAGE-BLOBS-2026-05-26.md](debates/D19-UNIQUEVIOLATION-ACTIVESTORAGE-BLOBS-2026-05-26.md) | **D19** — UniqueViolation em active_storage_blobs.key após adicionar migrator (fix: deduplicação) |
+| [debates/D21-BUG-CRITICO-IDEMPOTENCIA-DEDUPLICACAO-GLOBAL-2026-05-26.md](debates/D21-BUG-CRITICO-IDEMPOTENCIA-DEDUPLICACAO-GLOBAL-2026-05-26.md) | **D21 — 🔴 CRÍTICO** — Pipeline não-idempotente: deduplicação global + ausência de validação account name → 100% skip + account vazio |
+
+## 🐛 Correções de Bugs
+
+| Arquivo | Descrição |
+|---------|-----------|
+| [**CORRECOES_P0_BUG_D21_2026-05-26.md**](CORRECOES_P0_BUG_D21_2026-05-26.md) | **Correções P0 Bug D21** — Validação de account pré-existente + registro de mapeamentos em skips + --force-overwrite flag
 
 ## Scripts de Relatório (reutilizáveis)
 

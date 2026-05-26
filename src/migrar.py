@@ -43,6 +43,13 @@ from sqlalchemy import text
 
 from src.factory.connection_factory import ConnectionFactory
 from src.migrators.accounts_migrator import AccountsMigrator
+from src.migrators.active_storage_attachments_migrator import (
+    ActiveStorageAttachmentsMigrator,
+)
+from src.migrators.active_storage_blobs_migrator import ActiveStorageBlobsMigrator
+from src.migrators.active_storage_variant_records_migrator import (
+    ActiveStorageVariantRecordsMigrator,
+)
 from src.migrators.attachments_migrator import AttachmentsMigrator
 from src.migrators.canned_responses_migrator import CannedResponsesMigrator
 from src.migrators.contact_inboxes_migrator import ContactInboxesMigrator
@@ -64,6 +71,10 @@ from src.migrators.webhooks_migrator import WebhooksMigrator
 from src.reports.poc_reporter import POCReporter
 from src.reports.validation_reporter import ValidationReporter
 from src.repository.migration_state_repository import MigrationStateRepository
+from src.utils.account_resolver import (
+    check_account_exists_with_data,
+    resolve_account_id,
+)
 from src.utils.env_guard import assert_dev_only_env
 from src.utils.fk_validator import FKValidator
 from src.utils.id_remapper import IDRemapper
@@ -81,6 +92,7 @@ _ENV_PRESETS: dict[str, tuple[str, str]] = {
 }
 
 # Canonical FK migration order
+# ActiveStorage tables added after attachments (2026-05-26 — D18)
 _MIGRATION_ORDER = [
     "accounts",
     "custom_attribute_definitions",
@@ -96,6 +108,9 @@ _MIGRATION_ORDER = [
     "conversations",
     "messages",
     "attachments",
+    "active_storage_blobs",  # Root table — no FK dependencies
+    "active_storage_attachments",  # FK: blob_id, record_id (polymorphic)
+    "active_storage_variant_records",  # FK: blob_id
     "conversation_labels",
 ]
 
@@ -114,6 +129,9 @@ _MIGRATOR_MAP = {
     "conversations": ConversationsMigrator,
     "messages": MessagesMigrator,
     "attachments": AttachmentsMigrator,
+    "active_storage_blobs": ActiveStorageBlobsMigrator,
+    "active_storage_attachments": ActiveStorageAttachmentsMigrator,
+    "active_storage_variant_records": ActiveStorageVariantRecordsMigrator,
     "conversation_labels": ConversationLabelsMigrator,
 }
 
@@ -211,6 +229,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "If omitted, migrates all accounts found in SOURCE."
         ),
     )
+    parser.add_argument(
+        "--force-overwrite",
+        action="store_true",
+        help=(
+            "Sobrescrever account no DEST mesmo que já tenha dados. "
+            "⚠️ CUIDADO: Causa PERDA DE DADOS permanente. "
+            "Executa cleanup automático antes da migração."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -262,23 +289,87 @@ def main(argv: list[str] | None = None) -> int:
     dest_engine = factory.create_dest_engine()
     logger.info("Engines created")
 
-    # (2a) Resolve --account to source account_id
+    # (2a) Resolve --account to source account_id using fuzzy matching
     account_id_filter: int | None = None
     if args.account:
-        with source_engine.connect() as _conn:
-            _row = _conn.execute(
-                text("SELECT id FROM public.accounts WHERE LOWER(name) = LOWER(:name)"),
-                {"name": args.account},
-            ).fetchone()
-        if _row is None:
+        try:
+            account_id_filter = resolve_account_id(source_engine, args.account, fuzzy=True)
+        except ValueError as e:
+            # Multiple matches — log and abort
+            logger.error("Account resolution failed: %s", e)
+            return 3
+
+        if account_id_filter is None:
             logger.error("Account not found in SOURCE: %r", args.account)
             return 3
-        account_id_filter = int(_row[0])
+
         logger.info(
             "Account filter resolved: %r → src_account_id=%d",
             args.account,
             account_id_filter,
         )
+
+        # (2a.1) Verificar se account já existe no DEST (validação P0 — D21)
+        if not args.dry_run:
+            try:
+                has_data, dest_stats = check_account_exists_with_data(dest_engine, args.account)
+            except ValueError as e:
+                # Múltiplos matches no DEST — abortar
+                logger.error("Validação DEST falhou: %s", e)
+                return 4
+
+            if has_data and dest_stats:
+                # Account existe no DEST COM DADOS
+                dest_account_id = dest_stats["id"]
+                logger.error(
+                    "❌ Account '%s' já existe no DEST (ID=%d) com dados:",
+                    args.account,
+                    dest_account_id,
+                )
+                logger.error("   Conversations: %d", dest_stats["conversations"])
+                logger.error("   Messages: %d", dest_stats["messages"])
+                logger.error("   Attachments: %d", dest_stats["attachments"])
+                logger.error("   ActiveStorage: %d (%.2f%%)", dest_stats["active_storage"], dest_stats["as_coverage_pct"])
+                logger.error("")
+
+                if not args.force_overwrite:
+                    logger.error("Opções:")
+                    logger.error("  1. Use --force-overwrite para sobrescrever (⚠️  PERDA DE DADOS)")
+                    logger.error("  2. Limpe o account manualmente:")
+                    logger.error("     uv run python scripts/cleanup_accounts.py --account-ids %d", dest_account_id)
+                    logger.error("  3. Escolha outro account no SOURCE")
+                    return 4
+                else:
+                    # --force-overwrite ativo — executar cleanup automático
+                    logger.warning(
+                        "⚠️  Account '%s' (ID=%d) será SOBRESCRITO (--force-overwrite ativo)",
+                        args.account,
+                        dest_account_id,
+                    )
+                    logger.info("Executando cleanup automático...")
+
+                    # Import inline para evitar circular dependency
+                    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+                    from cleanup_accounts import delete_account_data
+
+                    try:
+                        delete_account_data(dest_engine, [dest_account_id], dry_run=False)
+                        logger.info("✅ Cleanup concluído — account %d removido", dest_account_id)
+                    except Exception as cleanup_error:
+                        logger.error("❌ Erro no cleanup: %s", cleanup_error)
+                        return 5
+
+            elif dest_stats:
+                # Account existe mas VAZIO — apenas warning
+                logger.warning(
+                    "⚠️  Account '%s' já existe no DEST (ID=%d) mas está VAZIO",
+                    args.account,
+                    dest_stats["id"],
+                )
+                logger.info("Continuando migração...")
+            else:
+                # Account NÃO existe no DEST — OK
+                logger.info("✅ Account '%s' não existe no DEST — será criado", args.account)
 
     # (2b) Create migration_state table if not exists
     state_repo = MigrationStateRepository()

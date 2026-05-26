@@ -1,0 +1,46 @@
+prompt:
+  role: user
+  content:
+    description:
+      "Investigação completa dos códigos python utilizados para migração de dados
+      para encontrar a causa raiz da impossibilidade de abrir mensagens da Unimed Guaxupé no
+      ambiente DEV, incluindo análise de logs, revisão de código e identificação de
+      possíveis falhas."
+    specification:
+      - project_name: "enterprise-chatwoot-migration"
+      - response: "código python, com conexão em PostgreSQL, utilizando SQLAlchemy e Alembic para migração de banco de dados."
+      - docstyle: "Documentar o código segundo padrão reStructuredText do Docstring, incluindo Doct test. (quando possível)"
+      - workflow-objetivo:
+          "objetivo.yaml → Copilot → objetivo-template.yaml → Copilot → mcp-questions.yaml → Copilot
+          → generate .vscode/mcp.json, settings.json, tasks.json"
+      - workflow-specify:
+          "objetivo.yaml → speckit.constitution → speckit.clarify → speckit.plan → speckit.checklist
+          → speckit.tasks → speckit.analyze → speckit.implement"
+      - out-scope: "Não deve ser alterada nada em nenhum código do Chatwoot, esse projeto é totalmente independente."
+      - rules:
+          - Regras para migração:
+              - "A analise deve ser complete e profunda de todos os códigos e documentos relacionados à migração, incluindo scripts de migração
+                e quaisquer logs disponíveis"
+              - "Analisar histórtico dos versionamentos de código relacionados à migração para identificar mudanças
+                que possam ter causado o problema"
+              - "Validar se o Cliente está ativo nas duas bases"
+              - "Caso o Cliente estja inativo na base destino, sobrepor todos os dados"
+              - "Caso haja conflitos clientes ativos e demais informações chaves, gerar relatório detalhado para análise posterior"
+              - "Remapear IDs da origem para valores posteriores ao maior ID existente no destino, preservando todas as relações internas entre entidades"
+              - "Migrar apenas as referências (URLs) de attachments S3 — não mover arquivos físicos no S3"
+          - "Todos os arquivos gerados devem ser armazenados nas devidas pastas, na raiz do projeto só os arquivos extremamente necessários"
+          - "Códigos gerados devem seguir padrões de qualidade e estilo, com linting e formatação automática"
+          - "Fluxo de trabalho deve ser guiado por prompts para GitHub Copilot"
+          - "Configuração MCP deve ser gerada automaticamente baseada nas especificações"
+          - "Sistema de versionamento e histórico deve rastrear todas as mudanças"
+          - "Acessar o repositório do chatwoot `https://github.com/chatwoot/chatwoot` apenas como referência de schema e migrations —
+            nenhum código do Chatwoot deve ser copiado ou alterado"
+          - "No repositório chatwoot analisar todas as migrations do banco de dados para identificar a versão de cada instância
+            e os dados a serem migrados"
+          - "Utilizar Fabric Design Pattern em TODO o código — da camada de conexão aos migrators — para arquitetura organizada e modular,
+            evitando código espaguete"
+          - "Nenhum dado sensível (e-mails, nomes, conteúdo de mensagens, telefones) deve aparecer em stdout, logs de arquivo ou qualquer saída visível"
+          - "A migração deve ser idempotente: re-execução não deve duplicar registros já migrados"
+          - "Credenciais acessadas exclusivamente via .secrets/generate_erd.json — nunca versionadas nem impressas"
+          - "Utilizar as melhores práticas de desenvolvimento de software, incluindo testes automatizados, documentação clara e manutenção de código"
+          - "Utilizar as melhores práticas de segurança, incluindo a gestão segura de credenciais e a proteção contra vulnerabilidades comuns"
