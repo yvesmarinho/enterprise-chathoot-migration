@@ -560,3 +560,174 @@ def test_contacts_orphan_account_id_skipped():
             migrator.migrate()
 
     assert len(remapped_rows) == 0
+
+
+# ---------------------------------------------------------------------------
+# T030-10 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_empty_source_no_op():
+    """Empty source returns MigrationResult with 0 migrated/skipped."""
+    rows = []
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+
+    with patch("src.migrators.contacts_migrator.Table"):
+        result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T030-11 — Phone number preserved
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_phone_number_preserved():
+    """Phone number field is preserved when present."""
+    phone = "+1-555-0123"
+    rows = [
+        {
+            "id": 11,
+            "account_id": 1,
+            "name": "Jane",
+            "email": "jane@example.com",
+            "phone_number": phone,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.contacts_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["phone_number"] == phone
+
+
+# ---------------------------------------------------------------------------
+# T030-12 — Multiple contacts same account
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_multiple_same_account():
+    """Multiple contacts for same account all migrated successfully."""
+    rows = [
+        {
+            "id": 12,
+            "account_id": 1,
+            "name": "Alice",
+            "email": "alice@example.com",
+            "phone_number": None,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 13,
+            "account_id": 1,
+            "name": "Bob",
+            "email": "bob@example.com",
+            "phone_number": None,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    remapped_rows = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.contacts_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert remapped_rows[0]["name"] == "Alice"
+    assert remapped_rows[1]["name"] == "Bob"
+
+
+# ---------------------------------------------------------------------------
+# T030-13 — Mixed valid and orphan accounts
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_mixed_valid_orphan_accounts():
+    """Multiple contacts: some valid, some with orphan accounts (skipped)."""
+    rows = [
+        {
+            "id": 14,
+            "account_id": 1,
+            "name": "Valid1",
+            "email": "valid1@example.com",
+            "phone_number": None,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 15,
+            "account_id": 999,
+            "name": "Orphan",
+            "email": "orphan@example.com",
+            "phone_number": None,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 16,
+            "account_id": 2,
+            "name": "Valid2",
+            "email": "valid2@example.com",
+            "phone_number": None,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    remapped_rows = []
+    skipped_ids = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_ids.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.contacts_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert len(skipped_ids) == 1
+    assert 15 in skipped_ids
