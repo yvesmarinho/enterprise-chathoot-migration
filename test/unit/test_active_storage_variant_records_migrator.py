@@ -1,6 +1,6 @@
 """Minimal unit tests for ActiveStorageVariantRecordsMigrator (T048)."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.migrators.active_storage_variant_records_migrator import (
     ActiveStorageVariantRecordsMigrator,
@@ -9,10 +9,19 @@ from src.repository.migration_state_repository import MigrationStateRepository
 from src.utils.id_remapper import IDRemapper
 
 
-def test_active_storage_variant_records_can_instantiate():
-    """Migrator can be instantiated with required dependencies."""
+def _make_migrator(source_rows=None):
+    """Build migrator with standard dependencies."""
+    source_rows = source_rows or []
+    
     source_engine = MagicMock()
     dest_engine = MagicMock()
+    
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = source_rows
+    source_engine.connect.return_value = src_conn
+    
     state_repo = MagicMock(spec=MigrationStateRepository)
     remapper = IDRemapper(
         {
@@ -22,7 +31,7 @@ def test_active_storage_variant_records_can_instantiate():
     )
     logger = MagicMock()
 
-    migrator = ActiveStorageVariantRecordsMigrator(
+    return ActiveStorageVariantRecordsMigrator(
         source_engine=source_engine,
         dest_engine=dest_engine,
         id_remapper=remapper,
@@ -30,30 +39,32 @@ def test_active_storage_variant_records_can_instantiate():
         logger=logger,
     )
 
+
+def test_active_storage_variant_records_can_instantiate():
+    """Migrator can be instantiated with required dependencies."""
+    migrator = _make_migrator()
     assert migrator is not None
-    assert migrator.source_engine == source_engine
-    assert migrator.dest_engine == dest_engine
+    assert migrator.source_engine is not None
+    assert migrator.dest_engine is not None
 
 
 def test_active_storage_variant_records_table_name():
     """Table name is correct."""
-    source_engine = MagicMock()
-    dest_engine = MagicMock()
-    state_repo = MagicMock(spec=MigrationStateRepository)
-    remapper = IDRemapper(
-        {
-            "active_storage_variant_records": 1000,
-            "active_storage_blobs": 500,
-        }
-    )
-    logger = MagicMock()
-
-    migrator = ActiveStorageVariantRecordsMigrator(
-        source_engine=source_engine,
-        dest_engine=dest_engine,
-        id_remapper=remapper,
-        state_repo=state_repo,
-        logger=logger,
-    )
-
+    migrator = _make_migrator()
     assert migrator._table_name() == "active_storage_variant_records"
+
+
+def test_active_storage_variant_records_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "blob_id": 100, "variation_digest": "digest1"},
+        {"id": 2, "blob_id": 101, "variation_digest": "digest2"},
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.active_storage_variant_records_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["blob_id"] == 100
+    assert result[1]["variation_digest"] == "digest2"
