@@ -178,3 +178,67 @@ def test_attachments_fk_remapping():
     assert r["id"] == 5 + 73435
     assert r["message_id"] == 3 + 1302949
     assert r["account_id"] == 1 + 20
+
+
+# ---------------------------------------------------------------------------
+# T033-5 — file_name preserved
+# ---------------------------------------------------------------------------
+
+
+def test_attachments_file_name_preserved():
+    """file_name field is copied as-is without modification."""
+    file_name = "document_2026.pdf"
+    rows = [
+        _base_row(id=6, message_id=1, account_id=1, file_name=file_name)
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated={"messages": {1}, "accounts": {1}})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.attachments_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["file_name"] == file_name
+
+
+# ---------------------------------------------------------------------------
+# T033-6 — mixed accounts partial skip
+# ---------------------------------------------------------------------------
+
+
+def test_attachments_mixed_accounts_partial_skip():
+    """Attachments from multiple accounts skip only those with orphaned FKs."""
+    rows = [
+        _base_row(id=7, message_id=1, account_id=1),
+        _base_row(id=8, message_id=2, account_id=2),
+        _base_row(id=9, message_id=999, account_id=1),
+    ]
+    remapped = []
+    skipped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+            else:
+                skipped.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated={"messages": {1, 2}, "accounts": {1, 2}})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.attachments_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 2
+    assert len(skipped) == 1
+    assert 9 in skipped
