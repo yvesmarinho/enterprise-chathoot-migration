@@ -448,3 +448,31 @@ def test_team_members_classify_row_poc_clean():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert reason == "clean"
+
+
+def test_team_members_classify_row_poc_orphan_team():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for unmigrated team_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"id": 1, "team_id": 999, "user_id": 1}
+    migrated_sets = {"teams": {1}, "users": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "team" in reason.lower()
+
+
+def test_team_members_classify_row_poc_orphan_user():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for unmigrated user_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"id": 1, "team_id": 1, "user_id": 999}
+    migrated_sets = {"teams": {1}, "users": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "user" in reason.lower()
