@@ -766,3 +766,187 @@ def test_webhooks_inbox_id_remapped():
     assert len(remapped_rows) == 1
     expected_inbox_id = remapper.remap(10, "inboxes")
     assert remapped_rows[0]["inbox_id"] == expected_inbox_id
+
+
+# ---------------------------------------------------------------------------
+# T038-18 — Empty source returns 0 migrated/skipped
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_empty_source_returns_zero():
+    """Empty source returns MigrationResult with 0 migrated and 0 skipped."""
+    migrator, _ = _make_migrator(source_rows=[], migrated={"accounts": {1}})
+
+    with patch("src.migrators.webhooks_migrator.Table"):
+        result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T038-19 — Webhook events field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_events_field_preserved():
+    """events field (webhook event subscriptions) is copied as-is."""
+    rows = [
+        {
+            "id": 206,
+            "account_id": 1,
+            "inbox_id": None,
+            "url": "https://example.com/webhook",
+            "events": "conversation_created,conversation_updated,message_created",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert (
+        remapped_rows[0]["events"]
+        == "conversation_created,conversation_updated,message_created"
+    )
+
+
+# ---------------------------------------------------------------------------
+# T038-20 — Webhook enabled field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_enabled_field_preserved():
+    """enabled boolean field is preserved through migration."""
+    rows = [
+        {
+            "id": 207,
+            "account_id": 1,
+            "inbox_id": None,
+            "url": "https://example.com/webhook",
+            "enabled": True,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0].get("enabled") is True
+
+
+# ---------------------------------------------------------------------------
+# T038-21 — Multiple webhooks with mixed enabled status
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_multiple_with_mixed_enabled_status():
+    """Multiple webhooks with varying enabled status all migrated correctly."""
+    rows = [
+        {
+            "id": 208,
+            "account_id": 1,
+            "inbox_id": None,
+            "url": "https://example.com/webhook1",
+            "enabled": True,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 209,
+            "account_id": 1,
+            "inbox_id": None,
+            "url": "https://example.com/webhook2",
+            "enabled": False,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert remapped_rows[0].get("enabled") is True
+    assert remapped_rows[1].get("enabled") is False
+
+
+# ---------------------------------------------------------------------------
+# T038-22 — Webhook with missing optional fields
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_with_missing_optional_fields():
+    """Webhook with minimal fields (no events, no enabled) migrates successfully."""
+    rows = [
+        {
+            "id": 210,
+            "account_id": 1,
+            "inbox_id": None,
+            "url": "https://example.com/webhook",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    # ID and FKs should be present
+    assert remapped_rows[0]["id"] is not None
+    assert remapped_rows[0]["account_id"] is not None
+    assert remapped_rows[0]["url"] is not None
