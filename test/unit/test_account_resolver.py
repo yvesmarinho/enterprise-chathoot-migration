@@ -97,9 +97,7 @@ def test_resolve_account_id_programming_error_accounts_table_unavailable(mock_en
     mock_conn.__enter__ = MagicMock(return_value=mock_conn)
     mock_conn.__exit__ = MagicMock(return_value=False)
     mock_conn.execute.side_effect = ProgrammingError(
-        "relation \"public.accounts\" does not exist",
-        "SELECT ...",
-        None
+        'relation "public.accounts" does not exist', "SELECT ...", None
     )
 
     mock_engine.connect.return_value = mock_conn
@@ -116,11 +114,7 @@ def test_resolve_account_id_programming_error_other_raises(mock_engine):
     mock_conn = MagicMock()
     mock_conn.__enter__ = MagicMock(return_value=mock_conn)
     mock_conn.__exit__ = MagicMock(return_value=False)
-    mock_conn.execute.side_effect = ProgrammingError(
-        "syntax error in SQL",
-        "SELECT ...",
-        None
-    )
+    mock_conn.execute.side_effect = ProgrammingError("syntax error in SQL", "SELECT ...", None)
 
     mock_engine.connect.return_value = mock_conn
 

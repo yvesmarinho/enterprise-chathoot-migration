@@ -72,9 +72,7 @@ def test_bootstrap_public_schema_empty_exclude():
     with patch("src.utils.schema_bootstrap.inspect", return_value=mock_inspector):
         with patch("src.utils.schema_bootstrap.Table", return_value=mock_src_table):
             with patch("src.utils.schema_bootstrap.MetaData"):
-                result = bootstrap_public_schema(
-                    source_engine, dest_engine, exclude_tables=[]
-                )
+                result = bootstrap_public_schema(source_engine, dest_engine, exclude_tables=[])
 
     assert result == ["accounts"]
 
@@ -169,7 +167,10 @@ def test_ensure_public_table_exists_with_foreign_key_dependencies():
     table_map = {"contacts": mock_src_table, "accounts": mock_account_table}
 
     with patch("src.utils.schema_bootstrap.inspect", return_value=mock_inspector):
-        with patch("src.utils.schema_bootstrap.Table", side_effect=lambda *a, **kw: table_map.get(a[0]) or mock_src_table):
+        with patch(
+            "src.utils.schema_bootstrap.Table",
+            side_effect=lambda *a, **kw: table_map.get(a[0]) or mock_src_table,
+        ):
             with patch("src.utils.schema_bootstrap.MetaData"):
                 result = ensure_public_table_exists(source_engine, dest_engine, "contacts")
 
@@ -215,7 +216,9 @@ def test_ensure_public_table_exists_avoids_recursive_fk_loop():
     table_map = {"contacts": mock_contacts_table, "accounts": mock_accounts_table}
 
     with patch("src.utils.schema_bootstrap.inspect", return_value=mock_inspector):
-        with patch("src.utils.schema_bootstrap.Table", side_effect=lambda *a, **kw: table_map.get(a[0])):
+        with patch(
+            "src.utils.schema_bootstrap.Table", side_effect=lambda *a, **kw: table_map.get(a[0])
+        ):
             with patch("src.utils.schema_bootstrap.MetaData"):
                 result = ensure_public_table_exists(source_engine, dest_engine, "contacts")
 

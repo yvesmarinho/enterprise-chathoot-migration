@@ -346,10 +346,16 @@ def test_canned_responses_bootstrap_missing_table():
         return MagicMock(spec=RealTable)
 
     with patch("src.migrators.canned_responses_migrator.Table", side_effect=table_side_effect):
-        with patch("src.migrators.canned_responses_migrator.ensure_public_table_exists") as mock_bootstrap:
-            with patch.object(migrator, "_run_batches", return_value=MigrationResult(
-                table="canned_responses", total_source=1, migrated=1, skipped=0
-            )):
+        with patch(
+            "src.migrators.canned_responses_migrator.ensure_public_table_exists"
+        ) as mock_bootstrap:
+            with patch.object(
+                migrator,
+                "_run_batches",
+                return_value=MigrationResult(
+                    table="canned_responses", total_source=1, migrated=1, skipped=0
+                ),
+            ):
                 migrator.migrate()
 
             # Verify bootstrap was called due to NoSuchTableError

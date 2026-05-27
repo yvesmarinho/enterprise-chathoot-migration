@@ -358,9 +358,7 @@ def test_conversation_labels_migrate_tags_reuses_existing_tag():
     # Fetch DEST existing tags (urgent already exists as id=50)
     def execute_side_effect(stmt, *args, **kwargs):
         result = MagicMock()
-        result.mappings.return_value.all.return_value = [
-            {"id": 50, "name": "urgent"}
-        ]
+        result.mappings.return_value.all.return_value = [{"id": 50, "name": "urgent"}]
         return result
 
     dest_conn.execute.side_effect = execute_side_effect

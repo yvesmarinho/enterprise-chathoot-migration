@@ -340,18 +340,22 @@ def test_labels_bootstrap_missing_dest_table():
     with patch.object(migrator, "_run_batches", side_effect=capture):
         # Mock Table to raise NoSuchTableError on first call (dest), success on second
         call_count = [0]
+
         def table_side_effect(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:  # src table
                 return MagicMock()
             elif call_count[0] == 2:  # dest table — raise error
                 from sqlalchemy.exc import NoSuchTableError
+
                 raise NoSuchTableError("labels", "labels")
             else:  # after bootstrap
                 return MagicMock()
 
         with patch("src.migrators.labels_migrator.Table", side_effect=table_side_effect):
-            with patch("src.migrators.labels_migrator.ensure_public_table_exists") as mock_bootstrap:
+            with patch(
+                "src.migrators.labels_migrator.ensure_public_table_exists"
+            ) as mock_bootstrap:
                 migrator.migrate()
                 # Bootstrap should have been called
                 mock_bootstrap.assert_called_once()

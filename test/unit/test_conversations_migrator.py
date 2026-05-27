@@ -433,7 +433,7 @@ def test_conversations_uuid_regenerated_per_row():
     dest_conn.__exit__ = MagicMock(return_value=False)
     dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
     dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
-    
+
     # Mock execute
     dest_conn.execute.return_value.fetchall.return_value = []
     dest_engine.connect.return_value = dest_conn

@@ -293,10 +293,16 @@ def test_custom_attribute_definitions_merged_account_dedup():
     )
 
     with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
-        with patch("src.migrators.custom_attribute_definitions_migrator.ensure_public_table_exists"):
-            with patch.object(migrator, "_run_batches", return_value=MigrationResult(
-                table="custom_attribute_definitions", total_source=1, migrated=0, skipped=1
-            )):
+        with patch(
+            "src.migrators.custom_attribute_definitions_migrator.ensure_public_table_exists"
+        ):
+            with patch.object(
+                migrator,
+                "_run_batches",
+                return_value=MigrationResult(
+                    table="custom_attribute_definitions", total_source=1, migrated=0, skipped=1
+                ),
+            ):
                 migrator.migrate()
 
     # Verify that state_repo.record_success was called during dedup
@@ -365,11 +371,19 @@ def test_custom_attribute_definitions_bootstrap_missing_table():
             raise NoSuchTableError("custom_attribute_definitions")
         return MagicMock(spec=RealTable)
 
-    with patch("src.migrators.custom_attribute_definitions_migrator.Table", side_effect=table_side_effect):
-        with patch("src.migrators.custom_attribute_definitions_migrator.ensure_public_table_exists") as mock_bootstrap:
-            with patch.object(migrator, "_run_batches", return_value=MigrationResult(
-                table="custom_attribute_definitions", total_source=1, migrated=1, skipped=0
-            )):
+    with patch(
+        "src.migrators.custom_attribute_definitions_migrator.Table", side_effect=table_side_effect
+    ):
+        with patch(
+            "src.migrators.custom_attribute_definitions_migrator.ensure_public_table_exists"
+        ) as mock_bootstrap:
+            with patch.object(
+                migrator,
+                "_run_batches",
+                return_value=MigrationResult(
+                    table="custom_attribute_definitions", total_source=1, migrated=1, skipped=0
+                ),
+            ):
                 migrator.migrate()
 
             assert mock_bootstrap.called

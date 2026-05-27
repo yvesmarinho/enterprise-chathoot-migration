@@ -197,6 +197,7 @@ def test_mask_message_json_dict() -> None:
     result = mask_message(msg)
     # Result should still be valid JSON
     import json
+
     parsed = json.loads(result)
     assert parsed["email"] == "***"
     assert parsed["id"] == 42
@@ -207,6 +208,7 @@ def test_mask_message_json_list() -> None:
     msg = '["user@domain.com", "safe", 123]'
     result = mask_message(msg)
     import json
+
     parsed = json.loads(result)
     assert parsed[0] == "***"
     assert parsed[1] == "safe"
