@@ -757,3 +757,46 @@ def test_labels_multiple_mixed_valid_orphan():
     assert len(remapped_rows) == 2
     assert len(skipped_ids) == 1
     assert 109 in skipped_ids
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_labels_table_name():
+    """_table_name() returns 'labels'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "labels"
+
+
+def test_labels_fetch_all_source_rows():
+    """_fetch_all_source_rows() fetches and reflects all rows."""
+    rows = [
+        {"id": 1, "account_id": 1, "title": "Urgent"},
+        {"id": 2, "account_id": 1, "title": "Follow-up"},
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.labels_migrator.Table") as mock_table:
+        mock_table_inst = MagicMock()
+        mock_table.return_value = mock_table_inst
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["id"] == 1
+    assert result[1]["title"] == "Follow-up"
+
+
+def test_labels_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"account_id": 1}
+    migrated_sets = {"accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
