@@ -345,3 +345,60 @@ def test_accounts_id_remapped():
             migrator.migrate()
 
     assert remapped_rows[0]["id"] == 99 + 43  # offset 43
+
+
+# ---------------------------------------------------------------------------
+# T025-10 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_accounts_empty_source_no_op():
+    """Empty source returns MigrationResult with 0 migrated/skipped."""
+    src_rows = []
+    dst_rows = []
+
+    migrator, _, _ = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    with patch("src.migrators.accounts_migrator.Table"):
+        result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T025-11 — Multiple accounts without merge rule
+# ---------------------------------------------------------------------------
+
+
+def test_accounts_multiple_no_merge():
+    """Multiple accounts with no merge rule matches all use offset."""
+    src_rows = [
+        {"id": 1, "name": "Account 1", "created_at": None, "updated_at": None},
+        {"id": 2, "name": "Account 2", "created_at": None, "updated_at": None},
+        {"id": 3, "name": "Account 3", "created_at": None, "updated_at": None},
+    ]
+    # DEST has no matching accounts
+    dst_rows = []
+
+    migrator, remapper, _ = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    remapped_rows = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.accounts_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 3
+    # All should be remapped with offset 43
+    assert remapped_rows[0]["id"] == 1 + 43
+    assert remapped_rows[1]["id"] == 2 + 43
+    assert remapped_rows[2]["id"] == 3 + 43
