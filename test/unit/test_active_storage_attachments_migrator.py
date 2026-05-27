@@ -101,3 +101,23 @@ def test_active_storage_attachments_classify_row_poc_orphan_blob():
 
     assert outcome == Outcome.ORPHAN_FK_SKIP
     assert "blob_id=999" in reason
+
+
+def test_active_storage_attachments_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"blob_id": 100, "record_type": "Attachment", "record_id": 1}
+    migrated_sets = {
+        "active_storage_blobs": {100, 101},
+        "attachments": {1},
+        "contacts": set(),
+        "users": set(),
+        "inboxes": set(),
+    }
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert "FK dependencies satisfied" in reason
