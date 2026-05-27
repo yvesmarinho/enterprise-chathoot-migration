@@ -68,3 +68,31 @@ def test_active_storage_variant_records_fetch_all_source_rows():
     assert len(result) == 2
     assert result[0]["blob_id"] == 100
     assert result[1]["variation_digest"] == "digest2"
+
+
+def test_active_storage_variant_records_classify_row_poc_orphan_blob():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for missing blob_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "blob_id": 999, "variation_digest": "digest1"}
+    migrated_sets = {"active_storage_blobs": {100, 101}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "blob_id=999" in reason
+
+
+def test_active_storage_variant_records_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "blob_id": 100, "variation_digest": "digest1"}
+    migrated_sets = {"active_storage_blobs": {100, 101}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert "dependency satisfied" in reason
