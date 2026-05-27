@@ -628,3 +628,31 @@ def test_contact_inboxes_classify_row_poc_clean():
 
     assert outcome == Outcome.WOULD_MIGRATE_MODIFIED
     assert "pubsub_token" in reason and "regenerated" in reason
+
+
+def test_contact_inboxes_classify_row_poc_orphan_contact():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for unmigrated contact_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"id": 1, "contact_id": 999, "inbox_id": 1}
+    migrated_sets = {"contacts": {1}, "inboxes": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "contact_id" in reason
+
+
+def test_contact_inboxes_classify_row_poc_orphan_inbox():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for unmigrated inbox_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"id": 1, "contact_id": 1, "inbox_id": 999}
+    migrated_sets = {"contacts": {1}, "inboxes": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "inbox_id" in reason
