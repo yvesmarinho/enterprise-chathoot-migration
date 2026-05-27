@@ -1321,3 +1321,121 @@ def test_inboxes_name_preserved_special_chars():
 
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["name"] == name
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_table_name():
+    """_table_name() returns 'inboxes'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "inboxes"
+
+
+def test_inboxes_fetch_all_source_rows():
+    """_fetch_all_source_rows() fetches and reflects all rows."""
+    rows = [
+        {"id": 1, "account_id": 5, "name": "Support", "channel_type": "Channel::Email"},
+        {"id": 2, "account_id": 5, "name": "Sales", "channel_type": "Channel::Api"},
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.inboxes_migrator.Table") as mock_table:
+        mock_table_inst = MagicMock()
+        mock_table.return_value = mock_table_inst
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["id"] == 1
+    assert result[1]["name"] == "Sales"
+
+
+def test_inboxes_classify_row_poc_orphan_account():
+    """_classify_row_poc() classifies orphan account_id as ORPHAN_FK_SKIP."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "account_id": 999}
+    migrated_sets = {"accounts": {1, 2, 3}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "account_id=999" in reason
+
+
+def test_inboxes_classify_row_poc_clean_account():
+    """_classify_row_poc() returns WOULD_MIGRATE for clean account_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "account_id": 2}
+    migrated_sets = {"accounts": {1, 2, 3}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
+
+
+# ---------------------------------------------------------------------------
+# Channel Type Configuration Coverage
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_cfg_has_all_types():
+    """All 9 channel types are configured in _CHANNEL_CFG."""
+    from src.migrators.inboxes_migrator import _CHANNEL_CFG
+
+    expected_types = [
+        "Channel::WebWidget",
+        "Channel::Api",
+        "Channel::FacebookPage",
+        "Channel::Telegram",
+        "Channel::Email",
+        "Channel::TwilioSms",
+        "Channel::Whatsapp",
+        "Channel::Line",
+        "Channel::Sms",
+    ]
+
+    for channel_type in expected_types:
+        assert channel_type in _CHANNEL_CFG, f"{channel_type} missing from _CHANNEL_CFG"
+        table_name, seq_name, regen_fields = _CHANNEL_CFG[channel_type]
+        assert table_name is not None
+        assert seq_name is not None
+        assert isinstance(regen_fields, dict)
+
+
+def test_inboxes_token_regen_fields_callable():
+    """Token fields (website_token, identifier, hmac_token) are callable."""
+    from src.migrators.inboxes_migrator import _CHANNEL_CFG
+
+    # WebWidget should have website_token
+    _, _, webwidget_regen = _CHANNEL_CFG["Channel::WebWidget"]
+    assert "website_token" in webwidget_regen
+    assert callable(webwidget_regen["website_token"])
+
+    # Api should have identifier and hmac_token
+    _, _, api_regen = _CHANNEL_CFG["Channel::Api"]
+    assert "identifier" in api_regen
+    assert "hmac_token" in api_regen
+    assert callable(api_regen["identifier"])
+    assert callable(api_regen["hmac_token"])
+
+
+def test_inboxes_token_regen_generates_unique_values():
+    """Token regeneration functions produce different values each time."""
+    from src.migrators.inboxes_migrator import _CHANNEL_CFG
+
+    _, _, webwidget_regen = _CHANNEL_CFG["Channel::WebWidget"]
+    gen_fn = webwidget_regen["website_token"]
+
+    token1 = gen_fn()
+    token2 = gen_fn()
+
+    assert token1 != token2
+    assert len(token1) > 0
+    assert len(token2) > 0
