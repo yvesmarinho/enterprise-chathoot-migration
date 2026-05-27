@@ -415,3 +415,159 @@ def test_conversation_labels_migrate_tags_empty():
     tag_id_map = migrator._migrate_tags()
 
     assert tag_id_map == {}
+
+
+# ---------------------------------------------------------------------------
+# T022-9 — Empty source rows no-op
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_empty_source_no_op():
+    """Empty source returns MigrationResult with 0 migrated/skipped."""
+    migrator, _, tag_id_map = _make_migrator(
+        source_rows=[],
+        migrated={"conversations": {1}, "users": {1}},
+        tag_id_map={},
+    )
+
+    with patch.object(migrator, "_migrate_tags", return_value=tag_id_map):
+        with patch("src.migrators.conversation_labels_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T022-10 — Multiple conversation_ids all valid
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_multiple_conversations_valid():
+    """Multiple conversation labels all with valid conversation_ids are migrated."""
+    rows = [
+        {
+            "id": 100,
+            "tag_id": 5,
+            "taggable_type": "Conversation",
+            "taggable_id": 1,
+            "context": "labels",
+            "tagger_type": "User",
+            "tagger_id": 1,
+            "created_at": None,
+        },
+        {
+            "id": 101,
+            "tag_id": 6,
+            "taggable_type": "Conversation",
+            "taggable_id": 2,
+            "context": "labels",
+            "tagger_type": "User",
+            "tagger_id": 1,
+            "created_at": None,
+        },
+        {
+            "id": 102,
+            "tag_id": 7,
+            "taggable_type": "Conversation",
+            "taggable_id": 1,
+            "context": "labels",
+            "tagger_type": "User",
+            "tagger_id": 1,
+            "created_at": None,
+        },
+    ]
+
+    migrator, remapper, tag_id_map = _make_migrator(
+        source_rows=rows,
+        migrated={"conversations": {1, 2}, "users": {1}},
+        tag_id_map={5: 50, 6: 60, 7: 70},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    with patch.object(migrator, "_migrate_tags", return_value=tag_id_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.conversation_labels_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 3
+    assert remapped_rows[0]["taggable_id"] == 1 + 100
+    assert remapped_rows[1]["taggable_id"] == 2 + 100
+    assert remapped_rows[2]["taggable_id"] == 1 + 100
+
+
+# ---------------------------------------------------------------------------
+# T022-11 — Mixed valid and orphan conversation_ids
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_mixed_valid_orphan():
+    """Multiple tags: some with valid conversation_ids, some orphan (skipped)."""
+    rows = [
+        {
+            "id": 200,
+            "tag_id": 5,
+            "taggable_type": "Conversation",
+            "taggable_id": 1,
+            "context": "labels",
+            "tagger_type": "User",
+            "tagger_id": 1,
+            "created_at": None,
+        },
+        {
+            "id": 201,
+            "tag_id": 6,
+            "taggable_type": "Conversation",
+            "taggable_id": 999,
+            "context": "labels",
+            "tagger_type": "User",
+            "tagger_id": 1,
+            "created_at": None,
+        },
+        {
+            "id": 202,
+            "tag_id": 7,
+            "taggable_type": "Conversation",
+            "taggable_id": 2,
+            "context": "labels",
+            "tagger_type": "User",
+            "tagger_id": 1,
+            "created_at": None,
+        },
+    ]
+
+    migrator, remapper, tag_id_map = _make_migrator(
+        source_rows=rows,
+        migrated={"conversations": {1, 2}, "users": {1}},
+        tag_id_map={5: 50, 6: 60, 7: 70},
+    )
+
+    remapped_rows = []
+    skipped_ids = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_ids.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    with patch.object(migrator, "_migrate_tags", return_value=tag_id_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.conversation_labels_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert len(skipped_ids) == 1
+    assert 201 in skipped_ids
