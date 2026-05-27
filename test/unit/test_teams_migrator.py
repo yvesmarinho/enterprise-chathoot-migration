@@ -116,3 +116,125 @@ def test_teams_small_volume_single_batch():
             migrator.migrate()
 
     assert batches_processed == [3]  # all 3 rows passed to _run_batches at once
+
+
+# ---------------------------------------------------------------------------
+# T028-3 — Orphan account_id causes skip
+# ---------------------------------------------------------------------------
+
+
+def test_teams_orphan_account_id_skipped():
+    """Team with unmigrated account_id is skipped."""
+    rows = [
+        {
+            "id": 1,
+            "account_id": 999,
+            "name": "OrphanTeam",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2, 3})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
+
+
+# ---------------------------------------------------------------------------
+# T028-4 — Team name field copied verbatim
+# ---------------------------------------------------------------------------
+
+
+def test_teams_name_field_unchanged():
+    """Team name field is copied as-is without modification."""
+    team_name = "Sales & Support"
+    rows = [
+        {
+            "id": 5,
+            "account_id": 1,
+            "name": team_name,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped_rows[0]["name"] == team_name
+
+
+# ---------------------------------------------------------------------------
+# T028-5 — Multiple account_ids with partial success
+# ---------------------------------------------------------------------------
+
+
+def test_teams_multiple_accounts_mixed_success():
+    """Teams from multiple accounts with some orphaned."""
+    rows = [
+        {
+            "id": 1,
+            "account_id": 1,
+            "name": "Team A",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 2,
+            "account_id": 2,
+            "name": "Team B",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 3,
+            "account_id": 999,
+            "name": "Orphan Team",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    remapped_rows = []
+    skipped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_rows.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert 999 not in [r["account_id"] for r in remapped_rows]
+    assert skipped_rows == [3]

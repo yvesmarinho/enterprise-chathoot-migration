@@ -113,3 +113,114 @@ def test_labels_32_records_single_batch():
             migrator.migrate()
 
     assert called_with_count == [32]
+
+
+# ---------------------------------------------------------------------------
+# T029-3 — Orphan account_id is skipped
+# ---------------------------------------------------------------------------
+
+
+def test_labels_orphan_account_id_skipped():
+    """Label with unmigrated account_id is skipped."""
+    rows = [
+        {
+            "id": 1,
+            "account_id": 999,
+            "title": "Orphan",
+            "color": "#FF0000",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.labels_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 0
+
+
+# ---------------------------------------------------------------------------
+# T029-4 — Color field copied verbatim (no normalization)
+# ---------------------------------------------------------------------------
+
+
+def test_labels_color_field_unchanged():
+    """Color field is copied as-is without modification."""
+    original_color = "#AABBCC"
+    rows = [
+        {
+            "id": 2,
+            "account_id": 1,
+            "title": "TestLabel",
+            "color": original_color,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.labels_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["color"] == original_color
+
+
+# ---------------------------------------------------------------------------
+# T029-5 — Mixed account_ids with some orphaned
+# ---------------------------------------------------------------------------
+
+
+def test_labels_mixed_account_ids_partial_skip():
+    """Labels with mixed account_ids skip only orphaned ones."""
+    rows = [
+        {
+            "id": i,
+            "account_id": 1 if i % 2 == 0 else 999,
+            "title": f"label_{i}",
+            "color": "#000000",
+            "created_at": None,
+            "updated_at": None,
+        }
+        for i in range(1, 6)
+    ]
+    remapped = []
+    skipped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+            else:
+                skipped.append(row["id"])
+        return MigrationResult(table=table_name, total_source=5, migrated=2, skipped=3)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.labels_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 2
+    assert len(skipped) == 3
