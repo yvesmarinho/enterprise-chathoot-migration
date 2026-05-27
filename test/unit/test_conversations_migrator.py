@@ -110,12 +110,16 @@ def test_conversations_null_contact_id_skips_record():
 
 
 # ---------------------------------------------------------------------------
-# T031-2 — Orphan contact_id → record skipped
+# T031-2 — Orphan contact_id → contact_id NULLed-out, record included
 # ---------------------------------------------------------------------------
 
 
 def test_conversations_orphan_contact_id_skips_record():
-    """Records with orphan contact_id are skipped (remap_fn returns None)."""
+    """Records with orphan contact_id are included with contact_id=None (not skipped).
+    
+    Per BUG-03 fix: Skipping whole conversation when contact_id unmigrated causes
+    cascade loss of messages/attachments. NULL contact_id is acceptable in Chatwoot.
+    """
     rows = [_base_row(contact_id=9999)]
     remapped = []
 
@@ -135,7 +139,9 @@ def test_conversations_orphan_contact_id_skips_record():
             mock_table.return_value = MagicMock()
             migrator.migrate()
 
-    assert remapped == []
+    # Record is included but contact_id is nulled
+    assert len(remapped) == 1
+    assert remapped[0].get("contact_id") is None
 
 
 # ---------------------------------------------------------------------------

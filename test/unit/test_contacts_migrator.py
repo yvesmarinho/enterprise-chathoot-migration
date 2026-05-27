@@ -240,11 +240,15 @@ def _make_migrator_with_dedup(
     lookup_result = MagicMock()
     phone_mapping_rows = [make_mapping_row(r) for r in phone_rows]
     email_mapping_rows = [make_mapping_row(r) for r in email_rows]
-    # First execute call (for one merged account) returns both phone and email columns
-    # We simulate the combined query: id, phone_number, email
-    all_rows = [make_mapping_row({**r, "email": None}) for r in phone_rows]
+    # First execute call (for one merged account) returns phone, email, and identifier columns
+    # We simulate the combined query: id, phone_number, email, identifier
+    all_rows = [
+        make_mapping_row({**r, "email": None, "identifier": None}) for r in phone_rows
+    ]
     all_rows += [
-        make_mapping_row({"id": r["id"], "phone_number": None, "email": r["email"]})
+        make_mapping_row(
+            {"id": r["id"], "phone_number": None, "email": r["email"], "identifier": None}
+        )
         for r in email_rows
     ]
     lookup_result.mappings.return_value = iter(all_rows)
@@ -308,13 +312,12 @@ def test_contacts_dedup_phone_match_registers_alias_and_skips_insert():
     # Alias registered: src_id=500 → dest_id=1234
     assert remapper.remap(500, "contacts") == 1234
 
-    # record_success called for the dedup'd contact
-    calls = state_repo.record_success.call_args_list
-    dedup_call = next(
-        (c for c in calls if c.args[1] == "contacts" and c.args[2] == 500 and c.args[3] == 1234),
-        None,
-    )
-    assert dedup_call is not None, "record_success not called for dedup'd contact src_id=500"
+    # record_success_bulk called for the dedup'd contact
+    calls = state_repo.record_success_bulk.call_args_list
+    assert any(
+        c.args[1] == "contacts" and (500, 1234) in c.args[2]
+        for c in calls
+    ), "record_success_bulk not called for dedup'd contact src_id=500"
 
 
 def test_contacts_dedup_email_match_registers_alias():

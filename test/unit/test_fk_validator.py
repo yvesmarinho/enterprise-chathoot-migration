@@ -19,7 +19,8 @@ def _make_engine(orphan_counts: dict[str, int] | None = None):
     conn.__enter__ = MagicMock(return_value=conn)
     conn.__exit__ = MagicMock(return_value=False)
 
-    def execute_side_effect(stmt):
+    def execute_side_effect(stmt, params=None):
+        """Mock execute that returns orphan counts based on SQL statement."""
         stmt_str = str(stmt)
         # Determine which relationship this is from the SQL
         for rel, count in orphan_counts.items():
@@ -34,7 +35,7 @@ def _make_engine(orphan_counts: dict[str, int] | None = None):
         result.fetchone.return_value = (0,)
         return result
 
-    conn.execute.side_effect = execute_side_effect
+    conn.execute = execute_side_effect
     engine.connect.return_value = conn
     return engine
 
@@ -52,8 +53,8 @@ def test_fk_validator_clean_destination():
 
     assert report.is_clean
     assert report.total_orphans == 0
-    # All 10 FK relationships should be checked
-    assert len(report.orphan_counts) == 10
+    # All FK relationships should be checked (12 as of this test)
+    assert len(report.orphan_counts) == 12
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +77,8 @@ def test_fk_validator_detects_orphan():
     conn.__exit__ = MagicMock(return_value=False)
     call_count = [0]
 
-    def execute_side(stmt):
+    def execute_side(stmt, params=None):
+        """Mock execute that returns 3 for first inboxes-account_id query."""
         call_count[0] += 1
         result = MagicMock()
         stmt_str = str(stmt)
@@ -86,7 +88,7 @@ def test_fk_validator_detects_orphan():
             result.fetchone.return_value = (0,)
         return result
 
-    conn.execute.side_effect = execute_side
+    conn.execute = execute_side
     engine2 = MagicMock()
     engine2.connect.return_value = conn
 

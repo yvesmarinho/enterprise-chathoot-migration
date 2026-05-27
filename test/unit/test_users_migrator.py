@@ -36,8 +36,10 @@ def _make_migrator(user_rows=None, au_rows=None, existing_emails=None, migrated_
     dest_conn.__exit__ = MagicMock(return_value=False)
     dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
     dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
-    # existing emails query returns list of tuples
-    dest_conn.execute.return_value.fetchall.return_value = [(email,) for email in existing_emails]
+    # existing emails query returns list of tuples (email, id)
+    dest_conn.execute.return_value.fetchall.return_value = [
+        (email, idx + 1000) for idx, email in enumerate(existing_emails)
+    ]
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
@@ -64,7 +66,7 @@ def _make_migrator(user_rows=None, au_rows=None, existing_emails=None, migrated_
 
 
 def test_users_email_collision_appends_migrated():
-    """Colliding email gets +migrated suffix appended to local-part."""
+    """Colliding email is merged: alias registered, INSERT skipped."""
     user_rows = [
         {
             "id": 10,
@@ -82,19 +84,21 @@ def test_users_email_collision_appends_migrated():
             r = remap_fn(row)
             if r is not None:
                 remapped_rows.append(r)
-        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
 
     migrator = _make_migrator(
         user_rows=user_rows,
-        existing_emails={"admin@corp.com"},  # already exists in dest
+        existing_emails={"admin@corp.com"},  # already exists in dest (dest_id=1000)
     )
     with patch.object(migrator, "_run_batches", side_effect=capture_batches):
         with patch("src.migrators.users_migrator.Table") as mock_table:
             mock_table.return_value = MagicMock()
             migrator.migrate()
 
-    assert len(remapped_rows) == 1
-    assert remapped_rows[0]["email"] == "admin+migrated@corp.com"
+    # Merged users are NOT inserted (remap_fn returns None)
+    assert len(remapped_rows) == 0
+    # But alias is registered: source 10 → dest 1000
+    assert migrator.id_remapper.has_alias("users", 10)
 
 
 # ---------------------------------------------------------------------------

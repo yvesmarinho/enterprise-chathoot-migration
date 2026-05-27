@@ -37,6 +37,11 @@ class _InMemoryStateRepo:
         # UNIQUE(tabela, id_origem) — second insert is a no-op
         self._ok[tabela].add(id_origem)
 
+    def record_success_bulk(self, conn, tabela: str, pairs: list[tuple[int, int]]):
+        """Record multiple successful migrations as (id_origem, id_destino) pairs."""
+        for id_origem, _ in pairs:
+            self._ok[tabela].add(id_origem)
+
     def record_failure(self, conn, tabela: str, id_origem: int, reason: str):
         if id_origem not in self._ok[tabela]:
             self._failed[tabela].add(id_origem)
@@ -105,6 +110,14 @@ class _ContactsMigratorDouble(BaseMigrator):
             dest_table,
             remap_fn=lambda r: r,
         )
+
+    def _table_name(self) -> str:
+        """Required abstract method implementation."""
+        return "contacts"
+
+    def _fetch_all_source_rows(self) -> list[dict]:
+        """Required abstract method implementation."""
+        return self._source_rows
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,14 @@ class _ConcreteMigrator(BaseMigrator):
         """Not used in these tests."""
         raise NotImplementedError
 
+    def _table_name(self) -> str:
+        """Required abstract method implementation."""
+        return "test_table"
+
+    def _fetch_all_source_rows(self) -> list[dict]:
+        """Required abstract method implementation."""
+        return []
+
 
 def _make_base_migrator(already_migrated=None):
     """Build a _ConcreteMigrator with mocked engines and repos."""

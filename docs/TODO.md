@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-26 — Sessão 26: ✅ D23/D24 concluídos + bootstrap on-demand estabilizado + ritual de encerramento executado
-**Status**: 🟡 Pipeline avançou após restauração do DEST; pendente revalidação completa end-to-end e quality gates faltantes no ambiente local.
+**Last Updated**: 2026-05-27 — Sessão 27: ritual de início concluído + foco em revisão/testes da migração DEV
+**Status**: 🟡 Pipeline estabilizado após D24; prioridade atual é quality gates locais + revalidação da migração DEV (Unimed Guaxupé).
 
 ---
 
@@ -30,6 +30,12 @@
 - [ ] **S26-P0-1** Instalar dependências de qualidade ausentes no ambiente (`pytest`, `flake8`, `mypy`) e registrar baseline local.
 - [ ] **S26-P0-2** Reexecutar gates de qualidade da sessão (`pytest`, `black --check`, `flake8`, `mypy`) após ajuste do ambiente.
 - [ ] **S26-P0-3** Validar ciclo completo da migração para Unimed Guaxupé com estratégia segura (cleanup controlado ou `--force-overwrite` aprovado).
+
+## 🔴 P0 — Foco Sessão 27 (2026-05-27)
+
+- [x] **S27-P0-1** Revisar estado técnico da migração DEV do Chatwoot (cobertura de tabelas, riscos e bloqueios abertos).
+- [x] **S27-P0-2** Executar quality gates locais (`pytest`, `black --check`, `flake8`, `mypy`) e registrar baseline da sessão.
+- [x] **S27-P0-3** Revalidar migração DEV de Unimed Guaxupé com evidências (integridade, UI e regressões críticas).
 
 ## ✅ CONCLUÍDO NESTA SESSÃO (S26 — 2026-05-26)
 
