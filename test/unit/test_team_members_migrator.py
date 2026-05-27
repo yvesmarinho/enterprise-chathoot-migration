@@ -262,3 +262,148 @@ def test_team_members_mixed_teams_users_partial_skip():
     assert len(skipped_rows) == 2
     assert 7 in skipped_rows  # orphan user_id
     assert 8 in skipped_rows  # orphan team_id
+
+
+# ---------------------------------------------------------------------------
+# T031-6 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_team_members_empty_source_no_migration():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    migrator, _ = _make_migrator(source_rows=[])
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.team_members_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T031-7 — ID remapping with offset
+# ---------------------------------------------------------------------------
+
+
+def test_team_members_id_remapping_offset():
+    """ID is remapped with offset_team_members."""
+    rows = [
+        {
+            "id": 50,
+            "team_id": 2,
+            "user_id": 3,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=rows,
+        migrated={"teams": {2}, "users": {3}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.team_members_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["id"] == 50 + 25  # offset_team_members = 25
+    assert remapped_rows[0]["team_id"] == 2 + 80  # offset_teams = 80
+    assert remapped_rows[0]["user_id"] == 3 + 150  # offset_users = 150
+
+
+# ---------------------------------------------------------------------------
+# T031-8 — Multiple members same team
+# ---------------------------------------------------------------------------
+
+
+def test_team_members_multiple_same_team():
+    """Multiple members in same team all migrated."""
+    rows = [
+        {
+            "id": 9,
+            "team_id": 3,
+            "user_id": 4,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 10,
+            "team_id": 3,
+            "user_id": 5,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=rows,
+        migrated={"teams": {3}, "users": {4, 5}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.team_members_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+
+
+# ---------------------------------------------------------------------------
+# T031-9 — Both FKs unmigrated (double orphan)
+# ---------------------------------------------------------------------------
+
+
+def test_team_members_both_fks_unmigrated_skipped():
+    """Team member with both unmigrated FKs is skipped."""
+    rows = [
+        {
+            "id": 11,
+            "team_id": 999,
+            "user_id": 999,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=rows,
+        migrated={"teams": {1}, "users": {1}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.team_members_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
