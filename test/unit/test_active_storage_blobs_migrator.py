@@ -61,3 +61,17 @@ def test_active_storage_blobs_fetch_all_source_rows():
     assert len(result) == 2
     assert result[0]["key"] == "blob1"
     assert result[1]["checksum"] == "def456"
+
+
+def test_active_storage_blobs_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row (no FKs)."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "key": "blob1", "filename": "file.pdf", "checksum": "abc123"}
+    migrated_sets = {}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert "FK dependencies" in reason
