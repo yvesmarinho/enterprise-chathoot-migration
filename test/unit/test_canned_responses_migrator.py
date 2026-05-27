@@ -524,3 +524,30 @@ def test_canned_responses_content_preserved():
 
     assert len(remapped) == 1
     assert remapped[0]["content"] == content
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows
+# ---------------------------------------------------------------------------
+
+
+def test_canned_responses_table_name():
+    """_table_name() returns 'canned_responses'."""
+    migrator, _ = _make_migrator()
+    assert migrator._table_name() == "canned_responses"
+
+
+def test_canned_responses_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "account_id": 1, "short_code": "reply1", "content": "Hello", "created_at": None, "updated_at": None},
+        {"id": 2, "account_id": 1, "short_code": "reply2", "content": "Goodbye", "created_at": None, "updated_at": None},
+    ]
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    with patch("src.migrators.canned_responses_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["short_code"] == "reply1"
+    assert result[1]["content"] == "Goodbye"

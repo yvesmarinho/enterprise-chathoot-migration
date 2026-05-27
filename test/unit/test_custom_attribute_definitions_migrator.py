@@ -562,3 +562,30 @@ def test_custom_attribute_definitions_attribute_model_preserved():
 
     assert len(remapped) == 1
     assert remapped[0]["attribute_model"] == "conversation"
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows
+# ---------------------------------------------------------------------------
+
+
+def test_custom_attribute_definitions_table_name():
+    """_table_name() returns 'custom_attribute_definitions'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "custom_attribute_definitions"
+
+
+def test_custom_attribute_definitions_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "account_id": 1, "attribute_key": "key1", "attribute_display_name": "Field 1", "attribute_model": "contact", "attribute_type": "text", "attribute_values": None, "created_at": None, "updated_at": None},
+        {"id": 2, "account_id": 1, "attribute_key": "key2", "attribute_display_name": "Field 2", "attribute_model": "conversation", "attribute_type": "dropdown", "attribute_values": None, "created_at": None, "updated_at": None},
+    ]
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+
+    with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["attribute_key"] == "key1"
+    assert result[1]["attribute_model"] == "conversation"

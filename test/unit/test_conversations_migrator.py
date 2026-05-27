@@ -1131,3 +1131,19 @@ def test_conversations_table_name():
     """_table_name() returns 'conversations'."""
     migrator = _make_migrator()
     assert migrator._table_name() == "conversations"
+
+
+def test_conversations_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "source_id": "src1", "status": "open", "account_id": 1},
+        {"id": 2, "source_id": "src2", "status": "closed", "account_id": 1},
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.conversations_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["source_id"] == "src1"
+    assert result[1]["status"] == "closed"
