@@ -990,3 +990,17 @@ def test_webhooks_classify_row_poc_clean():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert reason == "clean"
+
+
+def test_webhooks_classify_row_poc_orphan():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for orphan account."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"account_id": 999}
+    migrated_sets = {"accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "account" in reason.lower()
