@@ -8,6 +8,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.exc import ProgrammingError
 
 from src.utils.id_remapper import IDRemapper
 
@@ -197,3 +198,67 @@ def test_alias_works_without_offset_entry() -> None:
     remapper = IDRemapper({})
     remapper.register_alias("contacts", 7, 99)
     assert remapper.remap(7, "contacts") == 99
+
+
+# ---------------------------------------------------------------------------
+# T013-13 — has_alias returns True when alias is registered
+# ---------------------------------------------------------------------------
+
+
+def test_has_alias_returns_true_when_registered() -> None:
+    """has_alias returns True for (table, src_id) pairs with registered aliases."""
+    remapper = IDRemapper({"accounts": 50})
+    remapper.register_alias("accounts", 1, 1)
+    remapper.register_alias("accounts", 5, 20)
+
+    assert remapper.has_alias("accounts", 1) is True
+    assert remapper.has_alias("accounts", 5) is True
+
+
+# ---------------------------------------------------------------------------
+# T013-14 — has_alias returns False when alias is not registered
+# ---------------------------------------------------------------------------
+
+
+def test_has_alias_returns_false_when_not_registered() -> None:
+    """has_alias returns False for IDs without registered aliases."""
+    remapper = IDRemapper({"accounts": 50})
+    remapper.register_alias("accounts", 1, 1)
+
+    assert remapper.has_alias("accounts", 2) is False
+    assert remapper.has_alias("accounts", 999) is False
+
+
+# ---------------------------------------------------------------------------
+# T013-15 — has_alias returns False for unknown table
+# ---------------------------------------------------------------------------
+
+
+def test_has_alias_returns_false_for_unknown_table() -> None:
+    """has_alias returns False when the table has no aliases at all."""
+    remapper = IDRemapper({"accounts": 50})
+    remapper.register_alias("accounts", 1, 1)
+
+    # contacts table was never registered with any alias
+    assert remapper.has_alias("contacts", 1) is False
+
+
+# ---------------------------------------------------------------------------
+# T013-16 — compute_offsets raises ProgrammingError for non-"does not exist" errors
+# ---------------------------------------------------------------------------
+
+
+def test_compute_offsets_raises_on_non_existence_error() -> None:
+    """compute_offsets re-raises ProgrammingError if it's not a "does not exist" error."""
+    engine = MagicMock()
+    conn = MagicMock()
+    engine.connect.return_value.__enter__ = MagicMock(return_value=conn)
+    engine.connect.return_value.__exit__ = MagicMock(return_value=False)
+    # Simulate a different error (e.g., permission denied)
+    conn.execute.side_effect = ProgrammingError(
+        "permission denied for table contacts", "SELECT", None
+    )
+
+    remapper = IDRemapper()
+    with pytest.raises(ProgrammingError):
+        remapper.compute_offsets(engine, ["contacts"])
