@@ -376,3 +376,90 @@ def test_attachments_multiple_same_message():
     assert remapped[0]["file_name"] == "doc1.pdf"
     assert remapped[1]["file_name"] == "doc2.pdf"
     assert remapped[2]["file_name"] == "doc3.pdf"
+
+
+# ---------------------------------------------------------------------------
+# T033-12 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_attachments_empty_source_no_op():
+    """Empty source returns MigrationResult with 0 migrated/skipped."""
+    rows = []
+    migrator = _make_migrator(source_rows=rows, migrated={"messages": {1}, "accounts": {1}})
+
+    with patch("src.migrators.attachments_migrator.Table"):
+        result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T033-13 — Multiple attachments different messages
+# ---------------------------------------------------------------------------
+
+
+def test_attachments_multiple_different_messages():
+    """Multiple attachments for different messages all migrated successfully."""
+    rows = [
+        _base_row(id=15, message_id=1, account_id=1),
+        _base_row(id=16, message_id=2, account_id=1),
+        _base_row(id=17, message_id=3, account_id=1),
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated={"messages": {1, 2, 3}, "accounts": {1}})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.attachments_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 3
+    # Each message_id should be remapped
+    assert remapped[0]["message_id"] == 1 + 1302949
+    assert remapped[1]["message_id"] == 2 + 1302949
+    assert remapped[2]["message_id"] == 3 + 1302949
+
+
+# ---------------------------------------------------------------------------
+# T033-14 — Mixed valid and orphan messages
+# ---------------------------------------------------------------------------
+
+
+def test_attachments_mixed_valid_orphan_messages():
+    """Multiple attachments: some with valid messages, some orphan (skipped)."""
+    rows = [
+        _base_row(id=18, message_id=1, account_id=1),
+        _base_row(id=19, message_id=999, account_id=1),  # orphan message
+        _base_row(id=20, message_id=2, account_id=1),
+    ]
+    remapped = []
+    skipped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+            else:
+                skipped.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated={"messages": {1, 2}, "accounts": {1}})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.attachments_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 2
+    assert len(skipped) == 1
+    assert 19 in skipped
