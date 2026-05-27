@@ -587,3 +587,44 @@ def test_contact_inboxes_multiple_same_contact():
     assert len(remapped_rows) == 2
     assert remapped_rows[0]["role"] == "agent"
     assert remapped_rows[1]["role"] == "customer"
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_table_name():
+    """_table_name() returns 'contact_inboxes'."""
+    migrator, _ = _make_migrator()
+    assert migrator._table_name() == "contact_inboxes"
+
+
+def test_contact_inboxes_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "contact_id": 10, "inbox_id": 100},
+        {"id": 2, "contact_id": 11, "inbox_id": 101},
+    ]
+    migrator, _ = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.contact_inboxes_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["contact_id"] == 10
+    assert result[1]["inbox_id"] == 101
+
+
+def test_contact_inboxes_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE_MODIFIED for clean row (no dedup collision)."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"id": 1, "contact_id": 1, "inbox_id": 1}
+    migrated_sets = {"contacts": {1}, "inboxes": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE_MODIFIED
+    assert "pubsub_token" in reason and "regenerated" in reason
