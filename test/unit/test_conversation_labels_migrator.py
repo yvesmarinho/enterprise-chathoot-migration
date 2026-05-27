@@ -276,3 +276,144 @@ def test_conversation_labels_non_user_tagger_unchanged():
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["tagger_type"] == "AgentBot"
     assert remapped_rows[0]["tagger_id"] == 999  # unchanged
+
+
+# ---------------------------------------------------------------------------
+# T022-6 — _migrate_tags with new tag (insert)
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_migrate_tags_inserts_new_tag():
+    """_migrate_tags inserts new tags and returns correct mapping."""
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    # Fetch SOURCE tags referenced by conversation label taggings
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = [
+        {"id": 10, "name": "urgent"}
+    ]
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+
+    # Fetch DEST existing tags (empty initially)
+    def execute_side_effect(stmt, *args, **kwargs):
+        result = MagicMock()
+        result.scalar.return_value = 100  # nextval('tags_id_seq')
+        result.mappings.return_value.all.return_value = []
+        return result
+
+    dest_conn.execute.side_effect = execute_side_effect
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    remapper = IDRemapper({})
+    logger = logging.getLogger("test_tags")
+
+    migrator = ConversationLabelsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    with patch("src.migrators.conversation_labels_migrator.ensure_public_table_exists"):
+        with patch("src.migrators.conversation_labels_migrator.Table"):
+            tag_id_map = migrator._migrate_tags()
+
+    assert tag_id_map == {10: 100}
+
+
+# ---------------------------------------------------------------------------
+# T022-7 — _migrate_tags with existing tag (reuse)
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_migrate_tags_reuses_existing_tag():
+    """_migrate_tags reuses existing DEST tags by name (case-insensitive)."""
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    # Fetch SOURCE tags
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = [
+        {"id": 10, "name": "urgent"}
+    ]
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+
+    # Fetch DEST existing tags (urgent already exists as id=50)
+    def execute_side_effect(stmt, *args, **kwargs):
+        result = MagicMock()
+        result.mappings.return_value.all.return_value = [
+            {"id": 50, "name": "urgent"}
+        ]
+        return result
+
+    dest_conn.execute.side_effect = execute_side_effect
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    remapper = IDRemapper({})
+    logger = logging.getLogger("test_tags")
+
+    migrator = ConversationLabelsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    with patch("src.migrators.conversation_labels_migrator.ensure_public_table_exists"):
+        with patch("src.migrators.conversation_labels_migrator.Table"):
+            tag_id_map = migrator._migrate_tags()
+
+    assert tag_id_map == {10: 50}
+
+
+# ---------------------------------------------------------------------------
+# T022-8 — _migrate_tags empty (no tags)
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_migrate_tags_empty():
+    """_migrate_tags returns empty dict when no tags referenced."""
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    # No SOURCE tags referenced by conversation labels
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = []
+    source_engine.connect.return_value = src_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    remapper = IDRemapper({})
+    logger = logging.getLogger("test_tags")
+
+    migrator = ConversationLabelsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    tag_id_map = migrator._migrate_tags()
+
+    assert tag_id_map == {}
