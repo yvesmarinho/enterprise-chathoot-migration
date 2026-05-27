@@ -772,3 +772,17 @@ def test_contacts_classify_row_poc_clean():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert reason == "clean"
+
+
+def test_contacts_classify_row_poc_orphan():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for contact with unmigrated account."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "account_id": 999, "name": "Test Contact", "email": "test@example.com"}
+    migrated_sets = {"accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "account" in reason.lower()
