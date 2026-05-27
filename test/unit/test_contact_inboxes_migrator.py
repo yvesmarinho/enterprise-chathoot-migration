@@ -293,3 +293,141 @@ def test_contact_inboxes_batch_mixed_dedup_and_insert():
 
     # All 3 rows inserted (dedup doesn't skip in remap_fn)
     assert len(remapped_rows) == 3
+
+
+# ---------------------------------------------------------------------------
+# T032-6 — pubsub_token is NULLed on insert
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_pubsub_token_nulled():
+    """pubsub_token is set to NULL regardless of source value."""
+    ci_rows = [
+        {
+            "id": 17,
+            "contact_id": 1,
+            "inbox_id": 1,
+            "pubsub_token": "source-token-uuid-1234",
+            "source_id": "source-id-5678",
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=ci_rows,
+        migrated={"contacts": {1}, "inboxes": {1}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["pubsub_token"] is None
+
+
+# ---------------------------------------------------------------------------
+# T032-7 — source_id is regenerated (not copied)
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_source_id_regenerated():
+    """source_id is regenerated as UUID4, not copied from source."""
+    import uuid
+    
+    original_source_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    ci_rows = [
+        {
+            "id": 18,
+            "contact_id": 1,
+            "inbox_id": 1,
+            "pubsub_token": None,
+            "source_id": original_source_id,
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=ci_rows,
+        migrated={"contacts": {1}, "inboxes": {1}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["source_id"] != original_source_id
+    # Verify it looks like a UUID
+    try:
+        uuid.UUID(remapped_rows[0]["source_id"])
+        is_valid_uuid = True
+    except ValueError:
+        is_valid_uuid = False
+    assert is_valid_uuid
+
+
+# ---------------------------------------------------------------------------
+# T032-8 — ID remapping works correctly
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_id_remapped():
+    """ID, contact_id, and inbox_id are remapped with correct offsets."""
+    ci_rows = [
+        {
+            "id": 19,
+            "contact_id": 5,
+            "inbox_id": 3,
+            "pubsub_token": None,
+            "source_id": "original-uuid",
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, remapper = _make_migrator(
+        source_rows=ci_rows,
+        migrated={"contacts": {5}, "inboxes": {3}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["id"] == 19 + 50  # offset_contact_inboxes = 50
+    assert remapped_rows[0]["contact_id"] == 5 + 100  # offset_contacts = 100
+    assert remapped_rows[0]["inbox_id"] == 3 + 200  # offset_inboxes = 200
