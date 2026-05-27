@@ -463,3 +463,44 @@ def test_attachments_mixed_valid_orphan_messages():
     assert len(remapped) == 2
     assert len(skipped) == 1
     assert 19 in skipped
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_attachments_table_name():
+    """_table_name() returns 'attachments'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "attachments"
+
+
+def test_attachments_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        _base_row(id=1, message_id=10, account_id=1),
+        _base_row(id=2, message_id=11, account_id=1),
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.attachments_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["message_id"] == 10
+    assert result[1]["account_id"] == 1
+
+
+def test_attachments_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean attachment row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, message_id=1, account_id=1)
+    migrated_sets = {"messages": {1}, "accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
