@@ -402,3 +402,44 @@ def test_accounts_multiple_no_merge():
     assert remapped_rows[0]["id"] == 1 + 43
     assert remapped_rows[1]["id"] == 2 + 43
     assert remapped_rows[2]["id"] == 3 + 43
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_accounts_table_name():
+    """_table_name() returns 'accounts'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "accounts"
+
+
+def test_accounts_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "name": "Account A", "created_at": None, "updated_at": None},
+        {"id": 2, "name": "Account B", "created_at": None, "updated_at": None},
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.accounts_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["name"] == "Account A"
+    assert result[1]["name"] == "Account B"
+
+
+def test_accounts_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "name": "Account", "created_at": None, "updated_at": None}
+    migrated_sets = {}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "no FK dependency"
