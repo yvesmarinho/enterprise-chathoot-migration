@@ -212,3 +212,124 @@ def test_conversations_all_fk_columns_remapped():
     assert r["contact_id"] == 1 + 225536
     assert r["assignee_id"] == 1 + 294
     assert r["team_id"] == 1 + 22
+
+
+# ---------------------------------------------------------------------------
+# T031-5 — Required FK: account_id orphan → record skipped
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_required_fk_orphan_account_id_skipped():
+    """Records with unmigrated account_id are skipped (required FK)."""
+    rows = [_base_row(account_id=9999)]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1, 2}, "inboxes": {1}},  # 9999 not in accounts
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 0
+
+
+# ---------------------------------------------------------------------------
+# T031-6 — Required FK: inbox_id orphan → record skipped
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_required_fk_orphan_inbox_id_skipped():
+    """Records with unmigrated inbox_id are skipped (required FK)."""
+    rows = [_base_row(inbox_id=8888)]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1}, "inboxes": {1, 2}},  # 8888 not in inboxes
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 0
+
+
+# ---------------------------------------------------------------------------
+# T031-7 — UUID regeneration (not copied from source)
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_uuid_regenerated():
+    """UUID is regenerated (not copied from source) to avoid uniqueness violation."""
+    import uuid as uuid_lib
+    
+    original_uuid = str(uuid_lib.uuid4())
+    rows = [_base_row(id=10, uuid=original_uuid)]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["uuid"] != original_uuid
+    # Verify it's a valid UUID
+    try:
+        uuid_lib.UUID(remapped[0]["uuid"])
+    except ValueError:
+        raise AssertionError(f"Generated UUID is invalid: {remapped[0]['uuid']}")
+
+
+# ---------------------------------------------------------------------------
+# T031-8 — team_id NULLed-out when team not migrated
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_team_id_nulled_when_unmigrated():
+    """team_id is set to NULL when the team was not migrated."""
+    rows = [_base_row(team_id=666)]  # team 666 not migrated
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"teams": {1, 2, 3}},  # 666 not in migrated teams
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["team_id"] is None

@@ -32,12 +32,11 @@ def _make_migrator(source_rows=None, migrated=None):
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        migrated.get("accounts", {1}),
-        migrated.get("conversations", {1}),
-        migrated.get("users", {1}),
-        set(),  # already_migrated messages
-    ]
+    
+    def get_migrated_ids_side_effect(conn, table_name):
+        return migrated.get(table_name, {1} if table_name != "contacts" else {1})
+    
+    state_repo.get_migrated_ids.side_effect = get_migrated_ids_side_effect
 
     remapper = IDRemapper(
         {
@@ -45,6 +44,7 @@ def _make_migrator(source_rows=None, migrated=None):
             "accounts": 20,
             "conversations": 153582,
             "users": 294,
+            "contacts": 225536,
         }
     )
     logger = logging.getLogger("test_messages")
@@ -153,3 +153,146 @@ def test_messages_fk_remapping():
     assert r["account_id"] == 1 + 20
     assert r["conversation_id"] == 1 + 153582
     assert r["sender_id"] == 1 + 294
+
+
+# ---------------------------------------------------------------------------
+# T032-4 — sender_type='Contact' with migrated contact
+# ---------------------------------------------------------------------------
+
+
+def test_messages_sender_type_contact_remapped():
+    """Message with sender_type='Contact' and valid contact remaps via contacts offset."""
+    rows = [_base_row(id=11, sender_id=1, sender_type="Contact")]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1}, "conversations": {1}, "contacts": {1}},
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    # sender_id should be remapped via contacts offset (not users)
+    assert remapped[0]["sender_id"] != 1 + 294  # not users offset
+
+
+# ---------------------------------------------------------------------------
+# T032-5 — sender_type='User' with unmigrated user → NULL-out
+# ---------------------------------------------------------------------------
+
+
+def test_messages_sender_type_user_unmigrated_nulled():
+    """Message with sender_type='User' but unmigrated user sets sender_id=NULL."""
+    rows = [_base_row(id=12, sender_id=999, sender_type="User")]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1}, "conversations": {1}, "users": {1, 2, 3}},
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["sender_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T032-6 — sender_type='AgentBot' (unknown) → NULL-out
+# ---------------------------------------------------------------------------
+
+
+def test_messages_sender_type_agentbot_nulled():
+    """Message with sender_type='AgentBot' (unknown type) sets sender_id=NULL."""
+    rows = [_base_row(id=13, sender_id=999, sender_type="AgentBot")]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1}, "conversations": {1}, "users": {1}},
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["sender_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T032-7 — NULL sender_id (no remapping needed)
+# ---------------------------------------------------------------------------
+
+
+def test_messages_null_sender_id_unchanged():
+    """Message with NULL sender_id passes through unchanged (no FK check)."""
+    rows = [_base_row(id=14, sender_id=None, sender_type="User")]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["sender_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T032-8 — Orphan account_id (required FK) → skipped
+# ---------------------------------------------------------------------------
+
+
+def test_messages_orphan_account_id_skipped():
+    """Message with unmigrated account_id is skipped (required FK)."""
+    rows = [_base_row(id=15, account_id=999)]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1, 2}, "conversations": {1}},
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 0
