@@ -243,3 +243,124 @@ def test_inboxes_mixed_accounts_partial_skip():
     assert len(remapped_rows) == 2
     assert len(skipped_rows) == 1
     assert 10 in skipped_rows
+
+
+# ---------------------------------------------------------------------------
+# T026-6 — channel_id remapped and preserved when in channel_id_map
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_id_remapped():
+    """channel_id is remapped when present in channel_id_map."""
+    rows = [
+        {
+            "id": 11,
+            "account_id": 1,
+            "name": "inbox_with_channel",
+            "channel_type": "Channel::WebWidget",
+            "channel_id": 5,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    
+    # Mock _migrate_channels to return a channel_id_map
+    channel_id_map = {("Channel::WebWidget", 5): 100}
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_id_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_id"] == 100
+
+
+# ---------------------------------------------------------------------------
+# T026-7 — channel_id preserved as SOURCE when not in channel_id_map
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_id_kept_when_unmapped():
+    """channel_id is kept as SOURCE value when not found in channel_id_map."""
+    rows = [
+        {
+            "id": 12,
+            "account_id": 1,
+            "name": "inbox_unmapped_channel",
+            "channel_type": "Channel::Api",
+            "channel_id": 999,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    
+    # Empty channel_id_map — channel_id 999 not present
+    channel_id_map = {("Channel::Api", 1): 50}  # different id
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_id_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    # channel_id kept as SOURCE value (999)
+    assert remapped_rows[0]["channel_id"] == 999
+
+
+# ---------------------------------------------------------------------------
+# T026-8 — channel_id None or missing (no channel)
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_id_none_unchanged():
+    """Inbox with no channel (channel_id=None) is migrated as-is."""
+    rows = [
+        {
+            "id": 13,
+            "account_id": 1,
+            "name": "no_channel_inbox",
+            "channel_type": None,
+            "channel_id": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    
+    with patch.object(migrator, "_migrate_channels", return_value={}):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_id"] is None
