@@ -224,3 +224,134 @@ def test_labels_mixed_account_ids_partial_skip():
 
     assert len(remapped) == 2
     assert len(skipped) == 3
+
+
+# ---------------------------------------------------------------------------
+# T029-6 — Empty source: no-op
+# ---------------------------------------------------------------------------
+
+
+def test_labels_empty_source_no_op():
+    """When source has no rows, migration completes with 0 migrated."""
+    migrator = _make_migrator(source_rows=[], migrated_accounts={1})
+
+    result = None
+    with patch("src.migrators.labels_migrator.Table"):
+        result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T029-7 — title field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_labels_title_field_preserved():
+    """title field is copied as-is during migration."""
+    test_title = "urgent-issues"
+    rows = [
+        {
+            "id": 20,
+            "account_id": 1,
+            "title": test_title,
+            "color": "#FF0000",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.labels_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped) == 1
+    assert remapped[0]["title"] == test_title
+
+
+# ---------------------------------------------------------------------------
+# T029-8 — Bootstrap missing table
+# ---------------------------------------------------------------------------
+
+
+def test_labels_bootstrap_missing_dest_table():
+    """When DEST table missing, bootstrap is triggered."""
+    rows = [
+        {
+            "id": 21,
+            "account_id": 1,
+            "title": "test_label",
+            "color": "#000000",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.return_value = {1}
+
+    remapper = IDRemapper({"labels": 50, "accounts": 20})
+    logger = logging.getLogger("test_labels_bootstrap")
+
+    migrator = LabelsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        # Mock Table to raise NoSuchTableError on first call (dest), success on second
+        call_count = [0]
+        def table_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:  # src table
+                return MagicMock()
+            elif call_count[0] == 2:  # dest table — raise error
+                from sqlalchemy.exc import NoSuchTableError
+                raise NoSuchTableError("labels", "labels")
+            else:  # after bootstrap
+                return MagicMock()
+
+        with patch("src.migrators.labels_migrator.Table", side_effect=table_side_effect):
+            with patch("src.migrators.labels_migrator.ensure_public_table_exists") as mock_bootstrap:
+                migrator.migrate()
+                # Bootstrap should have been called
+                mock_bootstrap.assert_called_once()
