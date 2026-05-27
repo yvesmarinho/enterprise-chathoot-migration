@@ -364,3 +364,275 @@ def test_inboxes_channel_id_none_unchanged():
 
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["channel_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T026-9 — channel_type preserved through migration
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_type_field_preserved():
+    """channel_type field is preserved without modification during migration."""
+    rows = [
+        {
+            "id": 100,
+            "account_id": 1,
+            "name": "sales",
+            "channel_type": "Channel::Email",
+            "channel_id": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_migrate_channels", return_value={}):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_type"] == "Channel::Email"
+
+
+# ---------------------------------------------------------------------------
+# T026-10 — _migrate_channels: multiple channel types processed
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_migrate_channels_basic():
+    """_migrate_channels collects and migrates channel records for inbox migration."""
+    rows = [
+        {
+            "id": 101,
+            "account_id": 1,
+            "name": "web",
+            "channel_type": "Channel::WebWidget",
+            "channel_id": 50,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 102,
+            "account_id": 1,
+            "name": "telegram",
+            "channel_type": "Channel::Telegram",
+            "channel_id": 51,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    
+    # No merged accounts, so initial fetch returns empty
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1},  # accounts
+        set(),  # already_migrated
+    ]
+
+    remapper = IDRemapper({"inboxes": 151, "accounts": 20, "channel_web_widgets": 1000, "channel_telegram": 500})
+    logger = logging.getLogger("test_inboxes_migrate_channels")
+
+    migrator = InboxesMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    # Mock _migrate_channels to return a channel_id_map
+    channel_map = {
+        ("Channel::WebWidget", 50): 1050,
+        ("Channel::Telegram", 51): 551,
+    }
+
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    # Both rows should be remapped, channel_id updated
+    assert len(remapped_rows) == 2
+    assert remapped_rows[0]["channel_id"] == 1050
+    assert remapped_rows[1]["channel_id"] == 551
+
+
+# ---------------------------------------------------------------------------
+# T026-11 — Unknown channel_type: logged, channel_id kept as-is
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_unknown_channel_type_not_migrated():
+    """Unknown channel_type is logged with warning, channel_id not remapped."""
+    rows = [
+        {
+            "id": 103,
+            "account_id": 1,
+            "name": "unknown_channel",
+            "channel_type": "Channel::Unsupported",  # Unknown type
+            "channel_id": 52,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1},  # accounts
+        set(),  # already_migrated
+    ]
+
+    remapper = IDRemapper({"inboxes": 151, "accounts": 20})
+    logger = logging.getLogger("test_inboxes_unknown_channel")
+
+    migrator = InboxesMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    # _migrate_channels returns empty map for unknown channel type
+    with patch.object(migrator, "_migrate_channels", return_value={}):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    # Channel_id kept as-is (SOURCE value) since not in channel_id_map
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_id"] == 52  # Unchanged
+
+
+# ---------------------------------------------------------------------------
+# T026-12 — channel_id in map: remapped to DEST value
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_id_remapped_from_map():
+    """When channel_id is in the channel_id_map, it is remapped to DEST value."""
+    rows = [
+        {
+            "id": 104,
+            "account_id": 1,
+            "name": "api_channel",
+            "channel_type": "Channel::Api",
+            "channel_id": 60,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1},  # accounts
+        set(),  # already_migrated
+    ]
+
+    remapper = IDRemapper({"inboxes": 151, "accounts": 20})
+    logger = logging.getLogger("test_inboxes_channel_map")
+
+    migrator = InboxesMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    # _migrate_channels returns map with (channel_type, src_id) → dest_id
+    channel_map = {("Channel::Api", 60): 1060}
+
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    # Channel_id should be remapped to DEST value
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_id"] == 1060
