@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-27 — Sessão 27: ritual de início concluído + foco em revisão/testes da migração DEV
-**Status**: 🟡 Pipeline estabilizado após D24; prioridade atual é quality gates locais + revalidação da migração DEV (Unimed Guaxupé).
+**Last Updated**: 2026-05-27 — S32 Batch 9: Test expansion completed; 407 tests @ 75.24% coverage
+**Status**: 🟡 Test suite at 75.24% (need 90% for gate). Migration DEV validated (28.8% table coverage). Ready for S28: integration test phase or manual quality improvements.
 
 ---
 
@@ -25,17 +25,43 @@
 - [ ] **INV-ORPHANS-2** Confirmar que `conversation_labels` orphans (14.333) são de outros accounts
 - [ ] **INV-UI-1** Validar migração Unimed Guaxupé na UI do vya-chat-dev.vya.digital (8.190 conversas visíveis?)
 
-## 🔴 P0 — Foco Sessão 26 (2026-05-26)
-
-- [ ] **S26-P0-1** Instalar dependências de qualidade ausentes no ambiente (`pytest`, `flake8`, `mypy`) e registrar baseline local.
-- [ ] **S26-P0-2** Reexecutar gates de qualidade da sessão (`pytest`, `black --check`, `flake8`, `mypy`) após ajuste do ambiente.
-- [ ] **S26-P0-3** Validar ciclo completo da migração para Unimed Guaxupé com estratégia segura (cleanup controlado ou `--force-overwrite` aprovado).
-
 ## 🔴 P0 — Foco Sessão 27 (2026-05-27)
 
 - [x] **S27-P0-1** Revisar estado técnico da migração DEV do Chatwoot (cobertura de tabelas, riscos e bloqueios abertos).
 - [x] **S27-P0-2** Executar quality gates locais (`pytest`, `black --check`, `flake8`, `mypy`) e registrar baseline da sessão.
 - [x] **S27-P0-3** Revalidar migração DEV de Unimed Guaxupé com evidências (integridade, UI e regressões críticas).
+
+## 🔴 P0 — Foco Sessão 28 (2026-05-27+1)
+
+- [ ] **S28-P0-1** Avaliar se 90% coverage é atingível com unit tests (atual: 75.24%, gap 14.76pp)
+- [ ] **S28-P0-2** Se unit tests não suficientes: definir estratégia de integration tests (DB setup, fixtures)
+- [ ] **S28-P0-3** Se prosseguir com unit tests: focar em inboxes_migrator (39% → 70%+)
+
+---
+
+## ✅ CONCLUÍDO NESTA SESSÃO (S27 — 2026-05-27)
+
+### Test Expansion — Batch 9 (S32 continuation)
+- [x] **S32-B9-FIX** ✅ Fixed Outcome.INSERT bug in 3 active_storage modules (enum non-existent)
+- [x] **S32-B9-TESTS** ✅ Added 4 POC helper tests (403 → 407 total tests)
+- [x] **S32-B9-COVERAGE** ✅ Coverage improved 74.60% → 75.24% (+0.64pp from bug fix + tests)
+
+### Migration DEV Validation
+- [x] **S27-SCHEMA** ✅ Completed schema coverage audit (28.8% / 15 tables migrated, 37 gaps)
+- [x] **S27-INTEGRITY** ✅ Validated Unimed Guaxupé migration (8.190 conversas, 46.048 msgs, 0 FK violations)
+- [x] **S27-GAPS** ✅ Identified P0 blockers: mentions, conversation_participants, reporting_events
+
+### Quality Gates
+- [x] **S27-PYTEST** ✅ pytest: 407 passed, 75.24% coverage
+- [x] **S27-BLACK** ✅ black --check: 38 files OK
+- [x] **S27-FLAKE8** ✅ flake8: recorded baseline (E501/E203 legacy, non-blocking)
+- [x] **S27-MYPY** ✅ mypy: recorded baseline (22 errors, non-blocking)
+
+### Session Documentation
+- [x] **S27-DAILY** ✅ Updated DAILY_ACTIVITIES_2026-05-27.md with S32 activities
+- [x] **S27-FINAL** ✅ Created FINAL_STATUS_2026-05-27.md
+
+---
 
 ## ✅ CONCLUÍDO NESTA SESSÃO (S26 — 2026-05-26)
 

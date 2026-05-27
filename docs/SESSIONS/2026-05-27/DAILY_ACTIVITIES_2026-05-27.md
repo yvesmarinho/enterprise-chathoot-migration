@@ -179,3 +179,77 @@
 **Status**: ✅ Completo
 
 ---
+
+### Test Expansion — Batch 9 (S32 continuation)
+
+**18:01–18:15 — ✅ COMPLETO**
+
+**Objetivo**: Continuar expansão sistemática de testes partindo de S31 (323 testes @ 64.37%) visando gate de 90% coverage.
+
+**Contexto**: Sessão S31 alcançou 323 testes e 64.37% coverage. Sessão atual foca em correção de bugs descobertos e adição de testes POC (Proof-of-Concept) a módulos de active_storage.
+
+#### Atividade 1: Bug Fix — Outcome.INSERT Non-Existent Enum
+
+**Descoberta**:
+- 3 módulos `active_storage_*_migrator.py` retornavam `Outcome.INSERT` em `_classify_row_poc()`
+- Enum `Outcome` não possui valor `INSERT`; valores válidos: WOULD_MIGRATE, WOULD_MIGRATE_MODIFIED, ORPHAN_FK_SKIP, ALREADY_MIGRATED, COLLISION
+
+**Fix Aplicado**:
+| Arquivo | Linha | Change |
+|---------|-------|--------|
+| `src/migrators/active_storage_attachments_migrator.py` | 319 | `Outcome.INSERT` → `Outcome.WOULD_MIGRATE` |
+| `src/migrators/active_storage_blobs_migrator.py` | 184 | `Outcome.INSERT` → `Outcome.WOULD_MIGRATE` |
+| `src/migrators/active_storage_variant_records_migrator.py` | 230 | `Outcome.INSERT` → `Outcome.WOULD_MIGRATE` |
+
+**Impacto**: Desbloqueou capacidade de testar `_classify_row_poc()` em 3 módulos previamente não-testáveis.
+
+**Commit**: `6a670f7` — fix(migrators): replace non-existent Outcome.INSERT with WOULD_MIGRATE in active_storage modules
+
+#### Atividade 2: Adição de Testes POC Helper
+
+**Testes Adicionados**:
+
+| Módulo | Teste | Padrão | Resultado |
+|--------|-------|--------|-----------|
+| active_storage_attachments | `test_active_storage_attachments_classify_row_poc_clean` | WOULD_MIGRATE (blob_id exists) | ✅ |
+| active_storage_blobs | `test_active_storage_blobs_classify_row_poc_clean` | WOULD_MIGRATE (sem FK) | ✅ |
+| active_storage_variant_records | `test_active_storage_variant_records_classify_row_poc_orphan_blob` | ORPHAN_FK_SKIP (missing blob) | ✅ |
+| active_storage_variant_records | `test_active_storage_variant_records_classify_row_poc_clean` | WOULD_MIGRATE (blob exists) | ✅ |
+
+**Commits**:
+- `0fba38b` — test(active_storage_attachments): add classify_row_poc_clean test
+- `02cc26f` — test(active_storage_blobs): add classify_row_poc_clean test
+- `6a4cf6a` — test(active_storage_variant_records): add classify_row_poc tests
+
+**Métricas**:
+- Testes antes: 403
+- Testes depois: 407 (+4)
+- Coverage antes: 74.60%
+- Coverage depois: 75.24% (+0.64pp, includes previous batches)
+- Taxa: ~0.16pp por teste
+
+**Status**: ✅ Completo
+
+---
+
+### Quality Gate Verification — S32 Final
+
+**18:15 — ✅ COMPLETO**
+
+**Resultado**:
+```
+407 passed in 2.29s
+Coverage: 75.24%
+Coverage gap to 90%: 14.76pp
+Estimated tests needed: 50-75 more
+```
+
+**Análise de cobertura**:
+- Módulos em alta cobertura (saturation): canned_responses 99%, custom_attribute_definitions 99%, conversation_labels 88%
+- Módulos com gaps: inboxes 39% (102 missing), teams 59% (28 missing), webhooks 63% (29 missing)
+- Padrão observado: Testes POC helper ganham ~0.1-0.2pp cada; teste integration ganham ~0.5-1.0pp cada
+- Limitação: Exception paths (NoSuchTableError, merged-account dedup) difíceis de unit test sem DB real
+
+**Status**: ✅ Completo
+
+---
