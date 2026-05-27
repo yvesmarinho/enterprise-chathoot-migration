@@ -330,3 +330,242 @@ def test_users_phone_number_unchanged():
 
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["phone_number"] == phone
+
+
+# ---------------------------------------------------------------------------
+# T027-7 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_users_empty_source_no_migration():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    migrator = _make_migrator(user_rows=[], au_rows=[])
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.users_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T027-8 — Name field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_users_name_preserved():
+    """name field is copied as-is without modification."""
+    name = "Dr. John Smith-O'Neill"
+    user_rows = [
+        {
+            "id": 17,
+            "email": "john@example.com",
+            "name": name,
+            "phone_number": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    au_rows = [
+        {
+            "user_id": 17,
+            "account_id": 1,
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator = _make_migrator(
+        user_rows=user_rows,
+        au_rows=au_rows,
+        migrated_accounts={1},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.users_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["name"] == name
+
+
+# ---------------------------------------------------------------------------
+# T027-9 — Multiple users same account
+# ---------------------------------------------------------------------------
+
+
+def test_users_multiple_same_account():
+    """Multiple users for same account all migrated."""
+    user_rows = [
+        {
+            "id": 18,
+            "email": "user1@example.com",
+            "name": "User 1",
+            "phone_number": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 19,
+            "email": "user2@example.com",
+            "name": "User 2",
+            "phone_number": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    au_rows = [
+        {
+            "user_id": 18,
+            "account_id": 1,
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "user_id": 19,
+            "account_id": 1,
+            "role": "customer",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator = _make_migrator(
+        user_rows=user_rows,
+        au_rows=au_rows,
+        migrated_accounts={1},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.users_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert remapped_rows[0]["name"] == "User 1"
+    assert remapped_rows[1]["name"] == "User 2"
+
+
+# ---------------------------------------------------------------------------
+# T027-10 — ID remapping with offset_users
+# ---------------------------------------------------------------------------
+
+
+def test_users_id_remapping_offset():
+    """User ID is remapped with offset_users."""
+    user_rows = [
+        {
+            "id": 100,
+            "email": "offset@example.com",
+            "name": "Offset User",
+            "phone_number": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    au_rows = [
+        {
+            "user_id": 100,
+            "account_id": 1,
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator = _make_migrator(
+        user_rows=user_rows,
+        au_rows=au_rows,
+        migrated_accounts={1},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.users_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["id"] == 100 + 294  # offset_users = 294
+
+
+# ---------------------------------------------------------------------------
+# T027-11 — Email field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_users_email_preserved():
+    """email field is copied as-is without modification."""
+    email = "test.user+tag@example.co.uk"
+    user_rows = [
+        {
+            "id": 20,
+            "email": email,
+            "name": "Email Test",
+            "phone_number": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    au_rows = [
+        {
+            "user_id": 20,
+            "account_id": 1,
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator = _make_migrator(
+        user_rows=user_rows,
+        au_rows=au_rows,
+        migrated_accounts={1},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.users_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["email"] == email
