@@ -615,3 +615,22 @@ def test_users_classify_row_poc_clean():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert reason == "clean"
+
+
+def test_users_classify_row_poc_collision():
+    """_classify_row_poc returns WOULD_MIGRATE_MODIFIED for email collision."""
+    from src.reports.poc_reporter import Outcome
+
+    au_rows = [{"user_id": 1, "account_id": 1, "role": "agent"}]
+    migrator = _make_migrator(
+        au_rows=au_rows,
+        migrated_accounts={1},
+        existing_emails={"test@example.com"}
+    )
+    row = {"id": 1, "email": "test@example.com", "name": "Test User"}
+    migrated_sets = {"accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE_MODIFIED
+    assert "email collision" in reason or "migrated" in reason
