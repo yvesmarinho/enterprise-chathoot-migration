@@ -333,3 +333,161 @@ def test_conversations_team_id_nulled_when_unmigrated():
             migrator.migrate()
 
     assert remapped[0]["team_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T031-9 — Nullable contact_id NULLed when unmigrated
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_contact_id_nulled_when_unmigrated():
+    """contact_id is NULLed when contact not migrated (BUG-03 fix)."""
+    rows = [_base_row(contact_id=999)]  # contact 999 not migrated
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"contacts": {1, 2, 3}},  # 999 not migrated
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["contact_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T031-10 — display_id incremented per account
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_display_id_incremented_per_account():
+    """display_id is incremented separately per account during migration."""
+    rows = [
+        _base_row(id=1, account_id=1, display_id=1),
+        _base_row(id=2, account_id=1, display_id=2),
+        _base_row(id=3, account_id=2, display_id=1),
+    ]
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    migrator = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1, 2}},
+    )
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    # All display_ids should be regenerated (incremented from 0 per account)
+    # For account 1: 1, 2
+    # For account 2: 1
+    # So results should have different display_ids than originals
+    assert remapped[0]["display_id"] > 0
+    assert remapped[1]["display_id"] == remapped[0]["display_id"] + 1
+    assert remapped[2]["display_id"] > 0
+
+
+# ---------------------------------------------------------------------------
+# T031-11 — uuid regenerated per row
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_uuid_regenerated_per_row():
+    """Each conversation row gets a new UUID on migration."""
+    import uuid as uuid_lib
+
+    rows = [
+        _base_row(id=1),
+        _base_row(id=2),
+    ]
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    
+    # Mock execute
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1},  # accounts
+        {1},  # inboxes
+        {1},  # contacts
+        {1},  # users
+        {1},  # teams
+        set(),  # contact_inboxes
+        set(),  # already_migrated
+    ]
+
+    remapper = IDRemapper(
+        {
+            "conversations": 153582,
+            "accounts": 20,
+            "inboxes": 151,
+            "contacts": 225536,
+            "users": 294,
+            "teams": 22,
+        }
+    )
+    logger = logging.getLogger("test_conversations_uuid")
+
+    migrator = ConversationsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    # Verify both rows have new UUIDs and they're different
+    assert remapped[0]["uuid"] != remapped[1]["uuid"]
+    # Verify they're valid UUIDs
+    try:
+        uuid_lib.UUID(remapped[0]["uuid"])
+        uuid_lib.UUID(remapped[1]["uuid"])
+    except ValueError:
+        raise AssertionError("Generated UUIDs are invalid")
