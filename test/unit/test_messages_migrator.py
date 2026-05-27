@@ -488,3 +488,31 @@ def test_messages_classify_row_poc_orphan_conversation():
 
     assert outcome == Outcome.ORPHAN_FK_SKIP
     assert "conversation_id=999" in reason
+
+
+def test_messages_classify_row_poc_orphan_account():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for orphan account_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, account_id=999, conversation_id=1)
+    migrated_sets = {"conversations": {1}, "accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "account_id=999" in reason
+
+
+def test_messages_classify_row_poc_nulled_sender():
+    """_classify_row_poc returns WOULD_MIGRATE_MODIFIED for unmigrated sender_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, conversation_id=1, account_id=1, sender_id=999)
+    migrated_sets = {"conversations": {1}, "accounts": {1}, "users": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE_MODIFIED
+    assert "sender_id" in reason
