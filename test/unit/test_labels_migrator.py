@@ -552,3 +552,208 @@ def test_labels_id_remapping_offset():
     # ID should be remapped: 100 + 184 (offset_labels)
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["id"] == 100 + 184
+
+
+# ---------------------------------------------------------------------------
+# T029-14 — Multiple labels same account different colors
+# ---------------------------------------------------------------------------
+
+
+def test_labels_multiple_same_account_different_colors():
+    """Multiple labels for same account with different colors all migrated."""
+    rows = [
+        {
+            "id": 101,
+            "account_id": 1,
+            "title": "urgent",
+            "color": "#FF0000",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 102,
+            "account_id": 1,
+            "title": "medium",
+            "color": "#FFFF00",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 103,
+            "account_id": 1,
+            "title": "low",
+            "color": "#00FF00",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.labels_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 3
+    assert remapped_rows[0]["color"] == "#FF0000"
+    assert remapped_rows[1]["color"] == "#FFFF00"
+    assert remapped_rows[2]["color"] == "#00FF00"
+
+
+# ---------------------------------------------------------------------------
+# T029-15 — Label title with special characters preserved
+# ---------------------------------------------------------------------------
+
+
+def test_labels_title_with_special_characters():
+    """Label title with special characters (spaces, dashes, etc.) is preserved."""
+    special_title = "Bug Report - High Priority!!!"
+    rows = [
+        {
+            "id": 104,
+            "account_id": 1,
+            "title": special_title,
+            "color": "#FF6600",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.labels_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["title"] == special_title
+
+
+# ---------------------------------------------------------------------------
+# T029-16 — Multiple orphan accounts all skipped
+# ---------------------------------------------------------------------------
+
+
+def test_labels_multiple_orphan_accounts_all_skipped():
+    """Labels with multiple different orphan accounts are all skipped."""
+    rows = [
+        {
+            "id": 105,
+            "account_id": 999,
+            "title": "orphan1",
+            "color": "#AAAAAA",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 106,
+            "account_id": 888,
+            "title": "orphan2",
+            "color": "#BBBBBB",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 107,
+            "account_id": 777,
+            "title": "orphan3",
+            "color": "#CCCCCC",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    remapped_rows = []
+    skipped_ids = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_ids.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=0, skipped=3)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.labels_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
+    assert len(skipped_ids) == 3
+    assert 105 in skipped_ids
+    assert 106 in skipped_ids
+    assert 107 in skipped_ids
+
+
+# ---------------------------------------------------------------------------
+# T029-17 — Multiple with mixed valid and orphan
+# ---------------------------------------------------------------------------
+
+
+def test_labels_multiple_mixed_valid_orphan():
+    """Multiple labels: mix of valid and orphan accounts only valid migrated."""
+    rows = [
+        {
+            "id": 108,
+            "account_id": 1,
+            "title": "valid1",
+            "color": "#111111",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 109,
+            "account_id": 999,
+            "title": "orphan",
+            "color": "#222222",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 110,
+            "account_id": 2,
+            "title": "valid2",
+            "color": "#333333",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    remapped_rows = []
+    skipped_ids = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_ids.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.labels_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert len(skipped_ids) == 1
+    assert 109 in skipped_ids
