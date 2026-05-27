@@ -401,3 +401,44 @@ def test_inbox_members_both_fks_unmigrated_skipped():
             migrator.migrate()
 
     assert len(remapped_rows) == 0
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_inbox_members_table_name():
+    """_table_name() returns 'inbox_members'."""
+    migrator, _ = _make_migrator()
+    assert migrator._table_name() == "inbox_members"
+
+
+def test_inbox_members_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "inbox_id": 10, "user_id": 100},
+        {"id": 2, "inbox_id": 11, "user_id": 101},
+    ]
+    migrator, _ = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.inbox_members_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["inbox_id"] == 10
+    assert result[1]["user_id"] == 101
+
+
+def test_inbox_members_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _ = _make_migrator()
+    row = {"id": 1, "inbox_id": 1, "user_id": 1}
+    migrated_sets = {"inboxes": {1}, "users": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
