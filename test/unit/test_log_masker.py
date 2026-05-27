@@ -184,3 +184,77 @@ def test_mask_message_plain_text_fallback() -> None:
     result = mask_message("plain text user@host.com end")
     assert "user@host.com" not in result
     assert "***" in result
+
+
+# ---------------------------------------------------------------------------
+# T014-8 — mask_message with valid JSON dict
+# ---------------------------------------------------------------------------
+
+
+def test_mask_message_json_dict() -> None:
+    """mask_message parses and masks JSON dict containing PII."""
+    msg = '{"email": "test@example.com", "id": 42}'
+    result = mask_message(msg)
+    # Result should still be valid JSON
+    import json
+    parsed = json.loads(result)
+    assert parsed["email"] == "***"
+    assert parsed["id"] == 42
+
+
+def test_mask_message_json_list() -> None:
+    """mask_message parses and masks JSON array."""
+    msg = '["user@domain.com", "safe", 123]'
+    result = mask_message(msg)
+    import json
+    parsed = json.loads(result)
+    assert parsed[0] == "***"
+    assert parsed[1] == "safe"
+    assert parsed[2] == 123
+
+
+# ---------------------------------------------------------------------------
+# T014-9 — MaskingHandler with formatter preservation
+# ---------------------------------------------------------------------------
+
+
+def test_masking_handler_preserves_formatter() -> None:
+    """MaskingHandler preserves and uses the inner handler's formatter."""
+    buf = io.StringIO()
+    inner = logging.StreamHandler(buf)
+    formatter = logging.Formatter("%(levelname)s:%(message)s")
+    inner.setFormatter(formatter)
+
+    handler = MaskingHandler(inner)
+    assert handler.formatter == formatter
+
+
+# ---------------------------------------------------------------------------
+# T014-10 — MaskingHandler exception handling
+# ---------------------------------------------------------------------------
+
+
+def test_masking_handler_exception_on_handle() -> None:
+    """MaskingHandler calls handleError when inner handler raises exception."""
+    buf = io.StringIO()
+    inner = logging.StreamHandler(buf)
+
+    # Make the inner handler fail
+    original_handle = inner.handle
+    inner.handle = lambda record: (_ for _ in ()).throw(Exception("Handle failed"))
+
+    handler = MaskingHandler(inner)
+    handler.setLevel(logging.DEBUG)
+
+    record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="test@example.com",
+        args=(),
+        exc_info=None,
+    )
+
+    # Should not raise, handleError should be called
+    handler.emit(record)
