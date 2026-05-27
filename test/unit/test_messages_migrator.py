@@ -296,3 +296,139 @@ def test_messages_orphan_account_id_skipped():
             migrator.migrate()
 
     assert len(remapped) == 0
+
+
+# ---------------------------------------------------------------------------
+# T032-9 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_messages_empty_source_no_migration():
+    """Empty source rows returns MigrationResult(0 migrated, 0 skipped)."""
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    migrator = _make_migrator(source_rows=[])
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T032-10 — Message body preserved
+# ---------------------------------------------------------------------------
+
+
+def test_messages_body_preserved():
+    """Message body field is copied as-is without modification."""
+    body = "This is a test message with special chars: @#$%"
+    rows = [_base_row(id=16, content_type="text", body=body)]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["body"] == body
+
+
+# ---------------------------------------------------------------------------
+# T032-11 — Content type field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_messages_content_type_preserved():
+    """content_type field is copied as-is (html or text)."""
+    content_type = "html"
+    rows = [_base_row(id=17, content_type=content_type, body="<p>Test</p>")]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["content_type"] == content_type
+
+
+# ---------------------------------------------------------------------------
+# T032-12 — ID remapping with offset_messages
+# ---------------------------------------------------------------------------
+
+
+def test_messages_id_remapping_offset():
+    """Message ID is remapped using offset_messages."""
+    rows = [_base_row(id=200, content_type="text", body="Test")]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    # ID should be remapped with offset
+    assert len(remapped) == 1
+    assert remapped[0]["id"] > 200  # At least offset applied
+
+
+# ---------------------------------------------------------------------------
+# T032-13 — Multiple messages same conversation
+# ---------------------------------------------------------------------------
+
+
+def test_messages_multiple_same_conversation():
+    """Multiple messages from same conversation all migrated successfully."""
+    rows = [
+        _base_row(id=18, conversation_id=1, body="Message 1"),
+        _base_row(id=19, conversation_id=1, body="Message 2"),
+        _base_row(id=20, conversation_id=1, body="Message 3"),
+    ]
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.messages_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 3
+    assert remapped[0]["body"] == "Message 1"
+    assert remapped[1]["body"] == "Message 2"
+    assert remapped[2]["body"] == "Message 3"
