@@ -213,7 +213,7 @@ def test_users_without_account_users_still_migrated():
         au_rows=au_rows,
         migrated_accounts={1},
     )
-    
+
     remapped_rows = []
 
     def capture_batches(source_rows, table_name, dest_table, remap_fn):
@@ -263,7 +263,7 @@ def test_users_id_remapped():
         au_rows=au_rows,
         migrated_accounts={1},
     )
-    
+
     remapped_rows = []
 
     def capture_batches(source_rows, table_name, dest_table, remap_fn):
@@ -314,7 +314,7 @@ def test_users_phone_number_unchanged():
         au_rows=au_rows,
         migrated_accounts={1},
     )
-    
+
     remapped_rows = []
 
     def capture_batches(source_rows, table_name, dest_table, remap_fn):

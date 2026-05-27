@@ -188,9 +188,7 @@ def test_attachments_fk_remapping():
 def test_attachments_file_name_preserved():
     """file_name field is copied as-is without modification."""
     file_name = "document_2026.pdf"
-    rows = [
-        _base_row(id=6, message_id=1, account_id=1, file_name=file_name)
-    ]
+    rows = [_base_row(id=6, message_id=1, account_id=1, file_name=file_name)]
     remapped = []
 
     def capture(source_rows, table_name, dest_table, remap_fn):

@@ -13,7 +13,7 @@ from src.utils.id_remapper import IDRemapper
 
 def _make_migrator(source_rows=None, migrated=None, dest_ci_pairs=None):
     """Build ContactInboxesMigrator with mocked engines.
-    
+
     :param source_rows: Source contact_inboxes rows.
     :param migrated: Dict with 'contacts' and 'inboxes' migrated ID sets.
     :param dest_ci_pairs: List of (contact_id, inbox_id, ci_id) tuples already in DEST.
@@ -69,7 +69,7 @@ def _make_migrator(source_rows=None, migrated=None, dest_ci_pairs=None):
 
 def test_contact_inboxes_dedup_by_pair():
     """Dedup registers alias and logs; INSERT still occurs (handled by remap_fn constraint).
-    
+
     NOTE: contact_inboxes registers alias for deduped pairs but does NOT filter in remap_fn.
     The actual constraint violation is left to database-level uniqueness.
     """
@@ -345,7 +345,7 @@ def test_contact_inboxes_pubsub_token_nulled():
 def test_contact_inboxes_source_id_regenerated():
     """source_id is regenerated as UUID4, not copied from source."""
     import uuid
-    
+
     original_source_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     ci_rows = [
         {

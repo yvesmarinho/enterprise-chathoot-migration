@@ -116,7 +116,7 @@ def test_conversations_null_contact_id_skips_record():
 
 def test_conversations_orphan_contact_id_skips_record():
     """Records with orphan contact_id are included with contact_id=None (not skipped).
-    
+
     Per BUG-03 fix: Skipping whole conversation when contact_id unmigrated causes
     cascade loss of messages/attachments. NULL contact_id is acceptable in Chatwoot.
     """
@@ -280,7 +280,7 @@ def test_conversations_required_fk_orphan_inbox_id_skipped():
 def test_conversations_uuid_regenerated():
     """UUID is regenerated (not copied from source) to avoid uniqueness violation."""
     import uuid as uuid_lib
-    
+
     original_uuid = str(uuid_lib.uuid4())
     rows = [_base_row(id=10, uuid=original_uuid)]
     remapped = []

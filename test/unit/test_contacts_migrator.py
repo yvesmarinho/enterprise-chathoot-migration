@@ -242,9 +242,7 @@ def _make_migrator_with_dedup(
     email_mapping_rows = [make_mapping_row(r) for r in email_rows]
     # First execute call (for one merged account) returns phone, email, and identifier columns
     # We simulate the combined query: id, phone_number, email, identifier
-    all_rows = [
-        make_mapping_row({**r, "email": None, "identifier": None}) for r in phone_rows
-    ]
+    all_rows = [make_mapping_row({**r, "email": None, "identifier": None}) for r in phone_rows]
     all_rows += [
         make_mapping_row(
             {"id": r["id"], "phone_number": None, "email": r["email"], "identifier": None}
@@ -315,8 +313,7 @@ def test_contacts_dedup_phone_match_registers_alias_and_skips_insert():
     # record_success_bulk called for the dedup'd contact
     calls = state_repo.record_success_bulk.call_args_list
     assert any(
-        c.args[1] == "contacts" and (500, 1234) in c.args[2]
-        for c in calls
+        c.args[1] == "contacts" and (500, 1234) in c.args[2] for c in calls
     ), "record_success_bulk not called for dedup'd contact src_id=500"
 
 

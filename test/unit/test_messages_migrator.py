@@ -32,10 +32,10 @@ def _make_migrator(source_rows=None, migrated=None):
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    
+
     def get_migrated_ids_side_effect(conn, table_name):
         return migrated.get(table_name, {1} if table_name != "contacts" else {1})
-    
+
     state_repo.get_migrated_ids.side_effect = get_migrated_ids_side_effect
 
     remapper = IDRemapper(
