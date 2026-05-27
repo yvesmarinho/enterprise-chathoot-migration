@@ -431,3 +431,159 @@ def test_contact_inboxes_id_remapped():
     assert remapped_rows[0]["id"] == 19 + 50  # offset_contact_inboxes = 50
     assert remapped_rows[0]["contact_id"] == 5 + 100  # offset_contacts = 100
     assert remapped_rows[0]["inbox_id"] == 3 + 200  # offset_inboxes = 200
+
+
+# ---------------------------------------------------------------------------
+# T032-9 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_empty_source_no_migration():
+    """Empty source rows returns MigrationResult(0 migrated, 0 skipped)."""
+    migrator, _ = _make_migrator(source_rows=[])
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T032-10 — Role field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_role_preserved():
+    """Role field is copied as-is (agent or customer)."""
+    ci_rows = [
+        {
+            "id": 20,
+            "contact_id": 6,
+            "inbox_id": 4,
+            "pubsub_token": None,
+            "source_id": "uuid-role-test",
+            "role": "customer",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=ci_rows,
+        migrated={"contacts": {6}, "inboxes": {4}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert remapped_rows[0]["role"] == "customer"
+
+
+# ---------------------------------------------------------------------------
+# T032-11 — Orphan contact_id skipped
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_orphan_contact_skipped():
+    """Contact inbox with unmigrated contact_id is skipped."""
+    ci_rows = [
+        {
+            "id": 21,
+            "contact_id": 999,
+            "inbox_id": 5,
+            "pubsub_token": None,
+            "source_id": "uuid-orphan-contact",
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=ci_rows,
+        migrated={"contacts": {1, 2}, "inboxes": {5}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
+
+
+# ---------------------------------------------------------------------------
+# T032-12 — Multiple contact_inboxes same contact
+# ---------------------------------------------------------------------------
+
+
+def test_contact_inboxes_multiple_same_contact():
+    """Multiple contact_inboxes for same contact all migrated."""
+    ci_rows = [
+        {
+            "id": 22,
+            "contact_id": 7,
+            "inbox_id": 6,
+            "pubsub_token": None,
+            "source_id": "uuid-multi-1",
+            "role": "agent",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 23,
+            "contact_id": 7,
+            "inbox_id": 7,
+            "pubsub_token": None,
+            "source_id": "uuid-multi-2",
+            "role": "customer",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=ci_rows,
+        migrated={"contacts": {7}, "inboxes": {6, 7}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contact_inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert remapped_rows[0]["role"] == "agent"
+    assert remapped_rows[1]["role"] == "customer"
