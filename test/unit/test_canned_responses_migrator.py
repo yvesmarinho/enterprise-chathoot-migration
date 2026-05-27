@@ -422,3 +422,102 @@ def test_canned_responses_classify_row_poc_valid():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert "clean" in reason
+
+
+# ---------------------------------------------------------------------------
+# T024-9 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_canned_responses_empty_source():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    migrator, _ = _make_migrator(source_rows=[])
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    from unittest.mock import patch
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.canned_responses_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T024-10 — short_code field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_canned_responses_short_code_preserved():
+    """short_code field is copied as-is."""
+    rows = [
+        {
+            "id": 22,
+            "account_id": 1,
+            "short_code": "quick_reply_001",
+            "content": "Quick reply content here",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    from unittest.mock import patch
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.canned_responses_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped) == 1
+    assert remapped[0]["short_code"] == "quick_reply_001"
+
+
+# ---------------------------------------------------------------------------
+# T024-11 — content field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_canned_responses_content_preserved():
+    """content field is copied as-is."""
+    content = "This is a canned response with special chars: @#$%\nMultiline\n✓"
+    rows = [
+        {
+            "id": 23,
+            "account_id": 1,
+            "short_code": "test_content",
+            "content": content,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    from unittest.mock import patch
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.canned_responses_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped) == 1
+    assert remapped[0]["content"] == content
