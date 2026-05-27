@@ -731,3 +731,44 @@ def test_contacts_mixed_valid_orphan_accounts():
     assert len(remapped_rows) == 2
     assert len(skipped_ids) == 1
     assert 15 in skipped_ids
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_table_name():
+    """_table_name() returns 'contacts'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "contacts"
+
+
+def test_contacts_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "account_id": 1, "name": "Contact 1", "email": "c1@example.com"},
+        {"id": 2, "account_id": 1, "name": "Contact 2", "email": "c2@example.com"},
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.contacts_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["name"] == "Contact 1"
+    assert result[1]["email"] == "c2@example.com"
+
+
+def test_contacts_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean contact row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"id": 1, "account_id": 1, "name": "Test Contact", "email": "test@example.com"}
+    migrated_sets = {"accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
