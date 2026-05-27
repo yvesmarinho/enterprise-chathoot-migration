@@ -491,3 +491,343 @@ def test_conversations_uuid_regenerated_per_row():
         uuid_lib.UUID(remapped[1]["uuid"])
     except ValueError:
         raise AssertionError("Generated UUIDs are invalid")
+
+
+# ---------------------------------------------------------------------------
+# T035-12 — Subject field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_subject_preserved():
+    """Subject field is copied as-is without modification."""
+    subject = "Order inquiry from John"
+    rows = [
+        {
+            "id": 100,
+            "account_id": 1,
+            "inbox_id": 1,
+            "contact_id": 1,
+            "assignee_id": 1,
+            "team_id": 1,
+            "uuid": "test-uuid-1",
+            "subject": subject,
+            "status": "open",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1}, {1}, {1}, {1}, {1}, set(), set()
+    ]
+
+    remapper = IDRemapper(
+        {
+            "conversations": 153582,
+            "accounts": 20,
+            "inboxes": 151,
+            "contacts": 225536,
+            "users": 294,
+            "teams": 22,
+        }
+    )
+    logger = logging.getLogger("test_conversations_subject")
+
+    migrator = ConversationsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["subject"] == subject
+
+
+# ---------------------------------------------------------------------------
+# T035-13 — Status field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_status_preserved():
+    """Status field is copied without modification."""
+    status = "resolved"
+    rows = [
+        {
+            "id": 101,
+            "account_id": 1,
+            "inbox_id": 1,
+            "contact_id": 1,
+            "assignee_id": 1,
+            "team_id": 1,
+            "uuid": "test-uuid-2",
+            "subject": "Test",
+            "status": status,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1}, {1}, {1}, {1}, {1}, set(), set()
+    ]
+
+    remapper = IDRemapper(
+        {
+            "conversations": 153582,
+            "accounts": 20,
+            "inboxes": 151,
+            "contacts": 225536,
+            "users": 294,
+            "teams": 22,
+        }
+    )
+    logger = logging.getLogger("test_conversations_status")
+
+    migrator = ConversationsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert remapped[0]["status"] == status
+
+
+# ---------------------------------------------------------------------------
+# T035-14 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+
+
+# ---------------------------------------------------------------------------
+# T035-14 — Conversation ID remapped with offset
+# T035-15 — Orphan inbox_id skipped
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_orphan_inbox_skipped():
+    """Conversation with unmigrated inbox_id is skipped."""
+    rows = [
+        {
+            "id": 102,
+            "account_id": 1,
+            "inbox_id": 999,
+            "contact_id": 1,
+            "assignee_id": 1,
+            "team_id": 1,
+            "uuid": "test-uuid-3",
+            "subject": "Test",
+            "status": "open",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1}, {1}, {1}, {1}, {1}, set(), set()
+    ]
+
+    remapper = IDRemapper(
+        {
+            "conversations": 153582,
+            "accounts": 20,
+            "inboxes": 151,
+            "contacts": 225536,
+            "users": 294,
+            "teams": 22,
+        }
+    )
+    logger = logging.getLogger("test_conversations_orphan")
+
+    migrator = ConversationsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped) == 0
+
+
+# ---------------------------------------------------------------------------
+# T035-14 — Conversation ID remapped with offset
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_id_remapped_offset():
+    """Conversation ID is remapped using offset_conversations."""
+    rows = [
+        {
+            "id": 100,
+            "account_id": 1,
+            "inbox_id": 1,
+            "contact_id": 1,
+            "assignee_id": 1,
+            "team_id": 1,
+            "uuid": "test-uuid-14",
+            "subject": "Test ID Remap",
+            "status": "open",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
+    dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
+    dest_conn.execute.return_value.fetchall.return_value = []
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [
+        {1}, {1}, {1}, {1}, {1}, set(), set()
+    ]
+
+    remapper = IDRemapper(
+        {
+            "conversations": 153582,
+            "accounts": 20,
+            "inboxes": 151,
+            "contacts": 225536,
+            "users": 294,
+            "teams": 22,
+        }
+    )
+    logger = logging.getLogger("test_conversations_id_remap")
+
+    migrator = ConversationsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logger,
+    )
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.conversations_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    # ID should be remapped: 100 + 153582 (offset_conversations)
+    assert len(remapped) == 1
+    assert remapped[0]["id"] == 100 + 153582
