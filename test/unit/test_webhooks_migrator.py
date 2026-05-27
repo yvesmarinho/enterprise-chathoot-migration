@@ -591,3 +591,178 @@ def test_webhooks_id_remapping_with_offset():
     assert len(remapped_rows) == 1
     expected_id = remapper.remap(100, "webhooks")
     assert remapped_rows[0]["id"] == expected_id
+
+
+# ---------------------------------------------------------------------------
+# T038-14 — Webhook orphan account_id skipped
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_orphan_account_skipped():
+    """Webhook with orphaned account_id is skipped."""
+    rows = [
+        {
+            "id": 200,
+            "account_id": 999,
+            "inbox_id": None,
+            "url": "https://example.com/unknown",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1, 2}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    # Should be skipped due to orphan account_id
+    assert len(remapped_rows) == 0
+
+
+# ---------------------------------------------------------------------------
+# T038-15 — Webhook inbox_id NULL preserved
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_inbox_id_null_preserved():
+    """When inbox_id is NULL in source, it remains NULL in destination."""
+    rows = [
+        {
+            "id": 201,
+            "account_id": 1,
+            "inbox_id": None,
+            "url": "https://example.com/global-webhook",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["inbox_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T038-16 — Multiple webhooks same account different urls
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_multiple_different_urls():
+    """Multiple webhooks for same account with different URLs all migrated."""
+    rows = [
+        {
+            "id": 202,
+            "account_id": 1,
+            "inbox_id": 5,
+            "url": "https://example.com/webhook-1",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 203,
+            "account_id": 1,
+            "inbox_id": 5,
+            "url": "https://example.com/webhook-2",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 204,
+            "account_id": 1,
+            "inbox_id": 6,
+            "url": "https://example.com/webhook-3",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator, remapper = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1}, "inboxes": {5, 6}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    # All 3 should be migrated
+    assert len(remapped_rows) == 3
+    # URLs preserved
+    assert remapped_rows[0]["url"] == "https://example.com/webhook-1"
+    assert remapped_rows[1]["url"] == "https://example.com/webhook-2"
+    assert remapped_rows[2]["url"] == "https://example.com/webhook-3"
+
+
+# ---------------------------------------------------------------------------
+# T038-17 — Webhook with migrated inbox_id remapped
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_inbox_id_remapped():
+    """When inbox_id is provided and inbox is migrated, inbox_id is remapped."""
+    rows = [
+        {
+            "id": 205,
+            "account_id": 1,
+            "inbox_id": 10,
+            "url": "https://example.com/inbox-webhook",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, remapper = _make_migrator(
+        source_rows=rows,
+        migrated={"accounts": {1}, "inboxes": {10}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    expected_inbox_id = remapper.remap(10, "inboxes")
+    assert remapped_rows[0]["inbox_id"] == expected_inbox_id
