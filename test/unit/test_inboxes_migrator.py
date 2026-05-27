@@ -1065,3 +1065,257 @@ def test_inboxes_id_remapping_offset():
     # ID should be remapped: 300 + 151 (offset_inboxes)
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["id"] == 300 + 151
+
+
+# ---------------------------------------------------------------------------
+# T026-22 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_empty_source_no_migration():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows)
+    channel_map = {}
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T026-23 — Channel type field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_type_preserved():
+    """channel_type field is copied as-is (Channel::Email, ::WebWidget, etc)."""
+    rows = [
+        {
+            "id": 301,
+            "account_id": 1,
+            "name": "email_inbox",
+            "channel_type": "Channel::Email",
+            "channel_id": 77,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    channel_map = {("Channel::Email", 77): 3007}
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_type"] == "Channel::Email"
+
+
+# ---------------------------------------------------------------------------
+# T026-24 — enable_polling field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_enable_polling_preserved():
+    """enable_polling field is copied as-is (true or false)."""
+    rows = [
+        {
+            "id": 302,
+            "account_id": 1,
+            "name": "polling_inbox",
+            "channel_type": "Channel::Email",
+            "channel_id": 78,
+            "enable_polling": True,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    channel_map = {("Channel::Email", 78): 3008}
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["enable_polling"] is True
+
+
+# ---------------------------------------------------------------------------
+# T026-25 — Channel ID remapping with map lookup
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_id_remapped_from_map():
+    """channel_id is remapped using _migrate_channels map with (type, src_id) key."""
+    rows = [
+        {
+            "id": 303,
+            "account_id": 1,
+            "name": "mapped_inbox",
+            "channel_type": "Channel::WebWidget",
+            "channel_id": 79,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    # Simulate channel_id remapping: (Channel::WebWidget, 79) -> 9999
+    channel_map = {("Channel::WebWidget", 79): 9999}
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["channel_id"] == 9999
+
+
+# ---------------------------------------------------------------------------
+# T026-26 — Multiple inboxes different accounts
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_multiple_different_accounts_filtered():
+    """Multiple inboxes with unmigrated account_ids properly filtered."""
+    rows = [
+        {
+            "id": 304,
+            "account_id": 1,
+            "name": "inbox_a1",
+            "channel_type": "Channel::WebWidget",
+            "channel_id": 80,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 305,
+            "account_id": 999,
+            "name": "inbox_a999",
+            "channel_type": "Channel::WebWidget",
+            "channel_id": 81,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 306,
+            "account_id": 1,
+            "name": "inbox_a1_2",
+            "channel_type": "Channel::Email",
+            "channel_id": 82,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    remapped_rows = []
+    skipped_ids = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_ids.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    channel_map = {
+        ("Channel::WebWidget", 80): 4000,
+        ("Channel::Email", 82): 4001,
+    }
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    # Only 2 should migrate (account_id 1), 1 skipped (account_id 999)
+    assert len(remapped_rows) == 2
+    assert 305 in skipped_ids  # orphan account
+    assert len(skipped_ids) == 1
+
+
+# ---------------------------------------------------------------------------
+# T026-27 — Name field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_name_preserved_special_chars():
+    """inbox name field is copied as-is with special characters."""
+    name = "Customer Support - São Paulo™ 🎯"
+    rows = [
+        {
+            "id": 307,
+            "account_id": 1,
+            "name": name,
+            "channel_type": "Channel::WebWidget",
+            "channel_id": 83,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    channel_map = {("Channel::WebWidget", 83): 4002}
+    
+    with patch.object(migrator, "_migrate_channels", return_value=channel_map):
+        with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+            with patch("src.migrators.inboxes_migrator.Table"):
+                migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["name"] == name
