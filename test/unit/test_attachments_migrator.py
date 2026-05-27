@@ -504,3 +504,31 @@ def test_attachments_classify_row_poc_clean():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert reason == "clean"
+
+
+def test_attachments_classify_row_poc_orphan_message():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for unmigrated message_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, message_id=999, account_id=1)
+    migrated_sets = {"messages": {1}, "accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "message_id" in reason
+
+
+def test_attachments_classify_row_poc_orphan_account():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for unmigrated account_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, message_id=1, account_id=999)
+    migrated_sets = {"messages": {1}, "accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "account_id" in reason
