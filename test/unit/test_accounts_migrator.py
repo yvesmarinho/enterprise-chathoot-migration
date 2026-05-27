@@ -288,3 +288,60 @@ def test_accounts_merge_rule_name_mismatch_no_alias():
 
     # No alias registered — remap uses offset: 1 + 43 = 44
     assert remapper.remap(1, "accounts") == 44
+
+
+# ---------------------------------------------------------------------------
+# T014-8 — name field copied as-is
+# ---------------------------------------------------------------------------
+
+
+def test_accounts_name_preserved():
+    """name field is copied without modification."""
+    name = "Client Enterprise ABC"
+    src_rows = [{"id": 7, "name": name, "created_at": None, "updated_at": None}]
+    dst_rows = []
+
+    migrator, _, _ = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    remapped_rows = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.accounts_migrator.Table"):
+            migrator.migrate()
+
+    assert remapped_rows[0]["name"] == name
+
+
+# ---------------------------------------------------------------------------
+# T014-9 — id remapped with offset
+# ---------------------------------------------------------------------------
+
+
+def test_accounts_id_remapped():
+    """Account id is remapped with offset when no merge rule applies."""
+    src_rows = [{"id": 99, "name": "New Account", "created_at": None, "updated_at": None}]
+    dst_rows = []
+
+    migrator, remapper, _ = _make_migrator_with_dest_accounts(src_rows, dst_rows)
+
+    remapped_rows = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.accounts_migrator.Table"):
+            migrator.migrate()
+
+    assert remapped_rows[0]["id"] == 99 + 43  # offset 43
