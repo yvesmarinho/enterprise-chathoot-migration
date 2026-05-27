@@ -386,3 +386,182 @@ def test_teams_multiple_teams_same_account():
     assert len(remapped_rows) == 3
     assert all(r["account_id"] == 21 for r in remapped_rows)
     assert [r["id"] for r in remapped_rows] == [33, 34, 35]  # 11+22, 12+22, 13+22
+
+
+# ---------------------------------------------------------------------------
+# T028-10 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_teams_empty_source_no_migration():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    migrator = _make_migrator(source_rows=[])
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T028-11 — ID remapping with offset_teams
+# ---------------------------------------------------------------------------
+
+
+def test_teams_id_remapping_offset():
+    """Team ID is remapped using offset_teams (22)."""
+    rows = [
+        {
+            "id": 100,
+            "account_id": 1,
+            "name": "Offset Test Team",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["id"] == 100 + 22  # offset_teams = 22
+
+
+# ---------------------------------------------------------------------------
+# T028-12 — Description field preserved (if present)
+# ---------------------------------------------------------------------------
+
+
+def test_teams_description_field_preserved():
+    """Description field is copied as-is when present."""
+    rows = [
+        {
+            "id": 14,
+            "account_id": 1,
+            "name": "Described Team",
+            "description": "This team handles customer support",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0].get("description") == "This team handles customer support"
+
+
+# ---------------------------------------------------------------------------
+# T028-13 — Orphan account_id (not in migrated set)
+# ---------------------------------------------------------------------------
+
+
+def test_teams_orphan_account_skipped():
+    """Team with account_id not in migrated accounts is skipped."""
+    rows = [
+        {
+            "id": 15,
+            "account_id": 999,
+            "name": "Orphan Team",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
+
+
+# ---------------------------------------------------------------------------
+# T028-14 — Multiple teams mixed valid and orphan
+# ---------------------------------------------------------------------------
+
+
+def test_teams_multiple_mixed_orphan_valid():
+    """Multiple teams: some valid, some orphan, only valid ones migrated."""
+    rows = [
+        {
+            "id": 16,
+            "account_id": 1,
+            "name": "Valid Team 1",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 17,
+            "account_id": 999,
+            "name": "Orphan Team",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 18,
+            "account_id": 2,
+            "name": "Valid Team 2",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    remapped_rows = []
+    skipped_ids = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_ids.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.teams_migrator.Table") as mock_table:
+            mock_table.return_value = MagicMock()
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert len(skipped_ids) == 1
+    assert 17 in skipped_ids  # orphan account 999
