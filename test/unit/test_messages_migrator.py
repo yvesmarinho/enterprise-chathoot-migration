@@ -433,3 +433,58 @@ def test_messages_multiple_same_conversation():
     assert remapped[0]["body"] == "Message 1"
     assert remapped[1]["body"] == "Message 2"
     assert remapped[2]["body"] == "Message 3"
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_messages_table_name():
+    """_table_name() returns 'messages'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "messages"
+
+
+def test_messages_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        _base_row(id=1, content="Message 1"),
+        _base_row(id=2, content="Message 2"),
+    ]
+    migrator = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.messages_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["content"] == "Message 1"
+    assert result[1]["id"] == 2
+
+
+def test_messages_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, conversation_id=1)
+    migrated_sets = {"conversations": {1}, "accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
+
+
+def test_messages_classify_row_poc_orphan_conversation():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for orphan conversation_id."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = _base_row(id=1, conversation_id=999)
+    migrated_sets = {"conversations": {1, 2, 3}, "accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "conversation_id=999" in reason
