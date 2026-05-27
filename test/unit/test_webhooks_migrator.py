@@ -240,3 +240,163 @@ def test_webhooks_inbox_id_null_in_source_unchanged():
 
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["inbox_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# T038-6 — Empty source rows: no-op, returns 0 migrated
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_empty_source_no_op():
+    """When source has no rows, migration is a no-op."""
+    migrator, _ = _make_migrator(source_rows=[], migrated={"accounts": {1}})
+
+    result = None
+    with patch("src.migrators.webhooks_migrator.Table"):
+        result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T038-7 — url field preserved through migration
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_url_field_preserved():
+    """url field is copied as-is to destination."""
+    test_url = "https://api.example.com/v1/webhook-receiver"
+    rows = [
+        {
+            "id": 6,
+            "account_id": 1,
+            "url": test_url,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["url"] == test_url
+
+
+# ---------------------------------------------------------------------------
+# T038-8 — Mixed accounts: both migrated and orphan
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_mixed_accounts_partial_skip():
+    """Some webhooks migrated, some skipped due to orphan account_id."""
+    rows = [
+        {
+            "id": 7,
+            "account_id": 1,
+            "url": "https://example.com/webhook1",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 8,
+            "account_id": 999,
+            "url": "https://example.com/webhook2",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 9,
+            "account_id": 1,
+            "url": "https://example.com/webhook3",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator, _ = _make_migrator(source_rows=rows, migrated={"accounts": {1}})
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2  # Only 2 valid rows (7 and 9)
+    assert all(r["account_id"] > 1 for r in remapped_rows)
+
+
+# ---------------------------------------------------------------------------
+# T038-9 — Multiple inboxes: some migrated, some not
+# ---------------------------------------------------------------------------
+
+
+def test_webhooks_mixed_inbox_statuses():
+    """Some webhooks have migrated inbox_id, some have unmigrated."""
+    rows = [
+        {
+            "id": 10,
+            "account_id": 1,
+            "inbox_id": 5,
+            "url": "https://example.com/webhook_inbox5",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 11,
+            "account_id": 1,
+            "inbox_id": 999,
+            "url": "https://example.com/webhook_inbox999",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    def get_migrated_ids_fn(conn, table_name):
+        if table_name == "accounts":
+            return {1}
+        elif table_name == "inboxes":
+            return {5, 10}  # Only 5 and 10 were migrated
+        return set()
+
+    migrator, _ = _make_migrator(source_rows=rows)
+    migrator.state_repo.get_migrated_ids = MagicMock(side_effect=get_migrated_ids_fn)
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.webhooks_migrator.Table"):
+            migrator.migrate()
+
+    # First webhook should have remapped inbox_id
+    assert remapped_rows[0]["inbox_id"] is not None and remapped_rows[0]["inbox_id"] > 5
+    # Second webhook should have NULL inbox_id
+    assert remapped_rows[1]["inbox_id"] is None
