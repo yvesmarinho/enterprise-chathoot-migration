@@ -140,3 +140,67 @@ def test_validation_report_total_orphans():
         }
     )
     assert report.total_orphans == 10
+
+
+# ---------------------------------------------------------------------------
+# T041-5 — FK validator with account_id scoping
+# ---------------------------------------------------------------------------
+
+
+def test_fk_validator_validate_with_account_scoping():
+    """Validator applies account_id scope when provided."""
+    engine = MagicMock()
+    conn = MagicMock()
+    conn.__enter__ = MagicMock(return_value=conn)
+    conn.__exit__ = MagicMock(return_value=False)
+    conn.execute.return_value.fetchone.return_value = (0,)
+    engine.connect.return_value = conn
+
+    validator = FKValidator()
+    report = validator.validate(engine, account_id=42)
+
+    assert report.is_clean
+    # Verify at least one execute call included account_id in params
+    execute_calls = conn.execute.call_args_list
+    # Check if any call has account_id parameter
+    found_account_param = False
+    for call in execute_calls:
+        if len(call[0]) > 1 and isinstance(call[0][1], dict):
+            if "account_id" in call[0][1]:
+                found_account_param = True
+                break
+    assert found_account_param
+
+
+# ---------------------------------------------------------------------------
+# T041-6 — FK validator exception handling (returns -1 for unknown)
+# ---------------------------------------------------------------------------
+
+
+def test_fk_validator_validate_exception_returns_unknown():
+    """Validator returns -1 (unknown) when a FK check raises exception."""
+    engine = MagicMock()
+    conn = MagicMock()
+    conn.__enter__ = MagicMock(return_value=conn)
+    conn.__exit__ = MagicMock(return_value=False)
+
+    # Simulate exception on one relationship, success on others
+    call_count = [0]
+
+    def execute_side(stmt, params=None):
+        call_count[0] += 1
+        # Fail on second call
+        if call_count[0] == 2:
+            raise Exception("Database error")
+        result = MagicMock()
+        result.fetchone.return_value = (0,)
+        return result
+
+    conn.execute = execute_side
+    engine.connect.return_value = conn
+
+    validator = FKValidator()
+    report = validator.validate(engine)
+
+    # Should have one -1 (error) and rest 0
+    assert -1 in report.orphan_counts.values()
