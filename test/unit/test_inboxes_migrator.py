@@ -118,3 +118,128 @@ def test_inboxes_orphan_account_id_skipped():
             migrator.migrate()
 
     assert remapped_rows == []
+
+
+# ---------------------------------------------------------------------------
+# T016-3 — name field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_name_preserved():
+    """name field is copied as-is without modification."""
+    inbox_name = "support_emails"
+    rows = [
+        {
+            "id": 6,
+            "account_id": 1,
+            "name": inbox_name,
+            "channel_type": "Channel::Email",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert remapped_rows[0]["name"] == inbox_name
+
+
+# ---------------------------------------------------------------------------
+# T016-4 — channel_type preserved (polymorphic channels)
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_channel_type_preserved():
+    """channel_type string is copied as-is (polymorphic: Email, Api, WebWidget, etc)."""
+    channel_type = "Channel::Api"
+    rows = [
+        {
+            "id": 7,
+            "account_id": 2,
+            "name": "api_inbox",
+            "channel_type": channel_type,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert remapped_rows[0]["channel_type"] == channel_type
+
+
+# ---------------------------------------------------------------------------
+# T016-5 — Mixed accounts with partial skip
+# ---------------------------------------------------------------------------
+
+
+def test_inboxes_mixed_accounts_partial_skip():
+    """Inboxes from multiple accounts skip only orphaned ones."""
+    rows = [
+        {
+            "id": 8,
+            "account_id": 1,
+            "name": "acct1_inbox",
+            "channel_type": "Channel::Email",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 9,
+            "account_id": 2,
+            "name": "acct2_inbox",
+            "channel_type": "Channel::WebWidget",
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 10,
+            "account_id": 999,
+            "name": "orphan_inbox",
+            "channel_type": "Channel::Email",
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+    remapped_rows = []
+    skipped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+            else:
+                skipped_rows.append(row["id"])
+        return MigrationResult(table=table_name, total_source=3, migrated=2, skipped=1)
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inboxes_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+    assert len(skipped_rows) == 1
+    assert 10 in skipped_rows
