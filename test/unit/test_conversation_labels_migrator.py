@@ -571,3 +571,44 @@ def test_conversation_labels_mixed_valid_orphan():
     assert len(remapped_rows) == 2
     assert len(skipped_ids) == 1
     assert 201 in skipped_ids
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_labels_table_name():
+    """_table_name() returns 'conversation_labels'."""
+    migrator, _, _ = _make_migrator()
+    assert migrator._table_name() == "conversation_labels"
+
+
+def test_conversation_labels_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    rows = [
+        {"id": 1, "tag_id": 10, "taggable_id": 100, "context": "labels"},
+        {"id": 2, "tag_id": 11, "taggable_id": 101, "context": "labels"},
+    ]
+    migrator, _, _ = _make_migrator(source_rows=rows)
+
+    with patch("src.migrators.conversation_labels_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["tag_id"] == 10
+    assert result[1]["taggable_id"] == 101
+
+
+def test_conversation_labels_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator, _, _ = _make_migrator()
+    row = {"id": 1, "tag_id": 1, "taggable_id": 1, "context": "labels"}
+    migrated_sets = {"conversations": {1}, "users": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
