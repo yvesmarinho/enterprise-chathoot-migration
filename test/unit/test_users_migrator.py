@@ -569,3 +569,49 @@ def test_users_email_preserved():
 
     assert len(remapped_rows) == 1
     assert remapped_rows[0]["email"] == email
+
+
+# ---------------------------------------------------------------------------
+# POC Helper Methods — _table_name, _fetch_all_source_rows, _classify_row_poc
+# ---------------------------------------------------------------------------
+
+
+def test_users_table_name():
+    """_table_name() returns 'users'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "users"
+
+
+def test_users_fetch_all_source_rows():
+    """_fetch_all_source_rows() returns all source rows."""
+    user_rows = [
+        {"id": 1, "email": "user1@example.com", "name": "User 1"},
+        {"id": 2, "email": "user2@example.com", "name": "User 2"},
+    ]
+    au_rows = [
+        {"user_id": 1, "account_id": 1, "role": "agent"},
+        {"user_id": 2, "account_id": 1, "role": "agent"},
+    ]
+    migrator = _make_migrator(user_rows=user_rows, au_rows=au_rows)
+
+    with patch("src.migrators.users_migrator.Table"):
+        result = migrator._fetch_all_source_rows()
+
+    assert len(result) == 2
+    assert result[0]["email"] == "user1@example.com"
+    assert result[1]["name"] == "User 2"
+
+
+def test_users_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean user row."""
+    from src.reports.poc_reporter import Outcome
+
+    au_rows = [{"user_id": 1, "account_id": 1, "role": "agent"}]
+    migrator = _make_migrator(au_rows=au_rows, migrated_accounts={1})
+    row = {"id": 1, "email": "test@example.com", "name": "Test User"}
+    migrated_sets = {"accounts": {1}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
