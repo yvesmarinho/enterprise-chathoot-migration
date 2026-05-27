@@ -438,3 +438,128 @@ def test_contacts_dedup_only_for_merged_accounts():
     dest_conn.execute.assert_not_called()
     # No alias for id=800 → offset: 800 + 226274 = 227074
     assert remapper.remap(800, "contacts") == 227074
+
+
+# ---------------------------------------------------------------------------
+# T020-8 — identifier and additional_attributes fields preserved
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_identifier_and_attributes_preserved():
+    """identifier and additional_attributes JSON fields copied as-is."""
+    source_rows = [
+        {
+            "id": 9,
+            "account_id": 1,
+            "name": "David",
+            "email": None,
+            "phone_number": None,
+            "identifier": "external_id_123",
+            "additional_attributes": '{"custom": "value"}',
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapper = IDRemapper({"contacts": 100, "accounts": 50})
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = source_rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [{1}, set()]
+
+    migrator = ContactsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logging.getLogger("test_contacts_attrs"),
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contacts_migrator.Table"):
+            migrator.migrate()
+
+    assert remapped_rows[0]["identifier"] == "external_id_123"
+    assert remapped_rows[0]["additional_attributes"] == '{"custom": "value"}'
+
+
+# ---------------------------------------------------------------------------
+# T020-9 — orphan account_id skipped
+# ---------------------------------------------------------------------------
+
+
+def test_contacts_orphan_account_id_skipped():
+    """Contacts with unmigrated account_id are skipped."""
+    source_rows = [
+        {
+            "id": 10,
+            "account_id": 999,
+            "name": "Orphan",
+            "email": None,
+            "phone_number": None,
+            "identifier": None,
+            "additional_attributes": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    remapper = IDRemapper({"contacts": 100, "accounts": 50})
+    source_engine = MagicMock()
+    dest_engine = MagicMock()
+    src_conn = MagicMock()
+    src_conn.__enter__ = MagicMock(return_value=src_conn)
+    src_conn.__exit__ = MagicMock(return_value=False)
+    src_conn.execute.return_value.mappings.return_value.all.return_value = source_rows
+    source_engine.connect.return_value = src_conn
+
+    dest_conn = MagicMock()
+    dest_conn.__enter__ = MagicMock(return_value=dest_conn)
+    dest_conn.__exit__ = MagicMock(return_value=False)
+    dest_engine.connect.return_value = dest_conn
+
+    state_repo = MagicMock(spec=MigrationStateRepository)
+    state_repo.get_migrated_ids.side_effect = [{1}, set()]  # account_id=999 NOT migrated
+
+    migrator = ContactsMigrator(
+        source_engine=source_engine,
+        dest_engine=dest_engine,
+        id_remapper=remapper,
+        state_repo=state_repo,
+        logger=logging.getLogger("test_contacts_orphan"),
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.contacts_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
