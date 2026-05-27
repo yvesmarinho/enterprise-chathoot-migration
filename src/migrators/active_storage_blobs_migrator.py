@@ -181,4 +181,4 @@ class ActiveStorageBlobsMigrator(BaseMigrator):
         """
         from src.reports.poc_reporter import Outcome
 
-        return (Outcome.INSERT, "no FK dependencies")
+        return (Outcome.WOULD_MIGRATE, "no FK dependencies")

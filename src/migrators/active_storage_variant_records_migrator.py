@@ -227,4 +227,4 @@ class ActiveStorageVariantRecordsMigrator(BaseMigrator):
                 f"blob_id={blob_id} not in migrated blobs",
             )
 
-        return (Outcome.INSERT, "blob_id dependency satisfied")
+        return (Outcome.WOULD_MIGRATE, "blob_id dependency satisfied")

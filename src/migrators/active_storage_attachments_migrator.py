@@ -316,4 +316,4 @@ class ActiveStorageAttachmentsMigrator(BaseMigrator):
                 f"record_id={record_id} (record_type={record_type}) not in migrated {table_name}",
             )
 
-        return (Outcome.INSERT, "all FK dependencies satisfied")
+        return (Outcome.WOULD_MIGRATE, "all FK dependencies satisfied")
