@@ -1053,3 +1053,81 @@ def test_conversations_locked_preserved():
 
     assert len(remapped) == 1
     assert remapped[0]["locked"] is True
+
+
+# ---------------------------------------------------------------------------
+# T025-19 — _classify_row_poc POC methods
+# ---------------------------------------------------------------------------
+
+
+def test_conversations_classify_row_poc_clean():
+    """_classify_row_poc returns WOULD_MIGRATE for clean row."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {
+        "account_id": 1,
+        "inbox_id": 10,
+        "contact_id": 50,
+        "assignee_id": 2,
+        "team_id": 3,
+    }
+    migrated_sets = {
+        "accounts": {1},
+        "inboxes": {10},
+        "contacts": {50},
+        "users": {2},
+        "teams": {3},
+    }
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE
+    assert reason == "clean"
+
+
+def test_conversations_classify_row_poc_orphan_account():
+    """_classify_row_poc returns ORPHAN_FK_SKIP for orphan account."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {"account_id": 999, "inbox_id": 10}
+    migrated_sets = {"accounts": {1, 2}, "inboxes": {10}}
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.ORPHAN_FK_SKIP
+    assert "account_id=999" in reason
+
+
+def test_conversations_classify_row_poc_nullable_fk_modification():
+    """_classify_row_poc returns WOULD_MIGRATE_MODIFIED when nullable FKs will be nulled."""
+    from src.reports.poc_reporter import Outcome
+
+    migrator = _make_migrator()
+    row = {
+        "account_id": 1,
+        "inbox_id": 10,
+        "contact_id": 999,
+        "assignee_id": 777,
+        "team_id": 1,
+    }
+    migrated_sets = {
+        "accounts": {1},
+        "inboxes": {10},
+        "contacts": {1, 2},
+        "users": {1, 2},
+        "teams": {1},
+    }
+
+    outcome, reason = migrator._classify_row_poc(row, migrated_sets)
+
+    assert outcome == Outcome.WOULD_MIGRATE_MODIFIED
+    assert "contact_id=999" in reason
+    assert "assignee_id=777" in reason
+
+
+def test_conversations_table_name():
+    """_table_name() returns 'conversations'."""
+    migrator = _make_migrator()
+    assert migrator._table_name() == "conversations"
