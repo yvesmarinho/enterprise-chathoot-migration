@@ -455,3 +455,107 @@ def test_custom_attribute_definitions_classify_row_poc_valid():
 
     assert outcome == Outcome.WOULD_MIGRATE
     assert "clean" in reason
+
+
+# ---------------------------------------------------------------------------
+# T023-9 — Empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_custom_attribute_definitions_empty_source():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    migrator = _make_migrator(source_rows=[])
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    from unittest.mock import patch
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T023-10 — attribute_key field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_custom_attribute_definitions_attribute_key_preserved():
+    """attribute_key field is copied as-is."""
+    rows = [
+        {
+            "id": 22,
+            "account_id": 1,
+            "attribute_key": "custom_key_abc_123",
+            "attribute_display_name": "Display",
+            "attribute_model": "contact",
+            "attribute_values": None,
+            "attribute_type": "text",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    from unittest.mock import patch
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped) == 1
+    assert remapped[0]["attribute_key"] == "custom_key_abc_123"
+
+
+# ---------------------------------------------------------------------------
+# T023-11 — attribute_model field preserved
+# ---------------------------------------------------------------------------
+
+
+def test_custom_attribute_definitions_attribute_model_preserved():
+    """attribute_model field is copied as-is (conversation or contact)."""
+    rows = [
+        {
+            "id": 23,
+            "account_id": 1,
+            "attribute_key": "model_test",
+            "attribute_display_name": "Model",
+            "attribute_model": "conversation",
+            "attribute_values": None,
+            "attribute_type": "dropdown",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
+
+    remapped = []
+
+    def capture(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    from unittest.mock import patch
+    with patch.object(migrator, "_run_batches", side_effect=capture):
+        with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped) == 1
+    assert remapped[0]["attribute_model"] == "conversation"
