@@ -820,10 +820,7 @@ def test_webhooks_events_field_preserved():
             migrator.migrate()
 
     assert len(remapped_rows) == 1
-    assert (
-        remapped_rows[0]["events"]
-        == "conversation_created,conversation_updated,message_created"
-    )
+    assert remapped_rows[0]["events"] == "conversation_created,conversation_updated,message_created"
 
 
 # ---------------------------------------------------------------------------

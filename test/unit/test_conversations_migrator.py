@@ -535,9 +535,7 @@ def test_conversations_subject_preserved():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        {1}, {1}, {1}, {1}, {1}, set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [{1}, {1}, {1}, {1}, {1}, set(), set()]
 
     remapper = IDRemapper(
         {
@@ -618,9 +616,7 @@ def test_conversations_status_preserved():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        {1}, {1}, {1}, {1}, {1}, set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [{1}, {1}, {1}, {1}, {1}, set(), set()]
 
     remapper = IDRemapper(
         {
@@ -662,8 +658,6 @@ def test_conversations_status_preserved():
 # ---------------------------------------------------------------------------
 # T035-14 — Empty source no-op
 # ---------------------------------------------------------------------------
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -708,9 +702,7 @@ def test_conversations_orphan_inbox_skipped():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        {1}, {1}, {1}, {1}, {1}, set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [{1}, {1}, {1}, {1}, {1}, set(), set()]
 
     remapper = IDRemapper(
         {
@@ -790,9 +782,7 @@ def test_conversations_id_remapped_offset():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        {1}, {1}, {1}, {1}, {1}, set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [{1}, {1}, {1}, {1}, {1}, set(), set()]
 
     remapper = IDRemapper(
         {
@@ -860,9 +850,7 @@ def test_conversations_empty_source_no_migration():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        set(), set(), set(), set(), set(), set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [set(), set(), set(), set(), set(), set(), set()]
 
     remapper = IDRemapper(
         {
@@ -943,9 +931,7 @@ def test_conversations_can_reply_preserved():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        {1}, {1}, {1}, {1}, {1}, set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [{1}, {1}, {1}, {1}, {1}, set(), set()]
 
     remapper = IDRemapper(
         {
@@ -1029,9 +1015,7 @@ def test_conversations_locked_preserved():
     dest_engine.connect.return_value = dest_conn
 
     state_repo = MagicMock(spec=MigrationStateRepository)
-    state_repo.get_migrated_ids.side_effect = [
-        {1}, {1}, {1}, {1}, {1}, set(), set()
-    ]
+    state_repo.get_migrated_ids.side_effect = [{1}, {1}, {1}, {1}, {1}, set(), set()]
 
     remapper = IDRemapper(
         {

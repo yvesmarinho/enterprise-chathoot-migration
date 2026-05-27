@@ -305,6 +305,7 @@ def test_messages_orphan_account_id_skipped():
 
 def test_messages_empty_source_no_migration():
     """Empty source rows returns MigrationResult(0 migrated, 0 skipped)."""
+
     def capture(source_rows, table_name, dest_table, remap_fn):
         return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
 

@@ -395,6 +395,7 @@ def test_teams_multiple_teams_same_account():
 
 def test_teams_empty_source_no_migration():
     """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+
     def capture_batches(source_rows, table_name, dest_table, remap_fn):
         return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
 

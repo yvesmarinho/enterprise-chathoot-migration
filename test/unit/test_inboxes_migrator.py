@@ -273,10 +273,10 @@ def test_inboxes_channel_id_remapped():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
-    
+
     # Mock _migrate_channels to return a channel_id_map
     channel_id_map = {("Channel::WebWidget", 5): 100}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_id_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -314,10 +314,10 @@ def test_inboxes_channel_id_kept_when_unmapped():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
-    
+
     # Empty channel_id_map — channel_id 999 not present
     channel_id_map = {("Channel::Api", 1): 50}  # different id
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_id_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -356,7 +356,7 @@ def test_inboxes_channel_id_none_unchanged():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
-    
+
     with patch.object(migrator, "_migrate_channels", return_value={}):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -453,7 +453,7 @@ def test_inboxes_migrate_channels_basic():
     dest_conn.__exit__ = MagicMock(return_value=False)
     dest_conn.begin.return_value.__enter__ = MagicMock(return_value=None)
     dest_conn.begin.return_value.__exit__ = MagicMock(return_value=False)
-    
+
     # No merged accounts, so initial fetch returns empty
     dest_conn.execute.return_value.fetchall.return_value = []
     dest_engine.connect.return_value = dest_conn
@@ -464,7 +464,9 @@ def test_inboxes_migrate_channels_basic():
         set(),  # already_migrated
     ]
 
-    remapper = IDRemapper({"inboxes": 151, "accounts": 20, "channel_web_widgets": 1000, "channel_telegram": 500})
+    remapper = IDRemapper(
+        {"inboxes": 151, "accounts": 20, "channel_web_widgets": 1000, "channel_telegram": 500}
+    )
     logger = logging.getLogger("test_inboxes_migrate_channels")
 
     migrator = InboxesMigrator(
@@ -747,13 +749,13 @@ def test_inboxes_channel_fields_preserved_all_types():
         return MigrationResult(table=table_name, total_source=3, migrated=3, skipped=0)
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
-    
+
     channel_map = {
         ("Channel::WebWidget", 50): 100,
         ("Channel::Api", 51): 101,
         ("Channel::FacebookPage", 52): 102,
     }
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -827,10 +829,10 @@ def test_inboxes_channel_id_map_tuple_key_lookup():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
-    
+
     # Map entry uses (channel_type, src_channel_id) tuple as key
     channel_map = {("Channel::Api", 60): 3000}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -872,7 +874,7 @@ def test_inboxes_name_preserved():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     channel_map = {("Channel::WebWidget", 70): 3001}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -933,7 +935,7 @@ def test_inboxes_multiple_accounts_different_channels():
         ("Channel::Api", 72): 3003,
         ("Channel::FacebookPage", 73): 3004,
     }
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -977,7 +979,7 @@ def test_inboxes_enable_polling_preserved():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     channel_map = {("Channel::WebWidget", 74): 3005}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1016,7 +1018,7 @@ def test_inboxes_orphan_account_skipped():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1, 2})
     channel_map = {}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1056,7 +1058,7 @@ def test_inboxes_id_remapping_offset():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     channel_map = {("Channel::WebWidget", 76): 3006}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1081,7 +1083,7 @@ def test_inboxes_empty_source_no_migration():
 
     migrator = _make_migrator(source_rows=rows)
     channel_map = {}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1122,7 +1124,7 @@ def test_inboxes_channel_type_preserved():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     channel_map = {("Channel::Email", 77): 3007}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1163,7 +1165,7 @@ def test_inboxes_enable_polling_preserved():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     channel_map = {("Channel::Email", 78): 3008}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1204,7 +1206,7 @@ def test_inboxes_channel_id_remapped_from_map():
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     # Simulate channel_id remapping: (Channel::WebWidget, 79) -> 9999
     channel_map = {("Channel::WebWidget", 79): 9999}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1268,7 +1270,7 @@ def test_inboxes_multiple_different_accounts_filtered():
         ("Channel::WebWidget", 80): 4000,
         ("Channel::Email", 82): 4001,
     }
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):
@@ -1311,7 +1313,7 @@ def test_inboxes_name_preserved_special_chars():
 
     migrator = _make_migrator(source_rows=rows, migrated_accounts={1})
     channel_map = {("Channel::WebWidget", 83): 4002}
-    
+
     with patch.object(migrator, "_migrate_channels", return_value=channel_map):
         with patch.object(migrator, "_run_batches", side_effect=capture_batches):
             with patch("src.migrators.inboxes_migrator.Table"):

@@ -437,6 +437,7 @@ def test_canned_responses_empty_source():
         return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
 
     from unittest.mock import patch
+
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.canned_responses_migrator.Table"):
             result = migrator.migrate()
@@ -476,6 +477,7 @@ def test_canned_responses_short_code_preserved():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     from unittest.mock import patch
+
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.canned_responses_migrator.Table"):
             migrator.migrate()
@@ -515,6 +517,7 @@ def test_canned_responses_content_preserved():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     from unittest.mock import patch
+
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.canned_responses_migrator.Table"):
             migrator.migrate()

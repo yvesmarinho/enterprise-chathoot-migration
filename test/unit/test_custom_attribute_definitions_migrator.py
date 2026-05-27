@@ -470,6 +470,7 @@ def test_custom_attribute_definitions_empty_source():
         return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
 
     from unittest.mock import patch
+
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
             result = migrator.migrate()
@@ -512,6 +513,7 @@ def test_custom_attribute_definitions_attribute_key_preserved():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     from unittest.mock import patch
+
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
             migrator.migrate()
@@ -553,6 +555,7 @@ def test_custom_attribute_definitions_attribute_model_preserved():
         return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
 
     from unittest.mock import patch
+
     with patch.object(migrator, "_run_batches", side_effect=capture):
         with patch("src.migrators.custom_attribute_definitions_migrator.Table"):
             migrator.migrate()
