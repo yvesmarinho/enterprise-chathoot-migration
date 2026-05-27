@@ -256,3 +256,148 @@ def test_inbox_members_mixed_inboxes_users_partial_skip():
     assert len(skipped_rows) == 2
     assert 7 in skipped_rows  # orphan inbox_id
     assert 8 in skipped_rows  # orphan user_id
+
+
+# ---------------------------------------------------------------------------
+# T027-6 — empty source no-op
+# ---------------------------------------------------------------------------
+
+
+def test_inbox_members_empty_source_no_migration():
+    """Empty source returns MigrationResult(0 migrated, 0 skipped)."""
+    migrator, _ = _make_migrator(source_rows=[])
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        return MigrationResult(table=table_name, total_source=0, migrated=0, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inbox_members_migrator.Table"):
+            result = migrator.migrate()
+
+    assert result.total_source == 0
+    assert result.migrated == 0
+    assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# T027-7 — ID remapping with offset
+# ---------------------------------------------------------------------------
+
+
+def test_inbox_members_id_remapping_offset():
+    """ID is remapped with offset_inbox_members."""
+    rows = [
+        {
+            "id": 100,
+            "inbox_id": 2,
+            "user_id": 3,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=rows,
+        migrated={"inboxes": {2}, "users": {3}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=1, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inbox_members_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 1
+    assert remapped_rows[0]["id"] == 100 + 30  # offset_inbox_members = 30
+    assert remapped_rows[0]["inbox_id"] == 2 + 100  # offset_inboxes = 100
+    assert remapped_rows[0]["user_id"] == 3 + 200  # offset_users = 200
+
+
+# ---------------------------------------------------------------------------
+# T027-8 — Multiple members same inbox
+# ---------------------------------------------------------------------------
+
+
+def test_inbox_members_multiple_same_inbox():
+    """Multiple members in same inbox all migrated."""
+    rows = [
+        {
+            "id": 9,
+            "inbox_id": 3,
+            "user_id": 4,
+            "created_at": None,
+            "updated_at": None,
+        },
+        {
+            "id": 10,
+            "inbox_id": 3,
+            "user_id": 5,
+            "created_at": None,
+            "updated_at": None,
+        },
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=rows,
+        migrated={"inboxes": {3}, "users": {4, 5}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=2, migrated=2, skipped=0)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inbox_members_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 2
+
+
+# ---------------------------------------------------------------------------
+# T027-9 — Both FKs unmigrated (double orphan)
+# ---------------------------------------------------------------------------
+
+
+def test_inbox_members_both_fks_unmigrated_skipped():
+    """Inbox member with both unmigrated FKs is skipped."""
+    rows = [
+        {
+            "id": 11,
+            "inbox_id": 999,
+            "user_id": 999,
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
+
+    migrator, _ = _make_migrator(
+        source_rows=rows,
+        migrated={"inboxes": {1}, "users": {1}},
+    )
+
+    remapped_rows = []
+
+    def capture_batches(source_rows, table_name, dest_table, remap_fn):
+        for row in source_rows:
+            r = remap_fn(row)
+            if r is not None:
+                remapped_rows.append(r)
+        return MigrationResult(table=table_name, total_source=1, migrated=0, skipped=1)
+
+    with patch.object(migrator, "_run_batches", side_effect=capture_batches):
+        with patch("src.migrators.inbox_members_migrator.Table"):
+            migrator.migrate()
+
+    assert len(remapped_rows) == 0
