@@ -1,11 +1,12 @@
 """Migrator for the ``messages`` entity.
 
-:description: Remaps three FK columns:
+:description: Remaps four FK columns:
 
     * ``id``                → ``id + offset_messages``
     * ``account_id``        → ``account_id + offset_accounts``      (required — skip on orphan)
     * ``conversation_id``   → ``conversation_id + offset_conversations``
                               (nullable — skip record on orphan)
+    * ``inbox_id``          → ``inbox_id + offset_inboxes``         (required — skip on orphan)
     * ``sender_id``         → polymorphic: when ``sender_type='User'`` remaps via users
                               offset; when ``sender_type='Contact'`` remaps via contacts
                               offset; otherwise NULLed out (AgentBot, etc.).
@@ -15,6 +16,11 @@
     output automatically by the attached ``MaskingHandler``.
 
     This is the largest entity (~310,155 records → ~621 batches of 500).
+    
+    BUG FIX (2026-05-28): Added missing ``inbox_id`` remapping. Previously,
+    messages.inbox_id was not remapped, causing FK orphans when inbox IDs
+    were offset during migration. This caused ERROR 500 when loading
+    conversations (nil.instagram? error).
 """
 
 from __future__ import annotations
@@ -63,6 +69,7 @@ class MessagesMigrator(BaseMigrator):
         with self.dest_engine.connect() as conn:
             migrated_accounts = self.state_repo.get_migrated_ids(conn, "accounts")
             migrated_conversations = self.state_repo.get_migrated_ids(conn, "conversations")
+            migrated_inboxes = self.state_repo.get_migrated_ids(conn, "inboxes")
             migrated_users = self.state_repo.get_migrated_ids(conn, "users")
             migrated_contacts = self.state_repo.get_migrated_ids(conn, "contacts")
 
@@ -106,6 +113,19 @@ class MessagesMigrator(BaseMigrator):
                     )
                     return None
                 new_row["conversation_id"] = self.id_remapper.remap(conv_id_origin, "conversations")
+
+            # Required FK: inbox_id — skip record on orphan (BUG FIX 2026-05-28)
+            inbox_id = row.get("inbox_id")
+            if inbox_id is not None:
+                inbox_id_origin = int(inbox_id)
+                if inbox_id_origin not in migrated_inboxes:
+                    self.logger.warning(
+                        "MessagesMigrator: id=%d skipped — orphan inbox_id=%d",
+                        id_origin,
+                        inbox_id_origin,
+                    )
+                    return None
+                new_row["inbox_id"] = self.id_remapper.remap(inbox_id_origin, "inboxes")
 
             # Nullable FK: sender_id — polymorphic on sender_type
             # When sender_type='User', sender_id → users.id
@@ -166,7 +186,7 @@ class MessagesMigrator(BaseMigrator):
     ) -> tuple:
         """Classify a messages row for POC dry-run.
 
-        Required FKs (skip on orphan): ``account_id``, ``conversation_id``.
+        Required FKs (skip on orphan): ``account_id``, ``conversation_id``, ``inbox_id``.
         Nullable FK (NULL-out): ``sender_id``.
 
         :param row: Source row as plain dict.
@@ -180,6 +200,7 @@ class MessagesMigrator(BaseMigrator):
 
         accts = migrated_sets.get("accounts", set())
         convs = migrated_sets.get("conversations", set())
+        inboxes = migrated_sets.get("inboxes", set())
         users = migrated_sets.get("users", set())
 
         account_id = int(row["account_id"])
@@ -194,6 +215,13 @@ class MessagesMigrator(BaseMigrator):
             return (
                 Outcome.ORPHAN_FK_SKIP,
                 f"conversation_id={conv_id} not in migrated conversations",
+            )
+
+        inbox_id = row.get("inbox_id")
+        if inbox_id is not None and int(inbox_id) not in inboxes:
+            return (
+                Outcome.ORPHAN_FK_SKIP,
+                f"inbox_id={inbox_id} not in migrated inboxes",
             )
 
         sender_id = row.get("sender_id")
