@@ -57,6 +57,9 @@ from src.migrators.contacts_migrator import ContactsMigrator
 from src.migrators.conversation_labels_migrator import (
     ConversationLabelsMigrator,
 )
+from src.migrators.conversation_participants_migrator import (
+    ConversationParticipantsMigrator,
+)
 from src.migrators.conversations_migrator import ConversationsMigrator
 from src.migrators.custom_attribute_definitions_migrator import (
     CustomAttributeDefinitionsMigrator,
@@ -64,6 +67,7 @@ from src.migrators.custom_attribute_definitions_migrator import (
 from src.migrators.inboxes_migrator import InboxesMigrator
 from src.migrators.inbox_members_migrator import InboxMembersMigrator
 from src.migrators.labels_migrator import LabelsMigrator
+from src.migrators.mentions_migrator import MentionsMigrator
 from src.migrators.messages_migrator import MessagesMigrator
 from src.migrators.team_members_migrator import TeamMembersMigrator
 from src.migrators.teams_migrator import TeamsMigrator
@@ -109,6 +113,8 @@ _MIGRATION_ORDER = [
     "contact_inboxes",
     "conversations",
     "messages",
+    "mentions",  # FK: conversation, user, account
+    "conversation_participants",  # FK: conversation, user, account
     "attachments",
     "active_storage_blobs",  # Root table — no FK dependencies
     "active_storage_attachments",  # FK: blob_id, record_id (polymorphic)
@@ -131,6 +137,8 @@ _MIGRATOR_MAP = {
     "contact_inboxes": ContactInboxesMigrator,
     "conversations": ConversationsMigrator,
     "messages": MessagesMigrator,
+    "mentions": MentionsMigrator,
+    "conversation_participants": ConversationParticipantsMigrator,
     "attachments": AttachmentsMigrator,
     "active_storage_blobs": ActiveStorageBlobsMigrator,
     "active_storage_attachments": ActiveStorageAttachmentsMigrator,
