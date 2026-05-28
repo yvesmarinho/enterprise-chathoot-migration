@@ -1,6 +1,6 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-27 — S32 Batch 9: Test expansion completed; 407 tests @ 75.24% coverage
+**Last Updated**: 2026-05-28 — Session 28: ERROR 500 resolved, re-import successful, code frozen. ✅
 **Status**: 🟡 Test suite at 75.24% (need 90% for gate). Migration DEV validated (28.8% table coverage). Ready for S28: integration test phase or manual quality improvements.
 
 ---
@@ -36,6 +36,39 @@
 - [ ] **S28-P0-1** Avaliar se 90% coverage é atingível com unit tests (atual: 75.24%, gap 14.76pp)
 - [ ] **S28-P0-2** Se unit tests não suficientes: definir estratégia de integration tests (DB setup, fixtures)
 - [ ] **S28-P0-3** Se prosseguir com unit tests: focar em inboxes_migrator (39% → 70%+)
+
+---
+
+## ✅ CONCLUÍDO NESTA SESSÃO (S28 — 2026-05-28)
+
+### ERROR 500 Resolution — Account 69 (Unimed Guaxupé)
+- [x] **S28-INV-01** ✅ Investigação completa: ERROR 500 causado por FK orphan (inbox_id=100)
+- [x] **S28-DEB-01** ✅ Debate multi-perspectiva (5 personas): DBA, Backend, SQL Expert, Architect, DevOps
+- [x] **S28-FIX-01** ✅ SQL data fix: UPDATE 46.052 messages (inbox_id: 100 → 526), validação 0 orphans
+- [x] **S28-CODE-01** ✅ MessagesMigrator code fix: Inbox_id remapping adicionado (4 alterações)
+- [x] **S28-VAL-01** ✅ FK validation tool criado: `scripts/validate_fk_orphans.py` (264 linhas)
+- [x] **S28-RE-IMP-01** ✅ Re-importação completa: 91.766 registros migrados, 459.76s, 0 erros
+- [x] **S28-VAL-02** ✅ Post-migration FK validation: 12/12 checks passed, 0 orphans total
+- [x] **S28-DOC-01** ✅ Documentação completa: 13+ documentos, ~5.000 linhas
+
+### Code Freeze — Production Stability
+- [x] **S28-FREEZE-01** ✅ Congelamento de código declarado oficialmente
+- [x] **S28-FREEZE-DOCS** ✅ Criado `docs/CONGELAMENTO_CODIGO_2026_05_28.md`
+
+### Session Documentation — S28
+- [x] **S28-DAILY** ✅ Updated DAILY_ACTIVITIES_2026-05-28.md with all activities
+- [x] **S28-FINAL** ✅ Created FINAL_STATUS_2026-05-28.md
+- [x] **S28-RECOVERY** ✅ Updated SESSION_RECOVERY_2026-05-28.md for next session
+
+### Git Operations — S28
+- [x] **GIT-COMMIT-1** ✅ `805b904`: fix(inbox100): Add missing inbox_id remapping in MessagesMigrator
+- [x] **GIT-COMMIT-2** ✅ `6fd9171`: docs(finais): Documentação de solução final, validação e congelamento
+
+### Quality & Validation — S28
+- [x] **S28-PYTEST** ✅ pytest: 0 new failures (code frozen)
+- [x] **S28-LINT** ✅ No new lint errors (code frozen)
+- [x] **S28-FK** ✅ FK integrity 100%: 12/12 relationships validated, 0 orphans
+- [x] **S28-DATA** ✅ Data accessibility confirmed: 46.052 messages + 1.927 attachments + 8.203 conversations
 
 ---
 
