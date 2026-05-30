@@ -1,6 +1,6 @@
 # 🔍 EXPLICAÇÃO TÉCNICA: Por que inbox_id 100 é o problema?
 
-**Data**: 2026-05-28  
+**Data**: 2026-05-28
 **Assunto**: Root cause análise - FK Orphan durante migração
 
 ---
@@ -26,9 +26,9 @@ Account 25: Unimed Guaxupé
     └── 46.052 messages
 ```
 
-✅ **Inbox 100 existe** em SOURCE  
-✅ **Válido** - referenciado por messages  
-✅ **Correto** - Account 25 usa inbox_id = 100  
+✅ **Inbox 100 existe** em SOURCE
+✅ **Válido** - referenciado por messages
+✅ **Correto** - Account 25 usa inbox_id = 100
 
 ### Na DEST (chatwoot004_dev1_db) - Account 69
 
@@ -38,9 +38,9 @@ Account 69: Unimed Guaxupé
     └── 46.052 messages (ANTES DO FIX: apontavam para 100 ❌)
 ```
 
-❌ **Inbox 100 NÃO existe** em DEST  
-❌ **Referência quebrada** - messages apontavam para nada  
-✅ **Inbox correto** - 526 é o novo ID em DEST  
+❌ **Inbox 100 NÃO existe** em DEST
+❌ **Referência quebrada** - messages apontavam para nada
+✅ **Inbox correto** - 526 é o novo ID em DEST
 
 ---
 
@@ -108,15 +108,15 @@ DEST (chatwoot004_dev1_db)
 2. Rails Controller: Serializar conversations
 
 3. Serializer: Para cada message, chamar inbox.instagram?
-   
+
 4. Query: Inbox.find(message.inbox_id)
-   
+
 5. message.inbox_id = 100 (valor antigo não remapeado)
-   
+
 6. SELECT * FROM inboxes WHERE id = 100
-   
+
 7. Resultado: NULL (inbox 100 não existe em DEST)
-   
+
 8. message.inbox = nil
 
 9. Rails tenta: nil.instagram?
@@ -212,16 +212,16 @@ class InboxesMigrator:
         for inbox in inboxes:
             new_inbox_id = create_inbox(inbox)
             self.id_remapper.register('inboxes', inbox['id'], new_inbox_id)
-        
+
         # ❌ INCOMPLETO - não remapeia as messages!
         # Precisa fazer:
-        
+
         self.remapper.apply_to_table(
             table='messages',
             column='inbox_id',
             mapping=self.id_remapper.get_mapping('inboxes')
         )
-        
+
         # Depois validar:
         orphaned = self.validate_no_orphans(
             table='messages',
@@ -275,7 +275,7 @@ Depois: 46.052 messages com inbox_id = 526 (existe)
 
 ### ❓ Esse é o inbox_id da Unimed Guaxupé?
 
-**Resposta**: 
+**Resposta**:
 - ✅ **SIM** - em SOURCE (Account 25, chatwoot_db)
 - ❌ **NÃO** - em DEST (Account 69, chatwoot004_dev1_db)
 - 📍 **Em DEST, o inbox correto é 526**

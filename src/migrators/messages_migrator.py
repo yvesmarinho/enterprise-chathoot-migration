@@ -16,7 +16,7 @@
     output automatically by the attached ``MaskingHandler``.
 
     This is the largest entity (~310,155 records → ~621 batches of 500).
-    
+
     BUG FIX (2026-05-28): Added missing ``inbox_id`` remapping. Previously,
     messages.inbox_id was not remapped, causing FK orphans when inbox IDs
     were offset during migration. This caused ERROR 500 when loading

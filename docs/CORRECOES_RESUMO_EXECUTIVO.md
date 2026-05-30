@@ -1,6 +1,6 @@
 # ✅ CORREÇÕES DE CÓDIGO APLICADAS - RESUMO EXECUTIVO
 
-**Data**: 2026-05-28 12:54  
+**Data**: 2026-05-28 12:54
 **Status**: 🟢 **COMPLETO E VALIDADO**
 
 ---
@@ -140,7 +140,7 @@ MIGRATION_DEST_KEY=vya-chat-dev \
 
 ### Código
 - [x] MessagesMigrator.migrate() updated
-- [x] MessagesMigrator.remap_fn() updated  
+- [x] MessagesMigrator.remap_fn() updated
 - [x] MessagesMigrator._classify_row_poc() updated
 - [x] Docstring updated com BUG FIX note
 

@@ -1,7 +1,7 @@
 # 🔧 CORREÇÕES DE CÓDIGO - Investigação Inbox 100
 
-**Data**: 2026-05-28  
-**Status**: ✅ COMPLETO  
+**Data**: 2026-05-28
+**Status**: ✅ COMPLETO
 
 ---
 
@@ -89,7 +89,7 @@ def _classify_row_poc(...):
 def _classify_row_poc(...):
     """Required FKs: account_id, conversation_id, inbox_id"""
     inboxes = migrated_sets.get("inboxes", set())
-    
+
     inbox_id = row.get("inbox_id")
     if inbox_id is not None and int(inbox_id) not in inboxes:
         return (
@@ -147,7 +147,7 @@ Account 25 (SOURCE)        Account 69 (DEST - BUGGY)
 └─ inbox_id = 100          └─ inbox_id = 100 ❌ (orphaned!)
 ```
 
-**Resultado**: 
+**Resultado**:
 - Rails tries: Inbox.find(100)
 - Database: No inbox with id=100
 - message.inbox = nil

@@ -1,8 +1,8 @@
 # ✅ STATUS DE VALIDAÇÃO - MENSAGENS E ANEXOS ACESSÍVEIS
 
-**Data**: 2026-05-28  
-**Hora**: 13:14 UTC  
-**Account**: 69 (Unimed Guaxupé)  
+**Data**: 2026-05-28
+**Hora**: 13:14 UTC
+**Account**: 69 (Unimed Guaxupé)
 **Status**: 🟢 **OPERACIONAL - TODOS OS DADOS ACESSÍVEIS**
 
 ---

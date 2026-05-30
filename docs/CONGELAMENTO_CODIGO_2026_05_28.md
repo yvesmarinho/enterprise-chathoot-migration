@@ -1,8 +1,8 @@
 # 🔐 CONGELAMENTO DE CÓDIGO - DECLARAÇÃO OFICIAL
 
-**Data**: 2026-05-28 13:14 UTC  
-**Status**: ATIVO - Imediato e Indefinido  
-**Escopo**: TODO o código do projeto  
+**Data**: 2026-05-28 13:14 UTC
+**Status**: ATIVO - Imediato e Indefinido
+**Escopo**: TODO o código do projeto
 **Autoridade**: DevOps / Project Manager
 
 ---
