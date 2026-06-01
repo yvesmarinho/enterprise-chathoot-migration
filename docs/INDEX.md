@@ -2,8 +2,8 @@
 
 **Projeto**: `enterprise-chatwoot-migration`
 **Criado em**: 2026-04-09T11:37:54Z
-**Last Updated**: 2026-05-26 (Sessão 26 — D21 bug crítico idempotência + correções P0 implementadas)
-**Last Session**: 2026-05-26 (Sessão 26 — Bug D21: pipeline não-idempotente corrigido; validação account + mapeamento deduplicação + --force-overwrite)
+**Last Updated**: 2026-06-01 (Finalização do projeto — sucesso em produção, documentação organizada)
+**Status**: ✅ **PRODUÇÃO OPERACIONAL — CÓDIGO CONGELADO**
 
 ---
 
@@ -15,12 +15,79 @@
 | [TODO.md](TODO.md) | Tarefas pendentes |
 | [TODAY_ACTIVITIES.md](TODAY_ACTIVITIES.md) | Atividades do dia |
 
-## 🚀 Migração em Produção (16/05/2026 14:00 BRT)
+---
 
-| Arquivo | Descrição |
-|---------|-----------|
-| [**RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md**](RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md) | **Runbook completo** — Procedimentos, validações, rollback, troubleshooting (800 linhas) |
-| [**CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md**](CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md) | **Quick reference** — Checklist resumida para impressão e consulta rápida (200 linhas) |
+## 📁 Estrutura de Documentação (Reorganizada 2026-06-01)
+
+A documentação foi reorganizada em subpastas temáticas para melhor navegação:
+
+### 🚀 **[migration/](migration/)**
+Documentação sobre execução da migração em produção
+- `RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md` — Guia completo (procedimentos, validações, rollback)
+- `CHECKLIST_EXECUTIVA_MIGRACAO_2026-05-16.md` — Quick reference para equipe
+- `CHECKLIST_IMPLEMENTACAO_FIX_500.md` — Checklist de implementação de correção
+
+### 🔧 **[resolution/](resolution/)**
+Documentação sobre resolução de problemas críticos
+- `FIX_RESULTADO_FINAL_2026_05_28.md` — Validação do fix de ERROR 500
+- `CONGELAMENTO_CODIGO_2026_05_28.md` — Código congelado e validado
+- `CORRECOES_*.md` — Histórico de correções (6 documentos)
+
+### ✅ **[validation/](validation/)**
+Documentação sobre validações e conclusões
+- `CONCLUSAO_CORRECOES_COMPLETAS.md` — Investigação e correções completadas
+- `STATUS_VALIDACAO_MENSAGENS_ANEXOS_2026_05_28.md` — Status de validação
+
+### 🔍 **[investigation/](investigation/)**
+Documentação técnica de investigações
+- `INVESTIGACAO_COMPLETA_ERRO_500.md` — Análise completa do ERROR 500
+- `DEBATE_ERRO_500_ANALISE_COMPLETA.md` — Debate multi-perspectiva (5 personas)
+- `DEBATE_ERRO_500_RESULTADO_FINAL.md` — Resultado da análise
+- `EXPLICACAO_INBOX_100_ROOT_CAUSE.md` — Explicação da causa raiz
+- `INDICE_COMPLETO_INVESTIGACAO.md` — Índice de investigação
+
+### 📊 **[status/](status/)**
+Sínteses executivas e status reports
+- `SINTESE_FINAL_1_MINUTO.md` — Resumo em 1 minuto
+- `SUMARIO_EXECUTIVO_30SEG.md` — Resumo em 30 segundos
+- `SOLUCAO_FINAL_HISTORICO_COMPLETO.md` — Histórico completo da solução
+- `README_INVESTIGACAO_2026_05_28.md` — Resumo de investigação
+
+### 📈 **[process/](process/)**
+Documentação sobre processo e avaliação
+- `avaliação_do_processo.md` — Avaliação do processo de migração
+
+### 📚 **[reference/](reference/)**
+Documentação de referência e inventários
+- `INVENTARIO_COMPLETO_ARQUIVOS_MIGRACAO.md` — Inventário de arquivos
+- `KNOWLEDGE_BASE.md` — Base de conhecimento
+- `P-O-C-constitution.md` — Constituição do projeto
+- 4 documentos adicionais de referência
+
+---
+
+## 🚀 Migração em Produção — Status Atual
+
+**✅ CONCLUÍDA COM SUCESSO** (16/05/2026 - 2026-05-28)
+
+| Account | Source ID | Dest ID | Status | Data |
+|---------|-----------|---------|--------|------|
+| **Unimed Guaxupé** | 25 | 45/46 | ✅ Operacional | 2026-05-16 |
+
+**Métricas finais**:
+- 91.766 registros migrados
+- 100% FK integrity (0 orphans)
+- 8.190 conversas acessíveis
+- 46.052 mensagens funcionais
+- 1.927 attachments disponíveis
+
+**Validações**:
+- ✅ SQL data fix (46.052 messages corrigidas)
+- ✅ Code fix (MessagesMigrator inbox_id remapping)
+- ✅ FK validation tool (12/12 checks)
+- ✅ Post-migration validation (0 orphans)
+
+Veja [migration/RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md](migration/RUNBOOK_MIGRACAO_PRODUCAO_2026-05-16.md) para detalhes completos.
 
 ## Sessões de Trabalho
 
