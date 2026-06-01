@@ -1,7 +1,7 @@
 # 📝 TODO — Enterprise Chatwoot Migration
 
-**Last Updated**: 2026-05-28 — Session 28: ERROR 500 resolved, re-import successful, code frozen. ✅
-**Status**: 🟡 Test suite at 75.24% (need 90% for gate). Migration DEV validated (28.8% table coverage). Ready for S28: integration test phase or manual quality improvements.
+**Last Updated**: 2026-06-01 — Session 29: Project finalization complete. Production migration successful, docs reorganized. ✅
+**Status**: ✅ Produção operacional — Unimed Guaxupé migrada (91.766 registros). Código congelado (75.24% coverage). Documentação reorganizada (7 subpastas temáticas).
 
 ---
 
@@ -39,7 +39,17 @@
 
 ---
 
-## ✅ CONCLUÍDO NESTA SESSÃO (S28 — 2026-05-28)
+## ✅ CONCLUÍDO NESTA SESSÃO (S29 — 2026-06-01)
+
+### Finalização de Projeto
+- [x] **S29-FIN-01** ✅ Adicionar status de sucesso ao RUNBOOK (90+ linhas, métricas finais)
+- [x] **S29-FIN-02** ✅ Verificar códigos reutilizáveis em .tmp (nenhum código encontrado)
+- [x] **S29-FIN-03** ✅ Limpar pastas .tmp e logs (15 arquivos removidos)
+- [x] **S29-FIN-04** ✅ Reorganizar ./docs em 7 subpastas temáticas (29 arquivos movidos)
+- [x] **S29-GIT-01** ✅ Commit d658cea: chore(finalize): Project finalization
+- [x] **S29-GIT-02** ✅ Commit eaa7c52: chore(session-29): Session end ritual — finalization complete
+
+### Sessão Anterior (S28 — 2026-05-28)
 
 ### ERROR 500 Resolution — Account 69 (Unimed Guaxupé)
 - [x] **S28-INV-01** ✅ Investigação completa: ERROR 500 causado por FK orphan (inbox_id=100)
