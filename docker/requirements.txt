@@ -2,7 +2,7 @@
 # Atualizar aqui quando pyproject.toml mudar.
 sqlalchemy==2.0.49
 psycopg2-binary==2.9.11
-alembic==1.18.4
+alembic==1.18.5
 pandas>=2.2.0
 requests>=2.33.1
 # Security: pin vulnerable transitive deps (Dependabot alerts #1-#4)
